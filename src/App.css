@@ -193,3 +193,54 @@
   width: 100%;
   height: auto;
 }
+
+/* --------------------------------------------------------------------------------- */
+/* Contenedor común del vídeo y del canvas. */
+.camera-container {
+  /* Permite posicionar el canvas respecto a este contenedor. */
+  position: relative;
+
+  /* Se adapta a pantallas pequeñas. */
+  width: 100%;
+
+  /* Tamaño máximo en pantallas grandes. */
+  max-width: 640px;
+}
+
+/* Imagen de la webcam. */
+.camera-video {
+  /* Ocupa todo el ancho disponible. */
+  width: 100%;
+
+  /* Mantiene la proporción original. */
+  height: auto;
+
+  /* Evita espacios adicionales debajo del vídeo. */
+  display: block;
+}
+
+/* Capa donde dibujaremos landmarks y conexiones. */
+.camera-canvas {
+  /* Lo colocamos encima del vídeo. */
+  position: absolute;
+
+  /* Coincide con la esquina superior izquierda del vídeo. */
+  top: 0;
+  left: 0;
+
+  /* Ocupa exactamente el mismo espacio visual que el vídeo. */
+  width: 100%;
+  height: 100%;
+
+  /* Garantiza que esté por encima de la cámara. */
+  z-index: 10;
+
+  /* El canvas sigue siendo transparente salvo donde dibujemos. */
+  background: transparent;
+
+  /* Evita que el canvas bloquee clics. */
+  pointer-events: none;
+
+  /* Evita comportamientos extraños del elemento inline. */
+  display: block;
+}
