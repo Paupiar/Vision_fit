@@ -1,9 +1,9 @@
 // Importamos useEffect para gestionar el ciclo de vida del componente
-// y useRef para acceder directamente al <video> y al <canvas>.
+// y useRef para acceder al vídeo, canvas y animación.
 import { useEffect, useRef } from "react";
 
-// Definimos un tipo sencillo para representar un punto 2D.
-// De momento solo necesitamos las coordenadas x e y.
+// Definimos la estructura básica de un punto 2D.
+// x e y serán coordenadas normalizadas entre 0 y 1.
 interface Punto {
   x: number;
   y: number;
@@ -11,31 +11,33 @@ interface Punto {
 
 function CameraPreview() {
   // Referencia al elemento <video>.
-  // Nos permite conectar la webcam con el vídeo de la página.
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Referencia al elemento <canvas>.
-  // Nos permite dibujar puntos y líneas encima de la webcam.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  // Guardamos aquí el identificador de requestAnimationFrame.
+  // Nos permitirá detener la animación posteriormente.
+  const animationFrameRef = useRef<number | null>(null);
+
   useEffect(function () {
-    // Aquí guardaremos el stream recibido de la cámara.
+    // Guardaremos aquí el stream recibido de la webcam.
     let stream: MediaStream | null = null;
 
-    // Sirve para saber si el componente sigue montado.
+    // Permite saber si CameraPreview sigue montado.
     let componenteActivo = true;
 
-    // Función asíncrona que solicita acceso a la webcam.
+    // Función encargada de solicitar acceso a la webcam.
     async function iniciarCamara() {
       try {
-        // Pedimos acceso solo al vídeo.
+        // Pedimos acceso solamente al vídeo.
         const nuevoStream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: false
         });
 
-        // Si el componente ya se desmontó mientras esperábamos,
-        // detenemos el stream inmediatamente.
+        // Si el componente se desmontó mientras esperábamos
+        // a recibir la cámara, detenemos el stream inmediatamente.
         if (!componenteActivo) {
           nuevoStream.getTracks().forEach(function (track) {
             track.stop();
@@ -47,47 +49,50 @@ function CameraPreview() {
         // Guardamos el stream para poder detenerlo después.
         stream = nuevoStream;
 
-        // Comprobamos que el elemento <video> exista.
+        // Comprobamos que exista el elemento <video>.
         if (videoRef.current) {
           // Conectamos la webcam con el vídeo.
           videoRef.current.srcObject = stream;
         }
       } catch (error) {
-        // Mostramos cualquier problema relacionado con la cámara.
+        // Mostramos cualquier problema relacionado con la webcam.
         console.error("No se pudo acceder a la cámara:", error);
       }
     }
 
-    // Iniciamos la cámara cuando aparece CameraPreview.
+    // Iniciamos la cámara cuando aparece el componente.
     iniciarCamara();
 
-    // Esta función se ejecuta al desmontar CameraPreview.
+    // Esta función se ejecuta cuando CameraPreview se desmonta.
     return function detenerCamara() {
-      // Indicamos que el componente ya no está activo.
+      // Indicamos que el componente ha dejado de estar activo.
       componenteActivo = false;
 
-      // Si existe un stream, detenemos todas sus pistas.
+      // Detenemos la animación del canvas si existe.
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+
+      // Detenemos todas las pistas de la webcam.
       if (stream) {
         stream.getTracks().forEach(function (track) {
           track.stop();
         });
       }
 
-      // Desconectamos también el stream del elemento <video>.
+      // Desconectamos el stream del elemento <video>.
       if (videoRef.current) {
         videoRef.current.srcObject = null;
       }
     };
   }, []);
 
-  // Convierte un punto con coordenadas normalizadas
+  // Convierte coordenadas normalizadas entre 0 y 1
   // a coordenadas reales en píxeles del canvas.
   function convertirAPixeles(
     punto: Punto,
     canvas: HTMLCanvasElement
   ): Punto {
-    // Multiplicamos la coordenada normalizada
-    // por las dimensiones reales del canvas.
     return {
       x: punto.x * canvas.width,
       y: punto.y * canvas.height
@@ -102,7 +107,7 @@ function CameraPreview() {
     // Empezamos un nuevo trazado.
     contexto.beginPath();
 
-    // Dibujamos un círculo centrado en el punto recibido.
+    // Dibujamos el círculo.
     contexto.arc(
       punto.x,
       punto.y,
@@ -118,53 +123,52 @@ function CameraPreview() {
     contexto.fill();
   }
 
-  // Dibuja una línea entre dos puntos.
+  // Dibuja una conexión entre dos landmarks.
   function dibujarConexion(
     contexto: CanvasRenderingContext2D,
     puntoInicial: Punto,
     puntoFinal: Punto
   ) {
-    // Empezamos un nuevo trazado.
+    // Empezamos una nueva línea.
     contexto.beginPath();
 
-    // Movemos el "lápiz" al punto inicial.
+    // Colocamos el inicio de la línea.
     contexto.moveTo(
       puntoInicial.x,
       puntoInicial.y
     );
 
-    // Dibujamos una línea hasta el punto final.
+    // Indicamos dónde termina.
     contexto.lineTo(
       puntoFinal.x,
       puntoFinal.y
     );
 
-    // Elegimos el grosor de la línea.
+    // Definimos el grosor de la línea.
     contexto.lineWidth = 5;
 
-    // Elegimos el color de la conexión.
+    // Definimos el color.
     contexto.strokeStyle = "blue";
 
-    // Dibujamos físicamente la línea.
+    // Dibujamos la línea.
     contexto.stroke();
   }
 
-  // Dibuja hombro, codo y muñeca
-  // y las conexiones entre ellos.
+  // Dibuja un brazo formado por hombro, codo y muñeca.
   function dibujarBrazo(
     contexto: CanvasRenderingContext2D,
     hombro: Punto,
     codo: Punto,
     muneca: Punto
   ) {
-    // Dibujamos la conexión hombro -> codo.
+    // Dibujamos hombro -> codo.
     dibujarConexion(
       contexto,
       hombro,
       codo
     );
 
-    // Dibujamos la conexión codo -> muñeca.
+    // Dibujamos codo -> muñeca.
     dibujarConexion(
       contexto,
       codo,
@@ -177,10 +181,10 @@ function CameraPreview() {
     dibujarLandmark(contexto, muneca);
   }
 
-  // Función de prueba que simula landmarks
-  // como los que más adelante devolverá MediaPipe.
-  function dibujarLandmarksPrueba() {
-    // Comprobamos que existan vídeo y canvas.
+  // Esta función se ejecutará continuamente,
+  // aproximadamente una vez por cada frame de pantalla.
+  function dibujarFrame(timestamp: number) {
+    // Necesitamos que existan vídeo y canvas.
     if (!videoRef.current || !canvasRef.current) {
       return;
     }
@@ -189,20 +193,19 @@ function CameraPreview() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
-    // Igualamos la resolución interna del canvas
-    // con la resolución real de la webcam.
+    // Igualamos la resolución del canvas a la resolución real del vídeo.
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
     // Obtenemos el contexto 2D.
     const contexto = canvas.getContext("2d");
 
-    // Si no existe el contexto, detenemos la función.
+    // Si no existe, detenemos este frame.
     if (!contexto) {
       return;
     }
 
-    // Limpiamos cualquier dibujo anterior.
+    // Limpiamos completamente el frame anterior.
     contexto.clearRect(
       0,
       0,
@@ -210,25 +213,31 @@ function CameraPreview() {
       canvas.height
     );
 
-    // Creamos landmarks simulados
-    // usando coordenadas normalizadas entre 0 y 1.
+    // Creamos un valor que cambia continuamente entre -1 y 1.
+    // timestamp aumenta con el paso del tiempo.
+    // Math.sin() nos permite crear un movimiento suave.
+    const movimiento = Math.sin(timestamp / 500);
+
+    // El hombro permanece quieto.
     const hombroNormalizado: Punto = {
       x: 0.4,
       y: 0.25
     };
 
+    // El codo se mueve ligeramente.
     const codoNormalizado: Punto = {
-      x: 0.5,
+      x: 0.5 + movimiento * 0.05,
       y: 0.5
     };
 
+    // La muñeca se mueve más que el codo,
+    // simulando aproximadamente una flexión del brazo.
     const munecaNormalizada: Punto = {
-      x: 0.65,
-      y: 0.7
+      x: 0.65 + movimiento * 0.15,
+      y: 0.7 - movimiento * 0.15
     };
 
-    // Convertimos los landmarks normalizados
-    // a coordenadas reales del canvas.
+    // Convertimos los landmarks a píxeles reales.
     const hombro = convertirAPixeles(
       hombroNormalizado,
       canvas
@@ -244,7 +253,7 @@ function CameraPreview() {
       canvas
     );
 
-    // Dibujamos el brazo completo.
+    // Dibujamos el brazo actualizado.
     dibujarBrazo(
       contexto,
       hombro,
@@ -252,14 +261,14 @@ function CameraPreview() {
       muneca
     );
 
-    // Mostramos un mensaje para comprobar
-    // que el dibujo se ha realizado correctamente.
-    console.log("Brazo simulado dibujado");
+    // Pedimos al navegador que vuelva a ejecutar
+    // esta misma función en el siguiente frame.
+    animationFrameRef.current =
+      requestAnimationFrame(dibujarFrame);
   }
 
-  // Se ejecuta cuando el navegador ya conoce
-  // la resolución real del vídeo.
-  function mostrarResolucion() {
+  // Se ejecuta cuando el vídeo ya conoce su resolución real.
+  function iniciarDibujo() {
     // Comprobamos que el vídeo exista.
     if (!videoRef.current) {
       return;
@@ -276,41 +285,50 @@ function CameraPreview() {
       videoRef.current.videoHeight
     );
 
-    // Dibujamos los landmarks simulados.
-    dibujarLandmarksPrueba();
+    // Si ya existiera una animación anterior,
+    // la cancelamos para evitar dos bucles simultáneos.
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    // Iniciamos el primer frame.
+    animationFrameRef.current =
+      requestAnimationFrame(dibujarFrame);
   }
 
   return (
-    // Contenedor común para el vídeo y el canvas.
+    // Contenedor común para vídeo y canvas.
     <div className="camera-container">
+
       <video
-        // Asociamos el vídeo con videoRef.
+        // Conectamos el elemento con videoRef.
         ref={videoRef}
 
-        // Hace que la webcam se reproduzca automáticamente.
+        // Reproduce automáticamente la webcam.
         autoPlay
 
-        // Mantiene el vídeo dentro de la página en móviles.
+        // Mantiene el vídeo integrado en la página en móviles.
         playsInline
 
-        // Cuando conocemos la resolución real,
-        // ejecutamos mostrarResolucion().
-        onLoadedMetadata={mostrarResolucion}
+        // Cuando el vídeo está preparado,
+        // iniciamos nuestro bucle de dibujo.
+        onLoadedMetadata={iniciarDibujo}
 
         // Clase CSS del vídeo.
         className="camera-video"
       />
 
       <canvas
-        // Asociamos el canvas con canvasRef.
+        // Conectamos el canvas con canvasRef.
         ref={canvasRef}
 
-        // Clase CSS que lo coloca encima del vídeo.
+        // Clase CSS que coloca el canvas sobre el vídeo.
         className="camera-canvas"
       />
+
     </div>
   );
 }
 
-// Exportamos el componente para utilizarlo desde App.tsx.
+// Exportamos CameraPreview para utilizarlo desde App.tsx.
 export default CameraPreview;
