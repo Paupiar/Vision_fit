@@ -182,3 +182,14 @@
     border-right-color: var(--border);
   }
 }
+/* --------------------------------------------------------------------------------- */
+.camera-container {
+  width: 100%;
+  max-width: 640px;
+}
+
+.camera-video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
