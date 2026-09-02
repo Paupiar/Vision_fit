@@ -24,19 +24,45 @@ interface Punto {
 }
 
 
-// Guarda la posición inicial del codo
-// respecto al hombro.
-interface ReferenciaCodo {
+// Guarda una posición relativa de referencia.
+//
+// La utilizaremos tanto para:
+// - codo respecto al hombro;
+// - hombro respecto a la cadera.
+interface ReferenciaPosicion {
   dx: number;
   dy: number;
 
-  // Longitud hombro-codo utilizada
-  // para normalizar el desplazamiento.
-  longitudBrazo: number;
+  // Distancia utilizada para normalizar
+  // el desplazamiento.
+  longitudReferencia: number;
 }
 
 
 function CameraPreview() {
+  // --------------------------------------------------
+  // CONFIGURACIÓN
+  // --------------------------------------------------
+
+  // Umbral del desplazamiento del codo.
+  //
+  // Tras nuestras pruebas:
+  // - 20 % era demasiado sensible;
+  // - 30 % permitía demasiado movimiento;
+  // - 25 % ofrecía el mejor equilibrio.
+  const desplazamientoMaximoCodo =
+    0.25;
+
+
+  // Umbral inicial del movimiento
+  // hombro-cadera.
+  //
+  // Empezamos con un 15 %,
+  // pero lo calibraremos mediante pruebas reales.
+  const desplazamientoMaximoHombro =
+    0.13;
+
+
   // --------------------------------------------------
   // REFERENCIAS PRINCIPALES
   // --------------------------------------------------
@@ -53,7 +79,7 @@ function CameraPreview() {
   const poseLandmarkerRef =
     useRef<PoseLandmarker | null>(null);
 
-  // Identificador del bucle de animación.
+  // Identificador del bucle requestAnimationFrame.
   const animationFrameRef =
     useRef<number | null>(null);
 
@@ -63,24 +89,26 @@ function CameraPreview() {
   // --------------------------------------------------
 
   // "abajo":
-  // el usuario debe empezar a flexionar.
+  // el usuario debe comenzar a flexionar.
   //
   // "arriba":
   // el usuario debe volver a extender.
   const faseRef =
     useRef<"abajo" | "arriba">("abajo");
 
+
   // Número interno de repeticiones.
   const repeticionesRef =
     useRef<number>(0);
 
-  // Hasta qué instante debe mostrarse
-  // el brazo en verde.
+
+  // Hasta qué instante debemos dibujar
+  // los landmarks en verde.
   const verdeHastaRef =
     useRef<number>(0);
 
-  // Momento de la última actualización
-  // visual del ángulo y feedback.
+
+  // Última actualización de la interfaz.
   const ultimaActualizacionUIRef =
     useRef<number>(0);
 
@@ -89,8 +117,7 @@ function CameraPreview() {
   // FEEDBACK DE MOVIMIENTO
   // --------------------------------------------------
 
-  // Guarda el mensaje actual para evitar
-  // actualizaciones innecesarias de React.
+  // Último mensaje de movimiento.
   const feedbackRef =
     useRef<string>(
       "Colócate frente a la cámara"
@@ -98,52 +125,100 @@ function CameraPreview() {
 
 
   // --------------------------------------------------
-  // ANÁLISIS TÉCNICO
+  // ANÁLISIS DEL CODO
   // --------------------------------------------------
 
-  // Guarda la posición inicial del codo
+  // Posición inicial del codo
   // respecto al hombro.
   const referenciaCodoRef =
-    useRef<ReferenciaCodo | null>(null);
+    useRef<ReferenciaPosicion | null>(null);
 
-  // Guarda internamente el último
-  // mensaje técnico.
-  const feedbackTecnicoRef =
+
+  // Último mensaje técnico del codo.
+  const feedbackCodoRef =
     useRef<string>(
       "Extiende el brazo para calibrar el codo"
     );
 
 
   // --------------------------------------------------
-  // ESTADOS VISIBLES DE REACT
+  // ANÁLISIS DEL HOMBRO / TRONCO
   // --------------------------------------------------
 
-  // Repeticiones.
+  // Posición inicial del hombro
+  // respecto a la cadera.
+  const referenciaHombroRef =
+    useRef<ReferenciaPosicion | null>(null);
+
+
+  // Último mensaje relacionado
+  // con hombro y tronco.
+  const feedbackHombroRef =
+    useRef<string>(
+      "Extiende el brazo para calibrar el tronco"
+    );
+
+
+  // --------------------------------------------------
+  // ESTADOS VISIBLES
+  // --------------------------------------------------
+
+  // Número de repeticiones.
   const [repeticiones, setRepeticiones] =
     useState<number>(0);
+
 
   // Ángulo actual.
   const [anguloActual, setAnguloActual] =
     useState<number>(0);
 
-  // Fase visible.
+
+  // Fase actual.
   const [faseActual, setFaseActual] =
     useState<"abajo" | "arriba">("abajo");
 
-  // Feedback del recorrido.
+
+  // Feedback del rango de movimiento.
   const [feedback, setFeedback] =
     useState<string>(
       "Colócate frente a la cámara"
     );
 
-  // Feedback técnico.
+
+  // Feedback técnico del codo.
   const [
-    feedbackTecnico,
-    setFeedbackTecnico
+    feedbackCodo,
+    setFeedbackCodo
   ] =
     useState<string>(
       "Extiende el brazo para calibrar el codo"
     );
+
+
+  // Feedback técnico del hombro.
+  const [
+    feedbackHombro,
+    setFeedbackHombro
+  ] =
+    useState<string>(
+      "Extiende el brazo para calibrar el tronco"
+    );
+
+
+  // Porcentaje actual de desplazamiento del codo.
+  const [
+    desplazamientoCodo,
+    setDesplazamientoCodo
+  ] =
+    useState<number | null>(null);
+
+
+  // Porcentaje actual de desplazamiento del hombro.
+  const [
+    desplazamientoHombro,
+    setDesplazamientoHombro
+  ] =
+    useState<number | null>(null);
 
 
   // --------------------------------------------------
@@ -155,17 +230,10 @@ function CameraPreview() {
     let stream: MediaStream | null =
       null;
 
-    // Nos permite saber si CameraPreview
+    // Permite saber si el componente
     // sigue montado.
     let componenteActivo =
       true;
-
-
-    // Mensaje útil para comprobar que el navegador
-    // está utilizando esta versión del componente.
-    console.log(
-      "CameraPreview con análisis técnico cargado"
-    );
 
 
     async function iniciarSistema() {
@@ -181,8 +249,9 @@ function CameraPreview() {
           });
 
 
-        // Si el componente desapareció mientras
-        // esperábamos la cámara, apagamos el stream.
+        // Si el componente ha desaparecido
+        // mientras esperábamos la cámara,
+        // detenemos el stream.
         if (!componenteActivo) {
           nuevoStream
             .getTracks()
@@ -220,7 +289,7 @@ function CameraPreview() {
 
 
         // Si el componente desapareció
-        // mientras MediaPipe cargaba,
+        // mientras cargaba MediaPipe,
         // dejamos de continuar.
         if (!componenteActivo) {
           return;
@@ -237,8 +306,8 @@ function CameraPreview() {
         );
 
 
-        // Si el vídeo ya está preparado,
-        // iniciamos el análisis.
+        // Si el vídeo está preparado,
+        // comenzamos directamente.
         if (
           videoRef.current &&
           videoRef.current.readyState >= 2
@@ -255,7 +324,6 @@ function CameraPreview() {
     }
 
 
-    // Iniciamos cámara y MediaPipe.
     iniciarSistema();
 
 
@@ -268,7 +336,7 @@ function CameraPreview() {
         false;
 
 
-      // Detenemos el bucle de análisis.
+      // Detenemos el análisis.
       if (
         animationFrameRef.current !== null
       ) {
@@ -281,7 +349,7 @@ function CameraPreview() {
       }
 
 
-      // Apagamos físicamente la cámara.
+      // Apagamos la cámara.
       if (stream) {
         stream
           .getTracks()
@@ -306,11 +374,11 @@ function CameraPreview() {
 
 
   // --------------------------------------------------
-  // COORDENADAS
+  // CONVERTIR COORDENADAS
   // --------------------------------------------------
 
-  // Convierte las coordenadas normalizadas
-  // de MediaPipe a píxeles del canvas.
+  // Convierte coordenadas normalizadas
+  // de MediaPipe a píxeles.
   function convertirAPixeles(
     punto: Punto,
     canvas: HTMLCanvasElement
@@ -334,8 +402,8 @@ function CameraPreview() {
   // VISIBILIDAD
   // --------------------------------------------------
 
-  // Comprueba que MediaPipe tenga suficiente
-  // confianza en un landmark.
+  // Comprueba que MediaPipe tenga
+  // suficiente confianza en el punto.
   function esLandmarkValido(
     punto: Punto
   ): boolean {
@@ -346,7 +414,7 @@ function CameraPreview() {
     }
 
 
-    // Exigimos una visibilidad mínima del 70 %.
+    // Exigimos al menos 70 %.
     return (
       punto.visibility >= 0.7
     );
@@ -354,9 +422,10 @@ function CameraPreview() {
 
 
   // --------------------------------------------------
-  // DISTANCIA ENTRE DOS PUNTOS
+  // DISTANCIA
   // --------------------------------------------------
 
+  // Calcula la distancia entre dos puntos.
   function calcularDistancia(
     a: Punto,
     b: Punto
@@ -368,7 +437,6 @@ function CameraPreview() {
       a.y - b.y;
 
 
-    // Teorema de Pitágoras.
     return Math.sqrt(
       diferenciaX * diferenciaX +
       diferenciaY * diferenciaY
@@ -416,7 +484,7 @@ function CameraPreview() {
       (180 / Math.PI);
 
 
-    // Limitamos entre 0 y 180 grados.
+    // Limitamos entre 0 y 180.
     if (angulo > 180) {
       angulo =
         360 - angulo;
@@ -431,8 +499,7 @@ function CameraPreview() {
   // FEEDBACK VERDE
   // --------------------------------------------------
 
-  // Los landmarks aparecen verdes
-  // durante 0,3 segundos.
+  // Verde durante 0,3 segundos.
   function activarFeedbackVerde() {
     verdeHastaRef.current =
       performance.now() + 300;
@@ -446,8 +513,6 @@ function CameraPreview() {
   function cambiarFeedback(
     nuevoFeedback: string
   ) {
-    // Si el mensaje no ha cambiado,
-    // no actualizamos React.
     if (
       feedbackRef.current ===
       nuevoFeedback
@@ -466,7 +531,6 @@ function CameraPreview() {
   }
 
 
-  // Genera el feedback de subida y bajada.
   function actualizarFeedback(
     anguloCodo: number
   ) {
@@ -520,7 +584,7 @@ function CameraPreview() {
     // BAJADA
     // ----------------------------------------------
 
-    // Todavía se encuentra arriba.
+    // Sigue en la zona superior.
     if (anguloCodo <= 50) {
       cambiarFeedback(
         "Sigue bajando"
@@ -530,7 +594,7 @@ function CameraPreview() {
     }
 
 
-    // Está realizando la extensión.
+    // Está bajando.
     if (anguloCodo < 160) {
       cambiarFeedback(
         "Casi estás abajo"
@@ -540,7 +604,7 @@ function CameraPreview() {
     }
 
 
-    // Extensión completada.
+    // Extensión completa.
     cambiarFeedback(
       "Brazo extendido"
     );
@@ -548,40 +612,64 @@ function CameraPreview() {
 
 
   // --------------------------------------------------
-  // CAMBIAR FEEDBACK TÉCNICO
+  // FEEDBACK DEL CODO
   // --------------------------------------------------
 
-  function cambiarFeedbackTecnico(
+  function cambiarFeedbackCodo(
     nuevoFeedback: string
   ) {
-    // Evitamos actualizaciones repetidas.
     if (
-      feedbackTecnicoRef.current ===
+      feedbackCodoRef.current ===
       nuevoFeedback
     ) {
       return;
     }
 
 
-    feedbackTecnicoRef.current =
+    feedbackCodoRef.current =
       nuevoFeedback;
 
 
-    setFeedbackTecnico(
+    setFeedbackCodo(
       nuevoFeedback
     );
   }
 
 
   // --------------------------------------------------
-  // CALIBRAR POSICIÓN DEL CODO
+  // FEEDBACK DEL HOMBRO
+  // --------------------------------------------------
+
+  function cambiarFeedbackHombro(
+    nuevoFeedback: string
+  ) {
+    if (
+      feedbackHombroRef.current ===
+      nuevoFeedback
+    ) {
+      return;
+    }
+
+
+    feedbackHombroRef.current =
+      nuevoFeedback;
+
+
+    setFeedbackHombro(
+      nuevoFeedback
+    );
+  }
+
+
+  // --------------------------------------------------
+  // GUARDAR REFERENCIA DEL CODO
   // --------------------------------------------------
 
   function guardarReferenciaCodo(
     hombro: Punto,
     codo: Punto
   ) {
-    // Posición del codo relativa al hombro.
+    // Posición del codo respecto al hombro.
     const dx =
       codo.x -
       hombro.x;
@@ -591,7 +679,7 @@ function CameraPreview() {
       hombro.y;
 
 
-    // Longitud aproximada del brazo superior.
+    // Distancia hombro-codo.
     const longitudBrazo =
       calcularDistancia(
         hombro,
@@ -599,7 +687,6 @@ function CameraPreview() {
       );
 
 
-    // Evitamos divisiones entre cero.
     if (longitudBrazo <= 0) {
       return;
     }
@@ -612,7 +699,7 @@ function CameraPreview() {
       dy:
         dy,
 
-      longitudBrazo:
+      longitudReferencia:
         longitudBrazo
     };
 
@@ -624,25 +711,73 @@ function CameraPreview() {
 
 
   // --------------------------------------------------
-  // ANALIZAR ESTABILIDAD DEL CODO
+  // GUARDAR REFERENCIA DEL HOMBRO
+  // --------------------------------------------------
+
+  function guardarReferenciaHombro(
+    hombro: Punto,
+    cadera: Punto
+  ) {
+    // Posición del hombro respecto a la cadera.
+    const dx =
+      hombro.x -
+      cadera.x;
+
+    const dy =
+      hombro.y -
+      cadera.y;
+
+
+    // Distancia aproximada hombro-cadera.
+    //
+    // La utilizaremos como medida del torso
+    // para normalizar el desplazamiento.
+    const longitudTorso =
+      calcularDistancia(
+        hombro,
+        cadera
+      );
+
+
+    if (longitudTorso <= 0) {
+      return;
+    }
+
+
+    referenciaHombroRef.current = {
+      dx:
+        dx,
+
+      dy:
+        dy,
+
+      longitudReferencia:
+        longitudTorso
+    };
+
+
+    console.log(
+      "Referencia del hombro guardada"
+    );
+  }
+
+
+  // --------------------------------------------------
+  // ANALIZAR CODO
   // --------------------------------------------------
 
   function analizarTecnicaCodo(
     anguloCodo: number,
     hombro: Punto,
     codo: Punto
-  ) {
+  ): number | null {
     // ----------------------------------------------
     // CALIBRACIÓN
     // ----------------------------------------------
 
-    // Utilizamos la posición extendida
-    // como referencia.
     if (anguloCodo >= 160) {
-      // Guardamos referencia:
-      //
-      // - si todavía no existe;
-      // - o cuando acabamos de volver desde arriba.
+      // Calibramos al comenzar
+      // y al terminar cada repetición.
       if (
         referenciaCodoRef.current === null ||
         faseRef.current === "arriba"
@@ -654,24 +789,24 @@ function CameraPreview() {
       }
 
 
-      cambiarFeedbackTecnico(
+      cambiarFeedbackCodo(
         "Codo estable"
       );
 
-      return;
+
+      return 0;
     }
 
 
-    // Sin referencia no podemos
-    // analizar el desplazamiento.
+    // Sin referencia no podemos analizar.
     if (
       referenciaCodoRef.current === null
     ) {
-      cambiarFeedbackTecnico(
+      cambiarFeedbackCodo(
         "Extiende el brazo para calibrar el codo"
       );
 
-      return;
+      return null;
     }
 
 
@@ -679,8 +814,6 @@ function CameraPreview() {
     // POSICIÓN ACTUAL
     // ----------------------------------------------
 
-    // Posición actual del codo
-    // respecto al hombro.
     const dxActual =
       codo.x -
       hombro.x;
@@ -692,6 +825,120 @@ function CameraPreview() {
 
     const referencia =
       referenciaCodoRef.current;
+
+
+    const cambioX =
+      dxActual -
+      referencia.dx;
+
+    const cambioY =
+      dyActual -
+      referencia.dy;
+
+
+    const desplazamiento =
+      Math.sqrt(
+        cambioX * cambioX +
+        cambioY * cambioY
+      );
+
+
+    // ----------------------------------------------
+    // NORMALIZACIÓN
+    // ----------------------------------------------
+
+    const desplazamientoRelativo =
+      desplazamiento /
+      referencia.longitudReferencia;
+
+
+    // ----------------------------------------------
+    // EVALUACIÓN
+    // ----------------------------------------------
+
+    if (
+      desplazamientoRelativo >
+      desplazamientoMaximoCodo
+    ) {
+      cambiarFeedbackCodo(
+        "Mantén el codo estable"
+      );
+    } else {
+      cambiarFeedbackCodo(
+        "Codo estable"
+      );
+    }
+
+
+    return desplazamientoRelativo;
+  }
+
+
+  // --------------------------------------------------
+  // ANALIZAR HOMBRO / TRONCO
+  // --------------------------------------------------
+
+  function analizarTecnicaHombro(
+    anguloCodo: number,
+    hombro: Punto,
+    cadera: Punto
+  ): number | null {
+    // ----------------------------------------------
+    // CALIBRACIÓN
+    // ----------------------------------------------
+
+    // Igual que con el codo,
+    // utilizamos la posición extendida.
+    if (anguloCodo >= 160) {
+      if (
+        referenciaHombroRef.current === null ||
+        faseRef.current === "arriba"
+      ) {
+        guardarReferenciaHombro(
+          hombro,
+          cadera
+        );
+      }
+
+
+      cambiarFeedbackHombro(
+        "Tronco estable"
+      );
+
+
+      return 0;
+    }
+
+
+    // Sin referencia no podemos analizar.
+    if (
+      referenciaHombroRef.current === null
+    ) {
+      cambiarFeedbackHombro(
+        "Extiende el brazo para calibrar el tronco"
+      );
+
+      return null;
+    }
+
+
+    // ----------------------------------------------
+    // POSICIÓN ACTUAL
+    // ----------------------------------------------
+
+    // Posición actual del hombro
+    // respecto a la cadera.
+    const dxActual =
+      hombro.x -
+      cadera.x;
+
+    const dyActual =
+      hombro.y -
+      cadera.y;
+
+
+    const referencia =
+      referenciaHombroRef.current;
 
 
     // Diferencia respecto
@@ -717,41 +964,35 @@ function CameraPreview() {
     // NORMALIZACIÓN
     // ----------------------------------------------
 
-    // Normalizamos utilizando la longitud
-    // hombro-codo para no depender
-    // de la distancia a la cámara.
+    // Lo dividimos entre la longitud
+    // hombro-cadera.
+    //
+    // De esta forma el valor no depende
+    // directamente de los píxeles.
     const desplazamientoRelativo =
       desplazamiento /
-      referencia.longitudBrazo;
-
-
-    // Permitimos inicialmente un 20 %.
-    //
-    // Este valor se calibrará posteriormente
-    // mediante pruebas reales.
-    const desplazamientoMaximo =
-      0.20;
+      referencia.longitudReferencia;
 
 
     // ----------------------------------------------
-    // RESULTADO
+    // EVALUACIÓN
     // ----------------------------------------------
 
     if (
       desplazamientoRelativo >
-      desplazamientoMaximo
+      desplazamientoMaximoHombro
     ) {
-      cambiarFeedbackTecnico(
-        "Mantén el codo estable"
+      cambiarFeedbackHombro(
+        "Evita balancear el tronco"
       );
-
-      return;
+    } else {
+      cambiarFeedbackHombro(
+        "Tronco estable"
+      );
     }
 
 
-    cambiarFeedbackTecnico(
-      "Codo estable"
-    );
+    return desplazamientoRelativo;
   }
 
 
@@ -759,6 +1000,7 @@ function CameraPreview() {
   // CONTEO DEL CURL
   // --------------------------------------------------
 
+  // Esta lógica no cambia.
   function actualizarCurl(
     anguloCodo: number
   ) {
@@ -766,18 +1008,15 @@ function CameraPreview() {
     // POSICIÓN ABAJO
     // ----------------------------------------------
 
-    // 160 grados o más.
     if (anguloCodo >= 160) {
-      // Solo es cambio real si veníamos
-      // de la posición superior.
       if (
         faseRef.current === "arriba"
       ) {
-        // Feedback verde 0,3 segundos.
+        // Verde durante 0,3 segundos.
         activarFeedbackVerde();
 
 
-        // Fase visible.
+        // Actualizamos la fase visible.
         setFaseActual(
           "abajo"
         );
@@ -789,7 +1028,6 @@ function CameraPreview() {
       }
 
 
-      // Preparamos una nueva repetición.
       faseRef.current =
         "abajo";
     }
@@ -799,8 +1037,6 @@ function CameraPreview() {
     // POSICIÓN ARRIBA
     // ----------------------------------------------
 
-    // 50 grados o menos
-    // completa la subida.
     if (
       anguloCodo <= 50 &&
       faseRef.current === "abajo"
@@ -810,13 +1046,13 @@ function CameraPreview() {
         "arriba";
 
 
-      // Fase visible.
+      // Actualizamos la interfaz.
       setFaseActual(
         "arriba"
       );
 
 
-      // Verde durante 0,3 segundos.
+      // Feedback verde.
       activarFeedbackVerde();
 
 
@@ -825,7 +1061,6 @@ function CameraPreview() {
         repeticionesRef.current + 1;
 
 
-      // Actualizamos React.
       setRepeticiones(
         repeticionesRef.current
       );
@@ -925,8 +1160,8 @@ function CameraPreview() {
     codo: Punto,
     muneca: Punto
   ) {
-    // Comprobamos si estamos dentro
-    // de los 300 ms de feedback verde.
+    // Comprobamos si estamos todavía
+    // dentro de los 300 ms verdes.
     const verdeActivo =
       performance.now() <
       verdeHastaRef.current;
@@ -979,7 +1214,8 @@ function CameraPreview() {
   function analizarFrame(
     timestamp: number
   ) {
-    // Necesitamos vídeo, canvas y MediaPipe.
+    // Necesitamos vídeo, canvas
+    // y MediaPipe.
     if (
       !videoRef.current ||
       !canvasRef.current ||
@@ -1015,11 +1251,13 @@ function CameraPreview() {
     }
 
 
-    // Igualamos resolución de canvas
-    // y webcam.
+    // Adaptamos el canvas
+    // a la resolución real.
     if (
-      canvas.width !== video.videoWidth ||
-      canvas.height !== video.videoHeight
+      canvas.width !==
+        video.videoWidth ||
+      canvas.height !==
+        video.videoHeight
     ) {
       canvas.width =
         video.videoWidth;
@@ -1039,7 +1277,7 @@ function CameraPreview() {
     }
 
 
-    // Borramos el frame anterior.
+    // Limpiamos el frame anterior.
     contexto.clearRect(
       0,
       0,
@@ -1049,9 +1287,9 @@ function CameraPreview() {
 
 
     try {
-      // ------------------------------------------
+      // ----------------------------------------------
       // MEDIAPIPE
-      // ------------------------------------------
+      // ----------------------------------------------
 
       const resultado =
         poseLandmarker.detectForVideo(
@@ -1060,14 +1298,16 @@ function CameraPreview() {
         );
 
 
-      // Comprobamos que exista
-      // una persona detectada.
       if (
         resultado.landmarks.length > 0
       ) {
         const landmarks =
           resultado.landmarks[0];
 
+
+        // ------------------------------------------
+        // LANDMARKS NECESARIOS
+        // ------------------------------------------
 
         // 12 = hombro derecho.
         const hombroNormalizado =
@@ -1081,15 +1321,24 @@ function CameraPreview() {
         const munecaNormalizada =
           landmarks[16];
 
+        // 24 = cadera derecha.
+        const caderaNormalizada =
+          landmarks[24];
 
-        // Comprobamos que existan.
+
+        // ------------------------------------------
+        // ANÁLISIS PRINCIPAL DEL CURL
+        // ------------------------------------------
+
+        // Para contar repeticiones solamente
+        // necesitamos hombro, codo y muñeca.
+        //
+        // La cadera NO bloquea el contador.
         if (
           hombroNormalizado &&
           codoNormalizado &&
           munecaNormalizada
         ) {
-          // Los tres landmarks deben
-          // superar visibility >= 0.7.
           if (
             esLandmarkValido(
               hombroNormalizado
@@ -1102,7 +1351,7 @@ function CameraPreview() {
             )
           ) {
             // --------------------------------------
-            // CONVERTIMOS A PÍXELES
+            // CONVERSIÓN A PÍXELES
             // --------------------------------------
 
             const hombro =
@@ -1127,7 +1376,7 @@ function CameraPreview() {
 
 
             // --------------------------------------
-            // ÁNGULO DEL CODO
+            // ÁNGULO
             // --------------------------------------
 
             const anguloCodo =
@@ -1139,11 +1388,65 @@ function CameraPreview() {
 
 
             // --------------------------------------
-            // INTERFAZ
+            // TÉCNICA DEL CODO
             // --------------------------------------
 
-            // Actualizamos aproximadamente
-            // cada 100 milisegundos.
+            const desplazamientoRelativoCodo =
+              analizarTecnicaCodo(
+                anguloCodo,
+                hombro,
+                codo
+              );
+
+
+            // --------------------------------------
+            // TÉCNICA DEL HOMBRO
+            // --------------------------------------
+
+            // Empezamos sin medición.
+            let desplazamientoRelativoHombro:
+              number | null =
+              null;
+
+
+            // El análisis del tronco solo se realiza
+            // si MediaPipe ve correctamente la cadera.
+            //
+            // Si falla la cadera, el contador
+            // sigue funcionando igualmente.
+            if (
+              caderaNormalizada &&
+              esLandmarkValido(
+                caderaNormalizada
+              )
+            ) {
+              const cadera =
+                convertirAPixeles(
+                  caderaNormalizada,
+                  canvas
+                );
+
+
+              desplazamientoRelativoHombro =
+                analizarTecnicaHombro(
+                  anguloCodo,
+                  hombro,
+                  cadera
+                );
+            } else {
+              // No podemos analizar el tronco
+              // si la cadera no está visible.
+              cambiarFeedbackHombro(
+                "Asegúrate de que la cadera sea visible"
+              );
+            }
+
+
+            // --------------------------------------
+            // ACTUALIZAMOS LA INTERFAZ
+            // --------------------------------------
+
+            // Aproximadamente cada 100 ms.
             if (
               timestamp -
                 ultimaActualizacionUIRef.current >=
@@ -1157,10 +1460,52 @@ function CameraPreview() {
               );
 
 
-              // Feedback del recorrido.
+              // Feedback del movimiento.
               actualizarFeedback(
                 anguloCodo
               );
+
+
+              // ----------------------------------
+              // PORCENTAJE DEL CODO
+              // ----------------------------------
+
+              if (
+                desplazamientoRelativoCodo !==
+                null
+              ) {
+                setDesplazamientoCodo(
+                  Math.round(
+                    desplazamientoRelativoCodo *
+                    100
+                  )
+                );
+              } else {
+                setDesplazamientoCodo(
+                  null
+                );
+              }
+
+
+              // ----------------------------------
+              // PORCENTAJE DEL HOMBRO
+              // ----------------------------------
+
+              if (
+                desplazamientoRelativoHombro !==
+                null
+              ) {
+                setDesplazamientoHombro(
+                  Math.round(
+                    desplazamientoRelativoHombro *
+                    100
+                  )
+                );
+              } else {
+                setDesplazamientoHombro(
+                  null
+                );
+              }
 
 
               ultimaActualizacionUIRef.current =
@@ -1169,22 +1514,11 @@ function CameraPreview() {
 
 
             // --------------------------------------
-            // TÉCNICA
-            // --------------------------------------
-
-            // Analizamos el desplazamiento
-            // del codo respecto al hombro.
-            analizarTecnicaCodo(
-              anguloCodo,
-              hombro,
-              codo
-            );
-
-
-            // --------------------------------------
             // CONTEO
             // --------------------------------------
 
+            // No modificamos la lógica
+            // de repeticiones.
             actualizarCurl(
               anguloCodo
             );
@@ -1212,7 +1546,7 @@ function CameraPreview() {
     }
 
 
-    // Solicitamos el siguiente frame.
+    // Siguiente frame.
     animationFrameRef.current =
       requestAnimationFrame(
         analizarFrame
@@ -1225,7 +1559,6 @@ function CameraPreview() {
   // --------------------------------------------------
 
   function iniciarAnalisis() {
-    // Necesitamos MediaPipe preparado.
     if (
       !poseLandmarkerRef.current
     ) {
@@ -1243,7 +1576,6 @@ function CameraPreview() {
     }
 
 
-    // Iniciamos el análisis.
     animationFrameRef.current =
       requestAnimationFrame(
         analizarFrame
@@ -1282,7 +1614,7 @@ function CameraPreview() {
     <div>
 
       {/* ----------------------------------------------
-          DATOS DEL MOVIMIENTO
+          MOVIMIENTO
           ---------------------------------------------- */}
       <div className="exercise-data">
 
@@ -1309,11 +1641,7 @@ function CameraPreview() {
 
 
       {/* ----------------------------------------------
-          ANÁLISIS TÉCNICO
-
-          Lo colocamos como un bloque independiente.
-          Esto permite comprobar claramente que
-          React está renderizando esta funcionalidad.
+          TÉCNICA DEL CURL
           ---------------------------------------------- */}
       <div>
 
@@ -1322,11 +1650,71 @@ function CameraPreview() {
         </h3>
 
 
+        {/* ------------------------------------------
+            CODO
+            ------------------------------------------ */}
+
         <p>
           <strong>
-            Estado:
+            Codo:
           </strong>{" "}
-          {feedbackTecnico}
+          {feedbackCodo}
+        </p>
+
+
+        <p>
+          <strong>
+            Desplazamiento del codo:
+          </strong>{" "}
+
+          {desplazamientoCodo === null
+            ? "--"
+            : desplazamientoCodo + " %"}
+        </p>
+
+
+        <p>
+          <strong>
+            Límite del codo:
+          </strong>{" "}
+          {Math.round(
+            desplazamientoMaximoCodo *
+            100
+          )} %
+        </p>
+
+
+        {/* ------------------------------------------
+            TRONCO / HOMBRO
+            ------------------------------------------ */}
+
+        <p>
+          <strong>
+            Tronco:
+          </strong>{" "}
+          {feedbackHombro}
+        </p>
+
+
+        <p>
+          <strong>
+            Desplazamiento del hombro:
+          </strong>{" "}
+
+          {desplazamientoHombro === null
+            ? "--"
+            : desplazamientoHombro + " %"}
+        </p>
+
+
+        <p>
+          <strong>
+            Límite del hombro:
+          </strong>{" "}
+          {Math.round(
+            desplazamientoMaximoHombro *
+            100
+          )} %
         </p>
 
       </div>
@@ -1338,34 +1726,18 @@ function CameraPreview() {
       <div className="camera-container">
 
         <video
-          // Vídeo de la webcam.
           ref={videoRef}
-
-          // Reproducción automática.
           autoPlay
-
-          // Mantiene el vídeo integrado
-          // en la página en móviles.
           playsInline
-
-          // Cuando el vídeo está preparado
-          // iniciamos el análisis.
           onLoadedData={
             videoPreparado
           }
-
-          // Clase que ya utilizamos
-          // para invertir la cámara.
           className="camera-video"
         />
 
 
         <canvas
-          // Canvas situado encima del vídeo.
           ref={canvasRef}
-
-          // Clase que mantiene el canvas
-          // alineado e invertido junto al vídeo.
           className="camera-canvas"
         />
 
@@ -1376,5 +1748,5 @@ function CameraPreview() {
 }
 
 
-// Exportamos CameraPreview.
+// Exportamos el componente.
 export default CameraPreview;
