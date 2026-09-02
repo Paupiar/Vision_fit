@@ -1,18 +1,14 @@
-// Importamos useEffect para gestionar el inicio y cierre
-// de la cámara, useRef para conservar valores entre frames
-// y useState para mostrar datos en la interfaz.
+// Importamos los hooks de React necesarios.
 import {
   useEffect,
   useRef,
   useState
 } from "react";
 
-// Importamos únicamente el tipo PoseLandmarker
-// para poder tipar correctamente nuestra referencia.
+// Importamos únicamente el tipo PoseLandmarker.
 import type { PoseLandmarker } from "@mediapipe/tasks-vision";
 
-// Importamos nuestra función encargada
-// de crear y configurar MediaPipe.
+// Importamos nuestra configuración de MediaPipe.
 import { crearPoseLandmarker } from "../mediapipe/pose";
 
 
@@ -22,14 +18,21 @@ import { crearPoseLandmarker } from "../mediapipe/pose";
 
 // Representa un punto detectado por MediaPipe.
 interface Punto {
-  // Coordenada horizontal.
   x: number;
-
-  // Coordenada vertical.
   y: number;
-
-  // Nivel de visibilidad/confianza del landmark.
   visibility?: number;
+}
+
+
+// Guarda la posición inicial del codo
+// respecto al hombro.
+interface ReferenciaCodo {
+  dx: number;
+  dy: number;
+
+  // Longitud hombro-codo utilizada
+  // para normalizar el desplazamiento.
+  longitudBrazo: number;
 }
 
 
@@ -38,19 +41,19 @@ function CameraPreview() {
   // REFERENCIAS PRINCIPALES
   // --------------------------------------------------
 
-  // Referencia al elemento <video>.
+  // Elemento <video>.
   const videoRef =
     useRef<HTMLVideoElement | null>(null);
 
-  // Referencia al elemento <canvas>.
+  // Elemento <canvas>.
   const canvasRef =
     useRef<HTMLCanvasElement | null>(null);
 
-  // Referencia al detector de poses de MediaPipe.
+  // Detector de MediaPipe.
   const poseLandmarkerRef =
     useRef<PoseLandmarker | null>(null);
 
-  // Guarda el identificador de requestAnimationFrame.
+  // Identificador del bucle de animación.
   const animationFrameRef =
     useRef<number | null>(null);
 
@@ -59,42 +62,35 @@ function CameraPreview() {
   // ESTADO INTERNO DEL CURL
   // --------------------------------------------------
 
-  // Guarda la fase real del movimiento.
-  //
   // "abajo":
-  // el brazo está en la parte inferior
-  // y queremos que empiece a flexionar.
+  // el usuario debe empezar a flexionar.
   //
   // "arriba":
-  // ya ha completado la flexión
-  // y queremos que vuelva a bajar.
+  // el usuario debe volver a extender.
   const faseRef =
     useRef<"abajo" | "arriba">("abajo");
 
-
-  // Guarda internamente el número
-  // de repeticiones realizadas.
+  // Número interno de repeticiones.
   const repeticionesRef =
     useRef<number>(0);
 
-
-  // Guarda hasta qué momento deben
-  // mostrarse los landmarks en verde.
+  // Hasta qué instante debe mostrarse
+  // el brazo en verde.
   const verdeHastaRef =
     useRef<number>(0);
 
-
-  // Guarda cuándo actualizamos por última vez
-  // los datos visibles de la interfaz.
+  // Momento de la última actualización
+  // visual del ángulo y feedback.
   const ultimaActualizacionUIRef =
     useRef<number>(0);
 
 
-  // Guarda internamente el último mensaje
-  // de feedback mostrado.
-  //
-  // Así evitamos actualizar React si
-  // el mensaje sigue siendo el mismo.
+  // --------------------------------------------------
+  // FEEDBACK DE MOVIMIENTO
+  // --------------------------------------------------
+
+  // Guarda el mensaje actual para evitar
+  // actualizaciones innecesarias de React.
   const feedbackRef =
     useRef<string>(
       "Colócate frente a la cámara"
@@ -102,28 +98,51 @@ function CameraPreview() {
 
 
   // --------------------------------------------------
+  // ANÁLISIS TÉCNICO
+  // --------------------------------------------------
+
+  // Guarda la posición inicial del codo
+  // respecto al hombro.
+  const referenciaCodoRef =
+    useRef<ReferenciaCodo | null>(null);
+
+  // Guarda internamente el último
+  // mensaje técnico.
+  const feedbackTecnicoRef =
+    useRef<string>(
+      "Extiende el brazo para calibrar el codo"
+    );
+
+
+  // --------------------------------------------------
   // ESTADOS VISIBLES DE REACT
   // --------------------------------------------------
 
-  // Número de repeticiones.
+  // Repeticiones.
   const [repeticiones, setRepeticiones] =
     useState<number>(0);
 
-
-  // Ángulo actual del codo.
+  // Ángulo actual.
   const [anguloActual, setAnguloActual] =
     useState<number>(0);
 
-
-  // Fase actual mostrada al usuario.
+  // Fase visible.
   const [faseActual, setFaseActual] =
     useState<"abajo" | "arriba">("abajo");
 
-
-  // Mensaje de feedback.
+  // Feedback del recorrido.
   const [feedback, setFeedback] =
     useState<string>(
       "Colócate frente a la cámara"
+    );
+
+  // Feedback técnico.
+  const [
+    feedbackTecnico,
+    setFeedbackTecnico
+  ] =
+    useState<string>(
+      "Extiende el brazo para calibrar el codo"
     );
 
 
@@ -132,39 +151,38 @@ function CameraPreview() {
   // --------------------------------------------------
 
   useEffect(function () {
-    // Aquí guardaremos el stream
-    // real de la webcam.
+    // Stream de la webcam.
     let stream: MediaStream | null =
       null;
 
-
-    // Indica si el componente
+    // Nos permite saber si CameraPreview
     // sigue montado.
     let componenteActivo =
       true;
 
 
-    // Inicia la cámara y MediaPipe.
+    // Mensaje útil para comprobar que el navegador
+    // está utilizando esta versión del componente.
+    console.log(
+      "CameraPreview con análisis técnico cargado"
+    );
+
+
     async function iniciarSistema() {
       try {
-        // ----------------------------------------------
+        // ------------------------------------------
         // CÁMARA
-        // ----------------------------------------------
+        // ------------------------------------------
 
-        // Solicitamos acceso a la webcam.
         const nuevoStream =
           await navigator.mediaDevices.getUserMedia({
-            // Queremos vídeo.
             video: true,
-
-            // No necesitamos audio.
             audio: false
           });
 
 
-        // Si el componente desapareció
-        // mientras esperábamos el permiso,
-        // detenemos inmediatamente la cámara.
+        // Si el componente desapareció mientras
+        // esperábamos la cámara, apagamos el stream.
         if (!componenteActivo) {
           nuevoStream
             .getTracks()
@@ -181,24 +199,22 @@ function CameraPreview() {
           nuevoStream;
 
 
-        // Conectamos el stream
-        // con el elemento <video>.
+        // Lo conectamos al vídeo.
         if (videoRef.current) {
           videoRef.current.srcObject =
             stream;
         }
 
 
-        // ----------------------------------------------
+        // ------------------------------------------
         // MEDIAPIPE
-        // ----------------------------------------------
+        // ------------------------------------------
 
         console.log(
           "Cargando MediaPipe..."
         );
 
 
-        // Creamos nuestro detector de poses.
         const poseLandmarker =
           await crearPoseLandmarker();
 
@@ -211,7 +227,7 @@ function CameraPreview() {
         }
 
 
-        // Guardamos MediaPipe.
+        // Guardamos el detector.
         poseLandmarkerRef.current =
           poseLandmarker;
 
@@ -222,7 +238,7 @@ function CameraPreview() {
 
 
         // Si el vídeo ya está preparado,
-        // empezamos directamente el análisis.
+        // iniciamos el análisis.
         if (
           videoRef.current &&
           videoRef.current.readyState >= 2
@@ -231,8 +247,6 @@ function CameraPreview() {
         }
 
       } catch (error) {
-        // Mostramos cualquier error
-        // relacionado con cámara o MediaPipe.
         console.error(
           "Error al iniciar cámara o MediaPipe:",
           error
@@ -241,7 +255,7 @@ function CameraPreview() {
     }
 
 
-    // Iniciamos el sistema.
+    // Iniciamos cámara y MediaPipe.
     iniciarSistema();
 
 
@@ -249,11 +263,7 @@ function CameraPreview() {
     // LIMPIEZA
     // --------------------------------------------------
 
-    // Esta función se ejecuta cuando
-    // CameraPreview desaparece.
     return function detenerSistema() {
-      // Indicamos que el componente
-      // ya no está activo.
       componenteActivo =
         false;
 
@@ -265,6 +275,9 @@ function CameraPreview() {
         cancelAnimationFrame(
           animationFrameRef.current
         );
+
+        animationFrameRef.current =
+          null;
       }
 
 
@@ -278,8 +291,7 @@ function CameraPreview() {
       }
 
 
-      // Desconectamos el stream
-      // del elemento <video>.
+      // Desconectamos el vídeo.
       if (videoRef.current) {
         videoRef.current.srcObject =
           null;
@@ -294,31 +306,24 @@ function CameraPreview() {
 
 
   // --------------------------------------------------
-  // CONVERSIÓN DE COORDENADAS
+  // COORDENADAS
   // --------------------------------------------------
 
-  // MediaPipe utiliza coordenadas normalizadas
-  // aproximadamente entre 0 y 1.
-  //
-  // Canvas trabaja con píxeles.
-  //
-  // Esta función realiza la conversión.
+  // Convierte las coordenadas normalizadas
+  // de MediaPipe a píxeles del canvas.
   function convertirAPixeles(
     punto: Punto,
     canvas: HTMLCanvasElement
   ): Punto {
     return {
-      // Convertimos X a píxeles.
       x:
         punto.x *
         canvas.width,
 
-      // Convertimos Y a píxeles.
       y:
         punto.y *
         canvas.height,
 
-      // Conservamos la visibilidad.
       visibility:
         punto.visibility
     };
@@ -326,16 +331,14 @@ function CameraPreview() {
 
 
   // --------------------------------------------------
-  // VALIDACIÓN DE LANDMARKS
+  // VISIBILIDAD
   // --------------------------------------------------
 
-  // Comprueba que MediaPipe tenga
-  // suficiente confianza en el punto.
+  // Comprueba que MediaPipe tenga suficiente
+  // confianza en un landmark.
   function esLandmarkValido(
     punto: Punto
   ): boolean {
-    // Si visibility no existe,
-    // aceptamos el punto.
     if (
       punto.visibility === undefined
     ) {
@@ -343,8 +346,7 @@ function CameraPreview() {
     }
 
 
-    // Exigimos una visibilidad mínima
-    // del 70 %.
+    // Exigimos una visibilidad mínima del 70 %.
     return (
       punto.visibility >= 0.7
     );
@@ -352,21 +354,42 @@ function CameraPreview() {
 
 
   // --------------------------------------------------
-  // CÁLCULO DEL ÁNGULO
+  // DISTANCIA ENTRE DOS PUNTOS
   // --------------------------------------------------
 
-  // Calcula el ángulo formado por:
+  function calcularDistancia(
+    a: Punto,
+    b: Punto
+  ): number {
+    const diferenciaX =
+      a.x - b.x;
+
+    const diferenciaY =
+      a.y - b.y;
+
+
+    // Teorema de Pitágoras.
+    return Math.sqrt(
+      diferenciaX * diferenciaX +
+      diferenciaY * diferenciaY
+    );
+  }
+
+
+  // --------------------------------------------------
+  // ÁNGULO DEL CODO
+  // --------------------------------------------------
+
+  // Calcula:
   //
   // hombro -> codo -> muñeca
   //
-  // El codo es el vértice.
+  // siendo el codo el vértice.
   function calcularAngulo(
     a: Punto,
     b: Punto,
     c: Punto
   ): number {
-    // Dirección desde el codo
-    // hacia el hombro.
     const angulo1 =
       Math.atan2(
         a.y - b.y,
@@ -374,8 +397,6 @@ function CameraPreview() {
       );
 
 
-    // Dirección desde el codo
-    // hacia la muñeca.
     const angulo2 =
       Math.atan2(
         c.y - b.y,
@@ -383,22 +404,19 @@ function CameraPreview() {
       );
 
 
-    // Calculamos la diferencia
-    // entre las dos direcciones.
     let angulo =
       Math.abs(
         angulo2 - angulo1
       );
 
 
-    // Convertimos radianes a grados.
+    // Radianes -> grados.
     angulo =
       angulo *
       (180 / Math.PI);
 
 
-    // Queremos siempre un ángulo
-    // entre 0 y 180 grados.
+    // Limitamos entre 0 y 180 grados.
     if (angulo > 180) {
       angulo =
         360 - angulo;
@@ -413,8 +431,8 @@ function CameraPreview() {
   // FEEDBACK VERDE
   // --------------------------------------------------
 
-  // Activa el color verde durante
-  // 300 milisegundos = 0,3 segundos.
+  // Los landmarks aparecen verdes
+  // durante 0,3 segundos.
   function activarFeedbackVerde() {
     verdeHastaRef.current =
       performance.now() + 300;
@@ -422,16 +440,14 @@ function CameraPreview() {
 
 
   // --------------------------------------------------
-  // CAMBIAR MENSAJE DE FEEDBACK
+  // FEEDBACK DEL MOVIMIENTO
   // --------------------------------------------------
 
-  // Cambia el mensaje únicamente
-  // si realmente es diferente al anterior.
   function cambiarFeedback(
     nuevoFeedback: string
   ) {
-    // Si ya mostramos este mensaje,
-    // no necesitamos actualizar React.
+    // Si el mensaje no ha cambiado,
+    // no actualizamos React.
     if (
       feedbackRef.current ===
       nuevoFeedback
@@ -440,52 +456,28 @@ function CameraPreview() {
     }
 
 
-    // Guardamos el mensaje internamente.
     feedbackRef.current =
       nuevoFeedback;
 
 
-    // Actualizamos la interfaz.
     setFeedback(
       nuevoFeedback
     );
   }
 
 
-  // --------------------------------------------------
-  // FEEDBACK DEL MOVIMIENTO
-  // --------------------------------------------------
-
-  // Genera mensajes diferentes
-  // dependiendo de la fase actual.
-  //
-  // FASE ABAJO:
-  //
-  // 160° o más -> Brazo extendido
-  // 90°-159°   -> Sigue flexionando
-  // 51°-89°    -> Casi, flexiona un poco más
-  // 50° o menos -> Flexión completa
-  //
-  //
-  // FASE ARRIBA:
-  //
-  // 50° o menos -> Sigue bajando
-  // 51°-159°    -> Casi estás abajo
-  // 160° o más  -> Brazo extendido
+  // Genera el feedback de subida y bajada.
   function actualizarFeedback(
     anguloCodo: number
   ) {
     // ----------------------------------------------
-    // FASE ABAJO
+    // SUBIDA
     // ----------------------------------------------
 
-    // Estamos abajo y queremos
-    // que el usuario flexione el brazo.
     if (
       faseRef.current === "abajo"
     ) {
-      // 160 grados o más:
-      // posición inicial correctamente extendida.
+      // 160 grados o más.
       if (anguloCodo >= 160) {
         cambiarFeedback(
           "Brazo extendido"
@@ -495,8 +487,7 @@ function CameraPreview() {
       }
 
 
-      // Entre 90 y menos de 160 grados:
-      // todavía queda recorrido.
+      // 90 - 159 grados.
       if (anguloCodo >= 90) {
         cambiarFeedback(
           "Sigue flexionando"
@@ -506,8 +497,7 @@ function CameraPreview() {
       }
 
 
-      // Entre más de 50 y menos de 90 grados:
-      // está cerca de completar la subida.
+      // 51 - 89 grados.
       if (anguloCodo > 50) {
         cambiarFeedback(
           "Casi, flexiona un poco más"
@@ -517,8 +507,7 @@ function CameraPreview() {
       }
 
 
-      // 50 grados o menos:
-      // ha completado la flexión.
+      // 50 grados o menos.
       cambiarFeedback(
         "Flexión completa"
       );
@@ -528,14 +517,10 @@ function CameraPreview() {
 
 
     // ----------------------------------------------
-    // FASE ARRIBA
+    // BAJADA
     // ----------------------------------------------
 
-    // Ya hemos completado la subida.
-    // Ahora queremos que el usuario baje.
-
-    // Hasta 50 grados sigue prácticamente
-    // en la posición superior.
+    // Todavía se encuentra arriba.
     if (anguloCodo <= 50) {
       cambiarFeedback(
         "Sigue bajando"
@@ -545,8 +530,7 @@ function CameraPreview() {
     }
 
 
-    // Entre más de 50 y menos de 160 grados,
-    // está realizando la bajada.
+    // Está realizando la extensión.
     if (anguloCodo < 160) {
       cambiarFeedback(
         "Casi estás abajo"
@@ -556,10 +540,217 @@ function CameraPreview() {
     }
 
 
-    // 160 grados o más:
-    // ha completado la bajada.
+    // Extensión completada.
     cambiarFeedback(
       "Brazo extendido"
+    );
+  }
+
+
+  // --------------------------------------------------
+  // CAMBIAR FEEDBACK TÉCNICO
+  // --------------------------------------------------
+
+  function cambiarFeedbackTecnico(
+    nuevoFeedback: string
+  ) {
+    // Evitamos actualizaciones repetidas.
+    if (
+      feedbackTecnicoRef.current ===
+      nuevoFeedback
+    ) {
+      return;
+    }
+
+
+    feedbackTecnicoRef.current =
+      nuevoFeedback;
+
+
+    setFeedbackTecnico(
+      nuevoFeedback
+    );
+  }
+
+
+  // --------------------------------------------------
+  // CALIBRAR POSICIÓN DEL CODO
+  // --------------------------------------------------
+
+  function guardarReferenciaCodo(
+    hombro: Punto,
+    codo: Punto
+  ) {
+    // Posición del codo relativa al hombro.
+    const dx =
+      codo.x -
+      hombro.x;
+
+    const dy =
+      codo.y -
+      hombro.y;
+
+
+    // Longitud aproximada del brazo superior.
+    const longitudBrazo =
+      calcularDistancia(
+        hombro,
+        codo
+      );
+
+
+    // Evitamos divisiones entre cero.
+    if (longitudBrazo <= 0) {
+      return;
+    }
+
+
+    referenciaCodoRef.current = {
+      dx:
+        dx,
+
+      dy:
+        dy,
+
+      longitudBrazo:
+        longitudBrazo
+    };
+
+
+    console.log(
+      "Referencia del codo guardada"
+    );
+  }
+
+
+  // --------------------------------------------------
+  // ANALIZAR ESTABILIDAD DEL CODO
+  // --------------------------------------------------
+
+  function analizarTecnicaCodo(
+    anguloCodo: number,
+    hombro: Punto,
+    codo: Punto
+  ) {
+    // ----------------------------------------------
+    // CALIBRACIÓN
+    // ----------------------------------------------
+
+    // Utilizamos la posición extendida
+    // como referencia.
+    if (anguloCodo >= 160) {
+      // Guardamos referencia:
+      //
+      // - si todavía no existe;
+      // - o cuando acabamos de volver desde arriba.
+      if (
+        referenciaCodoRef.current === null ||
+        faseRef.current === "arriba"
+      ) {
+        guardarReferenciaCodo(
+          hombro,
+          codo
+        );
+      }
+
+
+      cambiarFeedbackTecnico(
+        "Codo estable"
+      );
+
+      return;
+    }
+
+
+    // Sin referencia no podemos
+    // analizar el desplazamiento.
+    if (
+      referenciaCodoRef.current === null
+    ) {
+      cambiarFeedbackTecnico(
+        "Extiende el brazo para calibrar el codo"
+      );
+
+      return;
+    }
+
+
+    // ----------------------------------------------
+    // POSICIÓN ACTUAL
+    // ----------------------------------------------
+
+    // Posición actual del codo
+    // respecto al hombro.
+    const dxActual =
+      codo.x -
+      hombro.x;
+
+    const dyActual =
+      codo.y -
+      hombro.y;
+
+
+    const referencia =
+      referenciaCodoRef.current;
+
+
+    // Diferencia respecto
+    // a la posición inicial.
+    const cambioX =
+      dxActual -
+      referencia.dx;
+
+    const cambioY =
+      dyActual -
+      referencia.dy;
+
+
+    // Desplazamiento total.
+    const desplazamiento =
+      Math.sqrt(
+        cambioX * cambioX +
+        cambioY * cambioY
+      );
+
+
+    // ----------------------------------------------
+    // NORMALIZACIÓN
+    // ----------------------------------------------
+
+    // Normalizamos utilizando la longitud
+    // hombro-codo para no depender
+    // de la distancia a la cámara.
+    const desplazamientoRelativo =
+      desplazamiento /
+      referencia.longitudBrazo;
+
+
+    // Permitimos inicialmente un 20 %.
+    //
+    // Este valor se calibrará posteriormente
+    // mediante pruebas reales.
+    const desplazamientoMaximo =
+      0.20;
+
+
+    // ----------------------------------------------
+    // RESULTADO
+    // ----------------------------------------------
+
+    if (
+      desplazamientoRelativo >
+      desplazamientoMaximo
+    ) {
+      cambiarFeedbackTecnico(
+        "Mantén el codo estable"
+      );
+
+      return;
+    }
+
+
+    cambiarFeedbackTecnico(
+      "Codo estable"
     );
   }
 
@@ -568,28 +759,25 @@ function CameraPreview() {
   // CONTEO DEL CURL
   // --------------------------------------------------
 
-  // Detecta las dos posiciones extremas
-  // del movimiento y cuenta las repeticiones.
   function actualizarCurl(
     anguloCodo: number
   ) {
     // ----------------------------------------------
-    // BRAZO EXTENDIDO
+    // POSICIÓN ABAJO
     // ----------------------------------------------
 
-    // 160 grados o más significa
-    // que hemos llegado abajo.
+    // 160 grados o más.
     if (anguloCodo >= 160) {
-      // Solo existe un cambio real
-      // si veníamos de arriba.
+      // Solo es cambio real si veníamos
+      // de la posición superior.
       if (
         faseRef.current === "arriba"
       ) {
-        // Feedback visual verde.
+        // Feedback verde 0,3 segundos.
         activarFeedbackVerde();
 
 
-        // Actualizamos la fase visible.
+        // Fase visible.
         setFaseActual(
           "abajo"
         );
@@ -601,49 +789,43 @@ function CameraPreview() {
       }
 
 
-      // Dejamos preparada
-      // la siguiente repetición.
+      // Preparamos una nueva repetición.
       faseRef.current =
         "abajo";
     }
 
 
     // ----------------------------------------------
-    // BRAZO FLEXIONADO
+    // POSICIÓN ARRIBA
     // ----------------------------------------------
 
-    // 50 grados o menos significa
-    // que hemos completado la subida.
-    //
-    // Solo contamos si anteriormente
-    // estábamos abajo.
+    // 50 grados o menos
+    // completa la subida.
     if (
       anguloCodo <= 50 &&
       faseRef.current === "abajo"
     ) {
-      // Cambiamos la fase interna.
+      // Cambiamos de fase.
       faseRef.current =
         "arriba";
 
 
-      // Actualizamos la fase visible.
+      // Fase visible.
       setFaseActual(
         "arriba"
       );
 
 
-      // Activamos el verde
-      // durante 0,3 segundos.
+      // Verde durante 0,3 segundos.
       activarFeedbackVerde();
 
 
-      // Sumamos exactamente
-      // una repetición.
+      // Sumamos una repetición.
       repeticionesRef.current =
         repeticionesRef.current + 1;
 
 
-      // Actualizamos el contador visible.
+      // Actualizamos React.
       setRepeticiones(
         repeticionesRef.current
       );
@@ -661,45 +843,32 @@ function CameraPreview() {
   // DIBUJAR LANDMARK
   // --------------------------------------------------
 
-  // Dibuja uno de los puntos
-  // del brazo.
   function dibujarLandmark(
     contexto: CanvasRenderingContext2D,
     punto: Punto,
     verdeActivo: boolean
   ) {
-    // Iniciamos un nuevo trazado.
     contexto.beginPath();
 
 
-    // Dibujamos el círculo.
     contexto.arc(
       punto.x,
       punto.y,
-
-      // Radio.
       8,
-
-      // Inicio.
       0,
-
-      // Círculo completo.
       Math.PI * 2
     );
 
 
-    // Verde durante el feedback.
     if (verdeActivo) {
       contexto.fillStyle =
         "limegreen";
     } else {
-      // Color normal.
       contexto.fillStyle =
         "red";
     }
 
 
-    // Dibujamos el punto.
     contexto.fill();
   }
 
@@ -708,49 +877,40 @@ function CameraPreview() {
   // DIBUJAR CONEXIÓN
   // --------------------------------------------------
 
-  // Dibuja una línea
-  // entre dos landmarks.
   function dibujarConexion(
     contexto: CanvasRenderingContext2D,
     inicio: Punto,
     fin: Punto,
     verdeActivo: boolean
   ) {
-    // Nuevo trazado.
     contexto.beginPath();
 
 
-    // Punto inicial.
     contexto.moveTo(
       inicio.x,
       inicio.y
     );
 
 
-    // Punto final.
     contexto.lineTo(
       fin.x,
       fin.y
     );
 
 
-    // Grosor de la línea.
     contexto.lineWidth =
       4;
 
 
-    // Verde durante el feedback.
     if (verdeActivo) {
       contexto.strokeStyle =
         "limegreen";
     } else {
-      // Color normal.
       contexto.strokeStyle =
         "blue";
     }
 
 
-    // Dibujamos la línea.
     contexto.stroke();
   }
 
@@ -759,17 +919,14 @@ function CameraPreview() {
   // DIBUJAR BRAZO
   // --------------------------------------------------
 
-  // Dibuja:
-  //
-  // hombro -> codo -> muñeca
   function dibujarBrazo(
     contexto: CanvasRenderingContext2D,
     hombro: Punto,
     codo: Punto,
     muneca: Punto
   ) {
-    // Comprobamos si todavía estamos
-    // dentro de los 300 ms de feedback.
+    // Comprobamos si estamos dentro
+    // de los 300 ms de feedback verde.
     const verdeActivo =
       performance.now() <
       verdeHastaRef.current;
@@ -793,7 +950,6 @@ function CameraPreview() {
     );
 
 
-    // Hombro.
     dibujarLandmark(
       contexto,
       hombro,
@@ -801,7 +957,6 @@ function CameraPreview() {
     );
 
 
-    // Codo.
     dibujarLandmark(
       contexto,
       codo,
@@ -809,7 +964,6 @@ function CameraPreview() {
     );
 
 
-    // Muñeca.
     dibujarLandmark(
       contexto,
       muneca,
@@ -819,21 +973,18 @@ function CameraPreview() {
 
 
   // --------------------------------------------------
-  // ANALIZAR CADA FRAME
+  // ANALIZAR FRAME
   // --------------------------------------------------
 
   function analizarFrame(
     timestamp: number
   ) {
-    // Comprobamos que todos los elementos
-    // necesarios estén disponibles.
+    // Necesitamos vídeo, canvas y MediaPipe.
     if (
       !videoRef.current ||
       !canvasRef.current ||
       !poseLandmarkerRef.current
     ) {
-      // Lo volvemos a intentar
-      // en el siguiente frame.
       animationFrameRef.current =
         requestAnimationFrame(
           analizarFrame
@@ -843,7 +994,6 @@ function CameraPreview() {
     }
 
 
-    // Guardamos referencias más cómodas.
     const video =
       videoRef.current;
 
@@ -854,8 +1004,7 @@ function CameraPreview() {
       poseLandmarkerRef.current;
 
 
-    // Esperamos hasta que el vídeo
-    // tenga suficientes datos.
+    // Esperamos a que el vídeo esté listo.
     if (video.readyState < 2) {
       animationFrameRef.current =
         requestAnimationFrame(
@@ -866,13 +1015,11 @@ function CameraPreview() {
     }
 
 
-    // Adaptamos el canvas
-    // a la resolución real de la cámara.
+    // Igualamos resolución de canvas
+    // y webcam.
     if (
-      canvas.width !==
-        video.videoWidth ||
-      canvas.height !==
-        video.videoHeight
+      canvas.width !== video.videoWidth ||
+      canvas.height !== video.videoHeight
     ) {
       canvas.width =
         video.videoWidth;
@@ -882,20 +1029,17 @@ function CameraPreview() {
     }
 
 
-    // Obtenemos el contexto 2D.
+    // Contexto de dibujo 2D.
     const contexto =
       canvas.getContext("2d");
 
 
-    // Si no existe,
-    // no podemos dibujar.
     if (!contexto) {
       return;
     }
 
 
-    // Borramos lo dibujado
-    // en el frame anterior.
+    // Borramos el frame anterior.
     contexto.clearRect(
       0,
       0,
@@ -905,11 +1049,10 @@ function CameraPreview() {
 
 
     try {
-      // ----------------------------------------------
+      // ------------------------------------------
       // MEDIAPIPE
-      // ----------------------------------------------
+      // ------------------------------------------
 
-      // Analizamos el frame actual.
       const resultado =
         poseLandmarker.detectForVideo(
           video,
@@ -917,29 +1060,22 @@ function CameraPreview() {
         );
 
 
-      // Comprobamos que se haya
-      // detectado una persona.
+      // Comprobamos que exista
+      // una persona detectada.
       if (
         resultado.landmarks.length > 0
       ) {
-        // Landmarks de la primera persona.
         const landmarks =
           resultado.landmarks[0];
 
-
-        // ------------------------------------------
-        // BRAZO DERECHO
-        // ------------------------------------------
 
         // 12 = hombro derecho.
         const hombroNormalizado =
           landmarks[12];
 
-
         // 14 = codo derecho.
         const codoNormalizado =
           landmarks[14];
-
 
         // 16 = muñeca derecha.
         const munecaNormalizada =
@@ -952,8 +1088,8 @@ function CameraPreview() {
           codoNormalizado &&
           munecaNormalizada
         ) {
-          // Comprobamos que los tres puntos
-          // tengan suficiente visibilidad.
+          // Los tres landmarks deben
+          // superar visibility >= 0.7.
           if (
             esLandmarkValido(
               hombroNormalizado
@@ -966,7 +1102,7 @@ function CameraPreview() {
             )
           ) {
             // --------------------------------------
-            // CONVERSIÓN A PÍXELES
+            // CONVERTIMOS A PÍXELES
             // --------------------------------------
 
             const hombro =
@@ -991,7 +1127,7 @@ function CameraPreview() {
 
 
             // --------------------------------------
-            // CÁLCULO DEL ÁNGULO
+            // ÁNGULO DEL CODO
             // --------------------------------------
 
             const anguloCodo =
@@ -1003,21 +1139,17 @@ function CameraPreview() {
 
 
             // --------------------------------------
-            // ACTUALIZAMOS LA INTERFAZ
+            // INTERFAZ
             // --------------------------------------
 
             // Actualizamos aproximadamente
             // cada 100 milisegundos.
-            //
-            // Así no obligamos a React
-            // a renderizar en cada frame.
             if (
               timestamp -
                 ultimaActualizacionUIRef.current >=
               100
             ) {
-              // Mostramos el ángulo
-              // redondeado sin decimales.
+              // Ángulo visible.
               setAnguloActual(
                 Math.round(
                   anguloCodo
@@ -1025,33 +1157,41 @@ function CameraPreview() {
               );
 
 
-              // Generamos el feedback
-              // correspondiente a la fase actual.
+              // Feedback del recorrido.
               actualizarFeedback(
                 anguloCodo
               );
 
 
-              // Guardamos el momento
-              // de esta actualización.
               ultimaActualizacionUIRef.current =
                 timestamp;
             }
 
 
             // --------------------------------------
-            // CONTEO DEL CURL
+            // TÉCNICA
             // --------------------------------------
 
-            // Comprobamos si hemos llegado
-            // a alguno de los extremos.
+            // Analizamos el desplazamiento
+            // del codo respecto al hombro.
+            analizarTecnicaCodo(
+              anguloCodo,
+              hombro,
+              codo
+            );
+
+
+            // --------------------------------------
+            // CONTEO
+            // --------------------------------------
+
             actualizarCurl(
               anguloCodo
             );
 
 
             // --------------------------------------
-            // DIBUJAMOS EL BRAZO
+            // DIBUJO
             // --------------------------------------
 
             dibujarBrazo(
@@ -1065,8 +1205,6 @@ function CameraPreview() {
       }
 
     } catch (error) {
-      // Mostramos cualquier problema
-      // sin detener completamente la aplicación.
       console.error(
         "Error analizando el frame:",
         error
@@ -1087,9 +1225,7 @@ function CameraPreview() {
   // --------------------------------------------------
 
   function iniciarAnalisis() {
-    // Si MediaPipe todavía
-    // no está preparado,
-    // no podemos empezar.
+    // Necesitamos MediaPipe preparado.
     if (
       !poseLandmarkerRef.current
     ) {
@@ -1097,8 +1233,7 @@ function CameraPreview() {
     }
 
 
-    // Evitamos tener dos bucles
-    // de análisis simultáneamente.
+    // Evitamos dos bucles simultáneos.
     if (
       animationFrameRef.current !== null
     ) {
@@ -1126,8 +1261,6 @@ function CameraPreview() {
   // --------------------------------------------------
 
   function videoPreparado() {
-    // Mostramos la resolución
-    // real de la webcam.
     if (videoRef.current) {
       console.log(
         "Resolución:",
@@ -1137,7 +1270,6 @@ function CameraPreview() {
     }
 
 
-    // Intentamos iniciar el análisis.
     iniciarAnalisis();
   }
 
@@ -1149,67 +1281,91 @@ function CameraPreview() {
   return (
     <div>
 
-      {/* Información en tiempo real del ejercicio. */}
+      {/* ----------------------------------------------
+          DATOS DEL MOVIMIENTO
+          ---------------------------------------------- */}
       <div className="exercise-data">
 
-        {/* Número de repeticiones detectadas. */}
         <h2>
           Repeticiones: {repeticiones}
         </h2>
 
 
-        {/* Ángulo actual del codo. */}
         <p>
           Ángulo del codo: {anguloActual}°
         </p>
 
 
-        {/* Fase actual del movimiento. */}
         <p>
           Fase: {faseActual}
         </p>
 
 
-        {/* Mensaje de ayuda generado
-            a partir del movimiento. */}
         <p>
-          Feedback: {feedback}
+          Movimiento: {feedback}
         </p>
 
       </div>
 
 
-      {/* Contenedor de vídeo y canvas. */}
+      {/* ----------------------------------------------
+          ANÁLISIS TÉCNICO
+
+          Lo colocamos como un bloque independiente.
+          Esto permite comprobar claramente que
+          React está renderizando esta funcionalidad.
+          ---------------------------------------------- */}
+      <div>
+
+        <h3>
+          Técnica del curl
+        </h3>
+
+
+        <p>
+          <strong>
+            Estado:
+          </strong>{" "}
+          {feedbackTecnico}
+        </p>
+
+      </div>
+
+
+      {/* ----------------------------------------------
+          CÁMARA + CANVAS
+          ---------------------------------------------- */}
       <div className="camera-container">
 
         <video
-          // Referencia al elemento <video>.
+          // Vídeo de la webcam.
           ref={videoRef}
 
-          // Reproduce automáticamente.
+          // Reproducción automática.
           autoPlay
 
-          // Evita que en móvil
-          // se abra a pantalla completa.
+          // Mantiene el vídeo integrado
+          // en la página en móviles.
           playsInline
 
-          // Cuando está preparado,
+          // Cuando el vídeo está preparado
           // iniciamos el análisis.
           onLoadedData={
             videoPreparado
           }
 
-          // Clase CSS de la cámara.
+          // Clase que ya utilizamos
+          // para invertir la cámara.
           className="camera-video"
         />
 
 
         <canvas
-          // Referencia al canvas.
+          // Canvas situado encima del vídeo.
           ref={canvasRef}
 
-          // Clase CSS que permite
-          // colocarlo encima del vídeo.
+          // Clase que mantiene el canvas
+          // alineado e invertido junto al vídeo.
           className="camera-canvas"
         />
 
@@ -1219,5 +1375,6 @@ function CameraPreview() {
   );
 }
 
-// Exportamos el componente.
+
+// Exportamos CameraPreview.
 export default CameraPreview;
