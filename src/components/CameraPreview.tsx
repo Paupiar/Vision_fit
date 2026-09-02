@@ -1,110 +1,176 @@
-// Importamos useEffect para gestionar cuándo se inicia y se detiene
-// la cámara, y useRef para guardar referencias al vídeo, canvas,
-// detector de MediaPipe y bucle de animación.
-import { useEffect, useRef } from "react";
+// Importamos useEffect para gestionar el ciclo de vida del componente,
+// useRef para guardar valores entre frames sin provocar renderizados
+// y useState para mostrar las repeticiones en la interfaz.
+import {
+  useEffect,
+  useRef,
+  useState
+} from "react";
 
-// Importamos el tipo PoseLandmarker para poder tipar correctamente
-// nuestra referencia al detector.
+// Importamos únicamente el tipo PoseLandmarker
+// para poder tipar correctamente nuestra referencia.
 import type { PoseLandmarker } from "@mediapipe/tasks-vision";
 
-// Importamos la función que hemos creado anteriormente
-// para preparar el detector de MediaPipe.
+// Importamos nuestra función que crea
+// y configura MediaPipe Pose Landmarker.
 import { crearPoseLandmarker } from "../mediapipe/pose";
 
-// Definimos la estructura mínima que necesitamos de un landmark.
-// MediaPipe devuelve x e y normalizadas entre 0 y 1.
-// visibility indica qué tan visible está ese punto.
+
+// Estructura mínima que necesitamos de un landmark.
 interface Punto {
+  // Posición horizontal.
   x: number;
+
+  // Posición vertical.
   y: number;
+
+  // Confianza de MediaPipe sobre la visibilidad del punto.
   visibility?: number;
 }
 
+
 function CameraPreview() {
+  // --------------------------------------------------
+  // REFERENCIAS DE REACT
+  // --------------------------------------------------
+
   // Referencia al elemento <video>.
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videoRef =
+    useRef<HTMLVideoElement | null>(null);
 
   // Referencia al elemento <canvas>.
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasRef =
+    useRef<HTMLCanvasElement | null>(null);
 
-  // Referencia al detector de pose de MediaPipe.
-  // Empieza en null porque MediaPipe tarda un poco en cargarse.
-  const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
+  // Referencia al detector de MediaPipe.
+  const poseLandmarkerRef =
+    useRef<PoseLandmarker | null>(null);
 
-  // Guardamos el identificador del bucle requestAnimationFrame
-  // para poder detenerlo cuando apaguemos la cámara.
-  const animationFrameRef = useRef<number | null>(null);
+  // Guarda el identificador de requestAnimationFrame
+  // para poder cancelar el bucle posteriormente.
+  const animationFrameRef =
+    useRef<number | null>(null);
+
+
+  // --------------------------------------------------
+  // ESTADO DEL CURL
+  // --------------------------------------------------
+
+  // Guarda la fase actual del curl entre frames.
+  //
+  // "abajo" -> brazo extendido.
+  // "arriba" -> brazo flexionado.
+  //
+  // Empezamos en "abajo", pero solo se contará
+  // cuando realmente se alcance primero la zona extendida.
+  const faseRef =
+    useRef<"abajo" | "arriba">("abajo");
+
+  // Guarda internamente las repeticiones detectadas.
+  // useRef es útil porque analizarFrame se ejecuta
+  // continuamente muchas veces por segundo.
+  const repeticionesRef =
+    useRef<number>(0);
+
+  // Estado de React utilizado únicamente para
+  // mostrar el contador en la interfaz.
+  const [repeticiones, setRepeticiones] =
+    useState<number>(0);
+
+
+  // --------------------------------------------------
+  // INICIALIZACIÓN DE CÁMARA Y MEDIAPIPE
+  // --------------------------------------------------
 
   useEffect(function () {
-    // Guardaremos aquí el stream de la webcam.
+    // Aquí guardaremos el stream de la webcam.
     let stream: MediaStream | null = null;
 
-    // Nos permite saber si el componente sigue activo.
+    // Indica si CameraPreview sigue montado.
     let componenteActivo = true;
 
-    // Función principal de inicialización.
+
+    // Inicia la webcam y MediaPipe.
     async function iniciarSistema() {
       try {
-        // --------------------------------------------------
-        // 1. INICIAMOS LA CÁMARA
-        // --------------------------------------------------
+        // ----------------------------------------------
+        // CÁMARA
+        // ----------------------------------------------
 
         // Solicitamos permiso para utilizar la webcam.
-        const nuevoStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false
-        });
+        const nuevoStream =
+          await navigator.mediaDevices.getUserMedia({
+            // Queremos vídeo.
+            video: true,
 
-        // Si el componente se desmontó mientras esperábamos,
-        // apagamos inmediatamente la webcam.
-        if (!componenteActivo) {
-          nuevoStream.getTracks().forEach(function (track) {
-            track.stop();
+            // No necesitamos micrófono.
+            audio: false
           });
+
+
+        // Si el componente desapareció mientras
+        // esperábamos la cámara, detenemos el stream.
+        if (!componenteActivo) {
+          nuevoStream
+            .getTracks()
+            .forEach(function (track) {
+              // Detenemos cada pista.
+              track.stop();
+            });
 
           return;
         }
+
 
         // Guardamos el stream.
         stream = nuevoStream;
 
-        // Conectamos el stream al elemento <video>.
+
+        // Conectamos la webcam con el elemento <video>.
         if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+          videoRef.current.srcObject =
+            stream;
         }
 
-        // --------------------------------------------------
-        // 2. CARGAMOS MEDIAPIPE
-        // --------------------------------------------------
+
+        // ----------------------------------------------
+        // MEDIAPIPE
+        // ----------------------------------------------
 
         console.log("Cargando MediaPipe...");
 
-        // Creamos el detector utilizando la función
-        // definida en poseLandmarker.ts.
-        const poseLandmarker = await crearPoseLandmarker();
 
-        // Si el componente desapareció mientras MediaPipe cargaba,
-        // no seguimos con la inicialización.
+        // Creamos el detector de poses.
+        const poseLandmarker =
+          await crearPoseLandmarker();
+
+
+        // Si el componente ya desapareció,
+        // no seguimos.
         if (!componenteActivo) {
           return;
         }
 
-        // Guardamos el detector para utilizarlo en cada frame.
-        poseLandmarkerRef.current = poseLandmarker;
+
+        // Guardamos el detector.
+        poseLandmarkerRef.current =
+          poseLandmarker;
 
         console.log("MediaPipe cargado");
 
+
         // Si el vídeo ya está preparado,
-        // iniciamos inmediatamente el análisis.
+        // iniciamos el análisis inmediatamente.
         if (
           videoRef.current &&
           videoRef.current.readyState >= 2
         ) {
           iniciarAnalisis();
         }
+
       } catch (error) {
-        // Mostramos cualquier error relacionado
-        // con la cámara o MediaPipe.
+        // Mostramos cualquier problema de cámara
+        // o inicialización de MediaPipe.
         console.error(
           "Error al iniciar cámara o MediaPipe:",
           error
@@ -112,63 +178,213 @@ function CameraPreview() {
       }
     }
 
-    // Ejecutamos la inicialización.
+
+    // Iniciamos el sistema.
     iniciarSistema();
 
-    // Función de limpieza que React ejecuta
-    // cuando CameraPreview desaparece.
+
+    // --------------------------------------------------
+    // LIMPIEZA
+    // --------------------------------------------------
+
+    // Se ejecuta cuando CameraPreview desaparece.
     return function detenerSistema() {
-      // Indicamos que el componente ya no está activo.
+      // Indicamos que el componente ha dejado de existir.
       componenteActivo = false;
 
-      // Detenemos el bucle de animación.
-      if (animationFrameRef.current !== null) {
-        cancelAnimationFrame(animationFrameRef.current);
+
+      // Cancelamos el bucle de análisis.
+      if (
+        animationFrameRef.current !== null
+      ) {
+        cancelAnimationFrame(
+          animationFrameRef.current
+        );
       }
 
-      // Apagamos todas las pistas de la webcam.
+
+      // Apagamos la webcam.
       if (stream) {
-        stream.getTracks().forEach(function (track) {
-          track.stop();
-        });
+        stream
+          .getTracks()
+          .forEach(function (track) {
+            // Detenemos cada pista activa.
+            track.stop();
+          });
       }
 
-      // Desconectamos la webcam del vídeo.
+
+      // Desconectamos el stream del vídeo.
       if (videoRef.current) {
         videoRef.current.srcObject = null;
       }
 
-      console.log("Cámara y análisis detenidos");
+
+      console.log(
+        "Cámara y análisis detenidos"
+      );
     };
   }, []);
 
-  // Convierte las coordenadas normalizadas de MediaPipe
-  // a coordenadas reales en píxeles del canvas.
+
+  // --------------------------------------------------
+  // CONVERTIR COORDENADAS
+  // --------------------------------------------------
+
+  // Convierte coordenadas normalizadas de MediaPipe
+  // a píxeles reales del canvas.
   function convertirAPixeles(
     punto: Punto,
     canvas: HTMLCanvasElement
   ): Punto {
     return {
+      // Convertimos X.
       x: punto.x * canvas.width,
+
+      // Convertimos Y.
       y: punto.y * canvas.height,
+
+      // Conservamos visibility.
       visibility: punto.visibility
     };
   }
 
-  // Comprueba que un landmark tenga suficiente visibilidad.
-  function esLandmarkValido(punto: Punto): boolean {
-    // Si MediaPipe no devuelve visibility,
-    // de momento aceptamos el landmark.
-    if (punto.visibility === undefined) {
+
+  // --------------------------------------------------
+  // VALIDAR LANDMARK
+  // --------------------------------------------------
+
+  // Comprueba si MediaPipe ve correctamente el punto.
+  function esLandmarkValido(
+    punto: Punto
+  ): boolean {
+    // Si no existe visibility,
+    // permitimos temporalmente el punto.
+    if (
+      punto.visibility === undefined
+    ) {
       return true;
     }
 
-    // Solo consideramos válido el punto
-    // si su visibilidad es igual o superior a 0.7.
+
+    // Exigimos como mínimo una visibilidad del 70 %.
     return punto.visibility >= 0.7;
   }
 
-  // Dibuja un landmark como un círculo.
+
+  // --------------------------------------------------
+  // CALCULAR ÁNGULO
+  // --------------------------------------------------
+
+  // Calcula el ángulo:
+  //
+  // hombro -> codo -> muñeca
+  //
+  // El codo es el vértice.
+  function calcularAngulo(
+    a: Punto,
+    b: Punto,
+    c: Punto
+  ): number {
+    // Dirección desde el codo hacia el hombro.
+    const angulo1 =
+      Math.atan2(
+        a.y - b.y,
+        a.x - b.x
+      );
+
+
+    // Dirección desde el codo hacia la muñeca.
+    const angulo2 =
+      Math.atan2(
+        c.y - b.y,
+        c.x - b.x
+      );
+
+
+    // Diferencia entre ambas direcciones.
+    let angulo =
+      Math.abs(
+        angulo2 - angulo1
+      );
+
+
+    // Convertimos radianes a grados.
+    angulo =
+      angulo * (180 / Math.PI);
+
+
+    // Nos aseguramos de obtener
+    // un ángulo entre 0° y 180°.
+    if (angulo > 180) {
+      angulo =
+        360 - angulo;
+    }
+
+
+    // Devolvemos el ángulo final.
+    return angulo;
+  }
+
+
+  // --------------------------------------------------
+  // CONTAR CURLS
+  // --------------------------------------------------
+
+  // Analiza el ángulo del codo
+  // y actualiza el estado de la repetición.
+  function actualizarCurl(
+    anguloCodo: number
+  ) {
+    // Si el ángulo supera 160°,
+    // consideramos que el brazo está extendido.
+    if (anguloCodo > 160) {
+      // Marcamos la fase como "abajo".
+      faseRef.current = "abajo";
+    }
+
+
+    // Solo contamos una repetición cuando:
+    //
+    // 1. El ángulo baja de 50°.
+    // 2. El brazo venía previamente de "abajo".
+    if (
+      anguloCodo < 50 &&
+      faseRef.current === "abajo"
+    ) {
+      // Cambiamos inmediatamente a "arriba".
+      //
+      // Esto evita sumar varias repeticiones
+      // mientras mantengas el brazo flexionado.
+      faseRef.current = "arriba";
+
+
+      // Incrementamos el contador interno.
+      repeticionesRef.current =
+        repeticionesRef.current + 1;
+
+
+      // Actualizamos el estado visual de React
+      // para mostrar el nuevo número en pantalla.
+      setRepeticiones(
+        repeticionesRef.current
+      );
+
+
+      // Mostramos también el resultado en consola
+      // durante estas primeras pruebas.
+      console.log(
+        "Repetición detectada:",
+        repeticionesRef.current
+      );
+    }
+  }
+
+
+  // --------------------------------------------------
+  // DIBUJAR LANDMARK
+  // --------------------------------------------------
+
   function dibujarLandmark(
     contexto: CanvasRenderingContext2D,
     punto: Punto
@@ -176,7 +392,8 @@ function CameraPreview() {
     // Empezamos un nuevo trazado.
     contexto.beginPath();
 
-    // Dibujamos un círculo en la posición del landmark.
+
+    // Dibujamos el círculo.
     contexto.arc(
       punto.x,
       punto.y,
@@ -185,14 +402,20 @@ function CameraPreview() {
       Math.PI * 2
     );
 
-    // Elegimos el color del punto.
+
+    // Color del landmark.
     contexto.fillStyle = "red";
 
-    // Rellenamos el círculo.
+
+    // Rellenamos el punto.
     contexto.fill();
   }
 
-  // Dibuja una línea entre dos landmarks.
+
+  // --------------------------------------------------
+  // DIBUJAR CONEXIÓN
+  // --------------------------------------------------
+
   function dibujarConexion(
     contexto: CanvasRenderingContext2D,
     inicio: Punto,
@@ -201,29 +424,38 @@ function CameraPreview() {
     // Empezamos un nuevo trazado.
     contexto.beginPath();
 
-    // Colocamos el inicio de la línea.
+
+    // Colocamos el lápiz en el primer punto.
     contexto.moveTo(
       inicio.x,
       inicio.y
     );
 
-    // Indicamos dónde termina.
+
+    // Dibujamos hasta el segundo punto.
     contexto.lineTo(
       fin.x,
       fin.y
     );
 
-    // Definimos el grosor.
+
+    // Grosor de la línea.
     contexto.lineWidth = 4;
 
-    // Elegimos el color de la conexión.
+
+    // Color de la conexión.
     contexto.strokeStyle = "blue";
+
 
     // Dibujamos la línea.
     contexto.stroke();
   }
 
-  // Dibuja el brazo derecho completo.
+
+  // --------------------------------------------------
+  // DIBUJAR BRAZO
+  // --------------------------------------------------
+
   function dibujarBrazo(
     contexto: CanvasRenderingContext2D,
     hombro: Punto,
@@ -237,6 +469,7 @@ function CameraPreview() {
       codo
     );
 
+
     // Conectamos codo con muñeca.
     dibujarConexion(
       contexto,
@@ -244,61 +477,99 @@ function CameraPreview() {
       muneca
     );
 
-    // Dibujamos los landmarks individuales.
-    dibujarLandmark(contexto, hombro);
-    dibujarLandmark(contexto, codo);
-    dibujarLandmark(contexto, muneca);
+
+    // Dibujamos los tres puntos.
+    dibujarLandmark(
+      contexto,
+      hombro
+    );
+
+    dibujarLandmark(
+      contexto,
+      codo
+    );
+
+    dibujarLandmark(
+      contexto,
+      muneca
+    );
   }
 
-  // Esta función analiza un frame de vídeo
-  // utilizando MediaPipe.
-  function analizarFrame(timestamp: number) {
-    // Comprobamos que existan todos los elementos necesarios.
+
+  // --------------------------------------------------
+  // ANALIZAR FRAME
+  // --------------------------------------------------
+
+  function analizarFrame(
+    timestamp: number
+  ) {
+    // Comprobamos que todos los elementos
+    // necesarios estén disponibles.
     if (
       !videoRef.current ||
       !canvasRef.current ||
       !poseLandmarkerRef.current
     ) {
-      // Volvemos a intentarlo en el siguiente frame.
+      // Lo volvemos a intentar
+      // en el siguiente frame.
       animationFrameRef.current =
-        requestAnimationFrame(analizarFrame);
+        requestAnimationFrame(
+          analizarFrame
+        );
 
       return;
     }
+
 
     // Guardamos referencias más cortas.
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const poseLandmarker = poseLandmarkerRef.current;
+    const video =
+      videoRef.current;
 
-    // Comprobamos que el vídeo tenga datos suficientes
-    // para poder analizarlo.
+    const canvas =
+      canvasRef.current;
+
+    const poseLandmarker =
+      poseLandmarkerRef.current;
+
+
+    // Esperamos hasta que el vídeo
+    // tenga datos suficientes.
     if (video.readyState < 2) {
       animationFrameRef.current =
-        requestAnimationFrame(analizarFrame);
+        requestAnimationFrame(
+          analizarFrame
+        );
 
       return;
     }
 
-    // Hacemos que la resolución interna del canvas
-    // coincida con la resolución real de la webcam.
+
+    // Ajustamos la resolución interna del canvas
+    // a la resolución real de la webcam.
     if (
       canvas.width !== video.videoWidth ||
       canvas.height !== video.videoHeight
     ) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width =
+        video.videoWidth;
+
+      canvas.height =
+        video.videoHeight;
     }
 
-    // Obtenemos el contexto 2D del canvas.
-    const contexto = canvas.getContext("2d");
+
+    // Obtenemos el contexto 2D.
+    const contexto =
+      canvas.getContext("2d");
+
 
     // Si no existe, no podemos dibujar.
     if (!contexto) {
       return;
     }
 
-    // Limpiamos lo dibujado en el frame anterior.
+
+    // Limpiamos el frame anterior.
     contexto.clearRect(
       0,
       0,
@@ -306,66 +577,124 @@ function CameraPreview() {
       canvas.height
     );
 
+
     try {
-      // --------------------------------------------------
-      // ANALIZAMOS EL FRAME REAL DE LA WEBCAM
-      // --------------------------------------------------
+      // ----------------------------------------------
+      // ANALIZAMOS LA WEBCAM CON MEDIAPIPE
+      // ----------------------------------------------
 
-      // MediaPipe procesa el frame actual del vídeo.
-      // timestamp indica el momento exacto del frame en milisegundos.
-      const resultado = poseLandmarker.detectForVideo(
-        video,
-        timestamp
-      );
+      const resultado =
+        poseLandmarker.detectForVideo(
+          video,
+          timestamp
+        );
 
-      // Comprobamos que MediaPipe haya detectado
-      // al menos una persona.
-      if (resultado.landmarks.length > 0) {
-        // Obtenemos todos los landmarks
-        // de la primera persona detectada.
-        const landmarks = resultado.landmarks[0];
 
-        // Landmark 12 = hombro derecho.
-        const hombroNormalizado = landmarks[12];
+      // Si encontramos una persona...
+      if (
+        resultado.landmarks.length > 0
+      ) {
+        // Obtenemos sus 33 landmarks.
+        const landmarks =
+          resultado.landmarks[0];
 
-        // Landmark 14 = codo derecho.
-        const codoNormalizado = landmarks[14];
 
-        // Landmark 16 = muñeca derecha.
-        const munecaNormalizada = landmarks[16];
+        // ------------------------------------------
+        // BRAZO DERECHO
+        // ------------------------------------------
 
-        // Comprobamos que los tres landmarks existan.
+        // 12 = hombro derecho.
+        const hombroNormalizado =
+          landmarks[12];
+
+        // 14 = codo derecho.
+        const codoNormalizado =
+          landmarks[14];
+
+        // 16 = muñeca derecha.
+        const munecaNormalizada =
+          landmarks[16];
+
+
+        // Comprobamos que existan.
         if (
           hombroNormalizado &&
           codoNormalizado &&
           munecaNormalizada
         ) {
-          // Comprobamos que los tres puntos tengan
-          // suficiente visibilidad.
+          // Comprobamos también
+          // que tengan suficiente visibilidad.
           if (
-            esLandmarkValido(hombroNormalizado) &&
-            esLandmarkValido(codoNormalizado) &&
-            esLandmarkValido(munecaNormalizada)
+            esLandmarkValido(
+              hombroNormalizado
+            ) &&
+            esLandmarkValido(
+              codoNormalizado
+            ) &&
+            esLandmarkValido(
+              munecaNormalizada
+            )
           ) {
-            // Convertimos las coordenadas normalizadas
-            // de MediaPipe a píxeles reales.
-            const hombro = convertirAPixeles(
-              hombroNormalizado,
-              canvas
+            // --------------------------------------
+            // CONVERTIMOS A PÍXELES
+            // --------------------------------------
+
+            const hombro =
+              convertirAPixeles(
+                hombroNormalizado,
+                canvas
+              );
+
+
+            const codo =
+              convertirAPixeles(
+                codoNormalizado,
+                canvas
+              );
+
+
+            const muneca =
+              convertirAPixeles(
+                munecaNormalizada,
+                canvas
+              );
+
+
+            // --------------------------------------
+            // CALCULAMOS EL ÁNGULO
+            // --------------------------------------
+
+            const anguloCodo =
+              calcularAngulo(
+                hombro,
+                codo,
+                muneca
+              );
+
+
+            // Mostramos temporalmente
+            // el ángulo en consola.
+            console.log(
+              "Ángulo del codo:",
+              Math.round(anguloCodo)
             );
 
-            const codo = convertirAPixeles(
-              codoNormalizado,
-              canvas
+
+            // --------------------------------------
+            // ANALIZAMOS EL CURL
+            // --------------------------------------
+
+            // Utilizamos el ángulo calculado
+            // para detectar repeticiones.
+            actualizarCurl(
+              anguloCodo
             );
 
-            const muneca = convertirAPixeles(
-              munecaNormalizada,
-              canvas
-            );
 
-            // Dibujamos el brazo derecho
-            // encima de la imagen de la webcam.
+            // --------------------------------------
+            // DIBUJAMOS EL BRAZO
+            // --------------------------------------
+
             dibujarBrazo(
               contexto,
               hombro,
@@ -375,42 +704,63 @@ function CameraPreview() {
           }
         }
       }
+
     } catch (error) {
-      // Si MediaPipe falla al procesar algún frame,
-      // mostramos el error sin detener toda la aplicación.
+      // Mostramos cualquier error de análisis
+      // sin detener la aplicación.
       console.error(
         "Error analizando el frame:",
         error
       );
     }
 
-    // Solicitamos analizar el siguiente frame.
+
+    // Solicitamos el siguiente frame.
     animationFrameRef.current =
-      requestAnimationFrame(analizarFrame);
+      requestAnimationFrame(
+        analizarFrame
+      );
   }
 
-  // Inicia el bucle de análisis.
+
+  // --------------------------------------------------
+  // INICIAR ANÁLISIS
+  // --------------------------------------------------
+
   function iniciarAnalisis() {
-    // No iniciamos el análisis si MediaPipe
-    // todavía no está preparado.
+    // MediaPipe debe estar preparado.
     if (!poseLandmarkerRef.current) {
       return;
     }
 
-    // Evitamos tener dos bucles funcionando a la vez.
-    if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(animationFrameRef.current);
+
+    // Evitamos dos bucles simultáneos.
+    if (
+      animationFrameRef.current !== null
+    ) {
+      cancelAnimationFrame(
+        animationFrameRef.current
+      );
     }
 
-    // Iniciamos el primer frame.
-    animationFrameRef.current =
-      requestAnimationFrame(analizarFrame);
 
-    console.log("Análisis de pose iniciado");
+    // Iniciamos el bucle.
+    animationFrameRef.current =
+      requestAnimationFrame(
+        analizarFrame
+      );
+
+
+    console.log(
+      "Análisis de pose iniciado"
+    );
   }
 
-  // Se ejecuta cuando el vídeo ya tiene datos suficientes
-  // para poder empezar a analizarlo.
+
+  // --------------------------------------------------
+  // VÍDEO PREPARADO
+  // --------------------------------------------------
+
   function videoPreparado() {
     // Mostramos la resolución real.
     if (videoRef.current) {
@@ -421,47 +771,63 @@ function CameraPreview() {
       );
     }
 
-    // Si MediaPipe ya está cargado,
-    // comenzamos el análisis.
+
+    // Intentamos empezar el análisis.
     iniciarAnalisis();
   }
 
+
+  // --------------------------------------------------
+  // INTERFAZ
+  // --------------------------------------------------
+
   return (
-    // Contenedor común de vídeo y canvas.
-    <div className="camera-container">
+    // Contenedor general del componente.
+    <div>
 
-      <video
-        // Referencia al vídeo.
-        ref={videoRef}
+      {/* Mostramos el contador real de curls. */}
+      <h2>
+        Repeticiones: {repeticiones}
+      </h2>
 
-        // Reproduce automáticamente la webcam.
-        autoPlay
 
-        // Mantiene el vídeo integrado en la página
-        // en dispositivos móviles.
-        playsInline
+      {/* Contenedor que agrupa vídeo y canvas. */}
+      <div className="camera-container">
 
-        // Cuando el vídeo está preparado,
-        // intentamos iniciar MediaPipe.
-        onLoadedData={videoPreparado}
+        <video
+          // Referencia al vídeo.
+          ref={videoRef}
 
-        // Clase CSS del vídeo.
-        className="camera-video"
-      />
+          // Reproduce automáticamente la webcam.
+          autoPlay
 
-      <canvas
-        // Referencia al canvas.
-        ref={canvasRef}
+          // Mantiene el vídeo integrado
+          // en la página en móviles.
+          playsInline
 
-        // Clase CSS que coloca el canvas
-        // encima del vídeo.
-        className="camera-canvas"
-      />
+          // Iniciamos el análisis
+          // cuando el vídeo está preparado.
+          onLoadedData={videoPreparado}
+
+          // Clase CSS de la cámara.
+          className="camera-video"
+        />
+
+
+        <canvas
+          // Referencia al canvas.
+          ref={canvasRef}
+
+          // Clase CSS del canvas.
+          className="camera-canvas"
+        />
+
+      </div>
 
     </div>
   );
 }
 
-// Exportamos CameraPreview
-// para poder utilizarlo desde App.tsx.
+
+// Exportamos CameraPreview.
 export default CameraPreview;
