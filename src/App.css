@@ -1,133 +1,234 @@
 /* --------------------------------------------------
-   ESTILOS GENERALES DE LA APLICACIÓN
--------------------------------------------------- */
+   ESTILOS GENERALES
+   -------------------------------------------------- */
 
-/* Aplicamos un pequeño margen al contenido principal
-   para que la interfaz no quede pegada a los bordes. */
 main {
-  /* Espacio interior general de la aplicación. */
   padding: 20px;
 }
 
 
 /* --------------------------------------------------
-   CONTENEDOR DE LA CÁMARA
--------------------------------------------------- */
+   DISTRIBUCIÓN PRINCIPAL DE VISIÓN FIT
+   -------------------------------------------------- */
 
-/* Este contenedor agrupa el <video> y el <canvas>. */
-.camera-container {
-  /* Permite colocar el canvas de forma absoluta
-     respecto a este contenedor. */
-  position: relative;
+/*
+  En escritorio utilizamos dos columnas:
 
-  /* Hace que la cámara se adapte al ancho disponible. */
-  width: 100%;
+  izquierda -> cámara
+  derecha   -> información y análisis
+*/
+.vision-fit-layout {
+  display: grid;
 
-  /* Limitamos el tamaño máximo en ordenador. */
-  max-width: 640px;
+  /*
+    La cámara ocupa más espacio
+    que la columna de información.
+  */
+  grid-template-columns:
+    minmax(0, 640px)
+    minmax(280px, 1fr);
 
-  /* Dejamos un pequeño espacio superior
-     respecto al contador u otros elementos. */
-  margin-top: 16px;
+  gap: 32px;
+
+  align-items: start;
+
+  margin-top: 20px;
 }
 
 
 /* --------------------------------------------------
-   VÍDEO DE LA WEBCAM
--------------------------------------------------- */
+   COLUMNA DE LA CÁMARA
+   -------------------------------------------------- */
+
+.vision-fit-camera-column {
+  width: 100%;
+}
+
+
+/*
+  Contenedor común de vídeo y canvas.
+
+  position: relative permite colocar
+  el canvas exactamente encima del vídeo.
+*/
+.camera-container {
+  position: relative;
+
+  width: 100%;
+
+  max-width: 640px;
+}
+
+
+/* --------------------------------------------------
+   VÍDEO
+   -------------------------------------------------- */
 
 .camera-video {
-  /* El vídeo ocupa todo el ancho del contenedor. */
   width: 100%;
 
-  /* La altura se calcula automáticamente
-     para mantener la proporción original. */
   height: auto;
 
-  /* Evita pequeños espacios que pueden aparecer
-     debajo de elementos de vídeo. */
   display: block;
 
-  /* Situamos el vídeo en una capa inferior
-     respecto al canvas. */
   position: relative;
 
-  /* Capa visual del vídeo. */
   z-index: 1;
 
-  /* Invertimos horizontalmente la imagen.
-     Así la webcam se comporta visualmente
-     como un espejo. */
+
+  /*
+    Invertimos horizontalmente la cámara
+    para que funcione como un espejo.
+  */
   transform: scaleX(-1);
+
+
+  /*
+    Un pequeño redondeo mejora
+    la presentación visual.
+  */
+  border-radius: 8px;
 }
 
 
 /* --------------------------------------------------
-   CANVAS DE LANDMARKS
--------------------------------------------------- */
+   CANVAS
+   -------------------------------------------------- */
 
 .camera-canvas {
-  /* Sacamos el canvas del flujo normal de la página
-     para poder colocarlo encima del vídeo. */
+  /*
+    Colocamos el canvas exactamente
+    encima del vídeo.
+  */
   position: absolute;
 
-  /* Lo colocamos exactamente en la esquina
-     superior izquierda del contenedor. */
   top: 0;
+
   left: 0;
 
-  /* Hace que el canvas ocupe el mismo
-     espacio visual que el vídeo. */
   width: 100%;
+
   height: 100%;
 
-  /* Lo situamos por encima del vídeo. */
-  z-index: 2;
-
-  /* Evita que el canvas bloquee clics
-     u otras interacciones de la interfaz. */
-  pointer-events: none;
-
-  /* Evita comportamientos extraños
-     propios de elementos inline. */
   display: block;
 
-  /* Invertimos también el canvas.
-     Esto es fundamental para que los landmarks
-     coincidan con la imagen invertida del vídeo. */
+  z-index: 2;
+
+
+  /*
+    El canvas no debe impedir
+    interactuar con otros elementos.
+  */
+  pointer-events: none;
+
+
+  /*
+    Como el vídeo está invertido,
+    el canvas también debe estarlo.
+
+    De este modo los landmarks siguen
+    alineados con la persona.
+  */
   transform: scaleX(-1);
+
+
+  /*
+    Mantenemos el mismo borde
+    que el vídeo.
+  */
+  border-radius: 8px;
 }
 
 
 /* --------------------------------------------------
-   CONTADOR DE REPETICIONES
--------------------------------------------------- */
+   COLUMNA DE DATOS
+   -------------------------------------------------- */
 
-/* Estilo provisional para el contador
-   que muestra las repeticiones detectadas. */
-h2 {
-  /* Separamos ligeramente el contador
-     del resto de elementos. */
-  margin-top: 16px;
+.vision-fit-data-column {
+  width: 100%;
 
-  /* Eliminamos margen inferior excesivo. */
+  min-width: 0;
+}
+
+
+/* --------------------------------------------------
+   BLOQUES DE ANÁLISIS
+   -------------------------------------------------- */
+
+.analysis-section {
+  margin-bottom: 24px;
+
+  padding-bottom: 16px;
+
+  border-bottom:
+    1px solid #dddddd;
+}
+
+
+.analysis-section h2,
+.analysis-section h3 {
+  margin-top: 0;
+
+  margin-bottom: 12px;
+}
+
+
+.analysis-section p {
+  margin-top: 6px;
+
+  margin-bottom: 6px;
+}
+
+
+/* --------------------------------------------------
+   HISTORIAL
+   -------------------------------------------------- */
+
+.repetition-history {
+  padding-left: 22px;
+
+  margin-top: 10px;
+}
+
+
+.repetition-history li {
   margin-bottom: 8px;
 }
 
 
 /* --------------------------------------------------
    BOTONES
--------------------------------------------------- */
+   -------------------------------------------------- */
 
-/* Estilo provisional para botones como
-   encender o apagar la cámara. */
 button {
-  /* Espacio interior del botón. */
   padding: 10px 16px;
 
-  /* Tamaño de texto cómodo. */
   font-size: 16px;
 
-  /* Cambia el cursor al pasar por encima. */
   cursor: pointer;
+}
+
+
+/* --------------------------------------------------
+   RESPONSIVE
+   -------------------------------------------------- */
+
+/*
+  En pantallas más pequeñas dejamos
+  de utilizar dos columnas.
+
+  La cámara aparecerá arriba
+  y los datos debajo.
+*/
+@media (max-width: 900px) {
+  .vision-fit-layout {
+    grid-template-columns: 1fr;
+
+    gap: 24px;
+  }
+
+
+  .camera-container {
+    max-width: 640px;
+  }
 }
