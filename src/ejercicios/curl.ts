@@ -2,26 +2,76 @@
 // CONFIGURACIÓN DEL CURL
 // --------------------------------------------------
 
-// Umbral máximo permitido para el desplazamiento
-// del codo.
+// Valores que utilizamos para el análisis
+// mediante cámara en directo.
 //
-// Tras las pruebas realizadas:
-// - 20 % era demasiado sensible;
-// - 30 % permitía demasiado movimiento;
-// - 25 % ofreció el mejor equilibrio.
+// Estos valores fueron calibrados
+// experimentalmente durante las pruebas.
 export const DESPLAZAMIENTO_MAXIMO_CODO =
   0.25;
 
-
-// Umbral máximo permitido para el balanceo
-// del tronco.
-//
-// Tras las pruebas realizadas:
-// - 10 % era demasiado sensible;
-// - 15 % permitía demasiado movimiento;
-// - 13 % ofreció el mejor equilibrio.
 export const DESPLAZAMIENTO_MAXIMO_HOMBRO =
   0.13;
+
+
+// --------------------------------------------------
+// TIPO DE CONFIGURACIÓN
+// --------------------------------------------------
+
+// Permite que el mismo algoritmo del curl
+// utilice diferentes tolerancias dependiendo
+// de la fuente de imagen.
+//
+// Por ejemplo:
+//
+// cámara -> landmarks más estables;
+// vídeo  -> algo más de tolerancia.
+export interface ConfiguracionCurl {
+  desplazamientoMaximoCodo: number;
+
+  desplazamientoMaximoHombro: number;
+}
+
+
+// --------------------------------------------------
+// CONFIGURACIÓN PARA CÁMARA
+// --------------------------------------------------
+
+// Es la configuración que se utilizará
+// por defecto si no especificamos otra.
+export const CONFIGURACION_CURL_CAMARA:
+  ConfiguracionCurl = {
+    desplazamientoMaximoCodo:
+      DESPLAZAMIENTO_MAXIMO_CODO,
+
+    desplazamientoMaximoHombro:
+      DESPLAZAMIENTO_MAXIMO_HOMBRO
+  };
+
+
+// --------------------------------------------------
+// CONFIGURACIÓN PARA VÍDEO
+// --------------------------------------------------
+
+// En vídeo damos algo más de tolerancia
+// debido a:
+//
+// - compresión;
+// - desenfoque de movimiento;
+// - FPS;
+// - calidad del vídeo;
+// - pequeñas variaciones de MediaPipe.
+//
+// Estos valores son iniciales.
+// Después los probaremos y calibraremos.
+export const CONFIGURACION_CURL_VIDEO:
+  ConfiguracionCurl = {
+    desplazamientoMaximoCodo:
+      0.30,
+
+    desplazamientoMaximoHombro:
+      0.16
+  };
 
 
 // --------------------------------------------------
@@ -46,6 +96,7 @@ export type FaseCurl =
 // para comparar dos landmarks.
 interface ReferenciaPosicion {
   dx: number;
+
   dy: number;
 
   // Distancia utilizada para normalizar
@@ -54,36 +105,38 @@ interface ReferenciaPosicion {
 }
 
 
-// Estado interno completo del analizador.
+// Estado interno completo del curl.
 //
-// Este objeto conserva la información
-// entre un frame y el siguiente.
+// Este estado permanece entre frames.
 export interface EstadoCurl {
   // Fase actual.
   fase: FaseCurl;
 
-  // Repeticiones detectadas.
+  // Número de repeticiones detectadas.
   repeticiones: number;
 
-  // Referencia del codo respecto al hombro.
+  // Referencia del codo
+  // respecto al hombro.
   referenciaCodo:
     ReferenciaPosicion | null;
 
-  // Referencia del hombro respecto a la cadera.
+  // Referencia del hombro
+  // respecto a la cadera.
   referenciaHombro:
     ReferenciaPosicion | null;
 
-  // Indica si durante la repetición actual
-  // se ha detectado algún error de codo.
+  // Indica si durante la repetición
+  // se ha detectado error de codo.
   errorCodoRepeticion: boolean;
 
-  // Indica si durante la repetición actual
-  // se ha detectado balanceo del tronco.
+  // Indica si durante la repetición
+  // se ha detectado balanceo.
   errorTroncoRepeticion: boolean;
 }
 
 
-// Resultado final de una repetición.
+// Resultado final
+// de una repetición.
 export interface ResultadoRepeticion {
   numero: number;
 
@@ -95,17 +148,17 @@ export interface ResultadoRepeticion {
 }
 
 
-// Resultado producido después
-// de analizar un único frame.
+// Resultado producido al analizar
+// un único frame.
 export interface ResultadoFrameCurl {
   // Ángulo actual del codo.
   anguloCodo: number;
 
-  // Fase después de analizar el frame.
+  // Fase actual.
   fase: FaseCurl;
 
-  // Mensaje relacionado con
-  // el rango de movimiento.
+  // Feedback del rango
+  // de movimiento.
   feedbackMovimiento: string;
 
   // Feedback técnico del codo.
@@ -117,6 +170,7 @@ export interface ResultadoFrameCurl {
   // Desplazamiento relativo del codo.
   //
   // Ejemplo:
+  //
   // 0.25 = 25 %.
   desplazamientoCodo:
     number | null;
@@ -125,22 +179,23 @@ export interface ResultadoFrameCurl {
   desplazamientoHombro:
     number | null;
 
-  // Indica si hemos pasado
-  // de arriba a abajo o viceversa.
+  // Indica si hemos cambiado
+  // de fase.
   cambioFase: boolean;
 
-  // Indica si en este frame
-  // hemos sumado una repetición.
+  // Indica si se ha sumado
+  // una repetición.
   repeticionSumada: boolean;
 
-  // Si acabamos de terminar completamente
-  // una repetición, contiene su resultado.
+  // Resultado de la repetición
+  // cuando se completa todo el ciclo.
   repeticionFinalizada:
     ResultadoRepeticion | null;
 }
 
 
-// Resumen completo de la sesión.
+// Resumen completo
+// de una sesión.
 export interface ResumenSesion {
   total: number;
 
@@ -160,11 +215,8 @@ export interface ResumenSesion {
 // CREAR ESTADO INICIAL
 // --------------------------------------------------
 
-// Crea un nuevo analizador de curl
+// Crea un estado nuevo
 // completamente limpio.
-//
-// Esto nos permitirá reutilizarlo más adelante
-// tanto con webcam como con vídeos.
 export function crearEstadoCurl():
   EstadoCurl {
   return {
@@ -190,11 +242,11 @@ export function crearEstadoCurl():
 
 
 // --------------------------------------------------
-// DISTANCIA ENTRE DOS PUNTOS
+// DISTANCIA
 // --------------------------------------------------
 
-// Calcula la distancia entre dos landmarks
-// utilizando el teorema de Pitágoras.
+// Calcula la distancia
+// entre dos puntos.
 export function calcularDistancia(
   a: Punto,
   b: Punto
@@ -202,26 +254,29 @@ export function calcularDistancia(
   const diferenciaX =
     a.x - b.x;
 
+
   const diferenciaY =
     a.y - b.y;
 
 
   return Math.sqrt(
-    diferenciaX * diferenciaX +
-    diferenciaY * diferenciaY
+    diferenciaX *
+      diferenciaX +
+    diferenciaY *
+      diferenciaY
   );
 }
 
 
 // --------------------------------------------------
-// ÁNGULO DEL CODO
+// ÁNGULO
 // --------------------------------------------------
 
 // Calcula el ángulo:
 //
-// hombro -> codo -> muñeca
+// hombro -> codo -> muñeca.
 //
-// El segundo punto es siempre
+// El segundo punto es
 // el vértice del ángulo.
 export function calcularAngulo(
   a: Punto,
@@ -249,13 +304,14 @@ export function calcularAngulo(
     );
 
 
-  // Convertimos radianes a grados.
+  // Convertimos radianes
+  // a grados.
   angulo =
     angulo *
     (180 / Math.PI);
 
 
-  // Queremos siempre un resultado
+  // Queremos un ángulo
   // entre 0 y 180 grados.
   if (angulo > 180) {
     angulo =
@@ -271,18 +327,8 @@ export function calcularAngulo(
 // CREAR REFERENCIA DE POSICIÓN
 // --------------------------------------------------
 
-// Guarda dónde está un punto
-// respecto a otro.
-//
-// Ejemplo:
-//
-// puntoMovil = codo
-// puntoBase = hombro
-//
-// o:
-//
-// puntoMovil = hombro
-// puntoBase = cadera
+// Guarda la posición relativa
+// de un landmark respecto a otro.
 function crearReferenciaPosicion(
   puntoMovil: Punto,
   puntoBase: Punto
@@ -304,8 +350,12 @@ function crearReferenciaPosicion(
     );
 
 
-  // Evitamos referencias imposibles.
-  if (longitudReferencia <= 0) {
+  // Evitamos referencias
+  // imposibles.
+  if (
+    longitudReferencia <=
+    0
+  ) {
     return null;
   }
 
@@ -324,23 +374,23 @@ function crearReferenciaPosicion(
 
 
 // --------------------------------------------------
-// CALCULAR DESPLAZAMIENTO
+// DESPLAZAMIENTO RELATIVO
 // --------------------------------------------------
 
-// Calcula cuánto ha cambiado la posición
-// respecto a una referencia.
+// Calcula cuánto se ha movido
+// un punto respecto a su referencia.
 //
-// El resultado queda normalizado:
+// El resultado está normalizado:
 //
-// 0.10 = 10 %
-// 0.25 = 25 %
-// 0.40 = 40 %
+// 0.10 -> 10 %
+// 0.25 -> 25 %
+// 0.40 -> 40 %
 function calcularDesplazamientoRelativo(
   puntoMovil: Punto,
   puntoBase: Punto,
   referencia: ReferenciaPosicion
 ): number {
-  // Posición actual.
+  // Posición relativa actual.
   const dxActual =
     puntoMovil.x -
     puntoBase.x;
@@ -352,7 +402,7 @@ function calcularDesplazamientoRelativo(
 
 
   // Diferencia respecto
-  // a la posición inicial.
+  // a la referencia.
   const cambioX =
     dxActual -
     referencia.dx;
@@ -366,14 +416,14 @@ function calcularDesplazamientoRelativo(
   // Desplazamiento total.
   const desplazamiento =
     Math.sqrt(
-      cambioX * cambioX +
-      cambioY * cambioY
+      cambioX *
+        cambioX +
+      cambioY *
+        cambioY
     );
 
 
-  // Normalizamos el resultado para
-  // que no dependa de los píxeles
-  // ni de la distancia a la cámara.
+  // Normalizamos.
   return (
     desplazamiento /
     referencia.longitudReferencia
@@ -382,15 +432,11 @@ function calcularDesplazamientoRelativo(
 
 
 // --------------------------------------------------
-// FEEDBACK DE MOVIMIENTO
+// FEEDBACK DEL MOVIMIENTO
 // --------------------------------------------------
 
 // Genera el mensaje correspondiente
 // al rango de movimiento.
-//
-// Es importante conocer la fase porque
-// el mismo ángulo significa cosas diferentes
-// durante la subida y durante la bajada.
 export function obtenerFeedbackMovimiento(
   anguloCodo: number,
   fase: FaseCurl
@@ -399,29 +445,48 @@ export function obtenerFeedbackMovimiento(
   // SUBIDA
   // ------------------------------------------------
 
-  if (fase === "abajo") {
-    // 160 grados o más.
-    if (anguloCodo >= 160) {
-      return "Brazo extendido";
+  if (
+    fase ===
+    "abajo"
+  ) {
+    // Brazo extendido.
+    if (
+      anguloCodo >=
+      160
+    ) {
+      return (
+        "Brazo extendido"
+      );
     }
 
 
-    // Entre 90 y 159 grados.
-    if (anguloCodo >= 90) {
-      return "Sigue flexionando";
+    // Primera mitad
+    // de la flexión.
+    if (
+      anguloCodo >=
+      90
+    ) {
+      return (
+        "Sigue flexionando"
+      );
     }
 
 
-    // Entre 51 y 89 grados.
-    if (anguloCodo > 50) {
+    // Cerca del final.
+    if (
+      anguloCodo >
+      50
+    ) {
       return (
         "Casi, flexiona un poco más"
       );
     }
 
 
-    // 50 grados o menos.
-    return "Flexión completa";
+    // Flexión completa.
+    return (
+      "Flexión completa"
+    );
   }
 
 
@@ -429,40 +494,50 @@ export function obtenerFeedbackMovimiento(
   // BAJADA
   // ------------------------------------------------
 
-  // Todavía está prácticamente arriba.
-  if (anguloCodo <= 50) {
-    return "Sigue bajando";
+  if (
+    anguloCodo <=
+    50
+  ) {
+    return (
+      "Sigue bajando"
+    );
   }
 
 
-  // Está realizando la bajada.
-  if (anguloCodo < 160) {
-    return "Casi estás abajo";
+  if (
+    anguloCodo <
+    160
+  ) {
+    return (
+      "Casi estás abajo"
+    );
   }
 
 
-  // Posición inferior completada.
-  return "Brazo extendido";
+  return (
+    "Brazo extendido"
+  );
 }
 
 
 // --------------------------------------------------
-// CLASIFICAR UNA REPETICIÓN
+// CLASIFICAR REPETICIÓN
 // --------------------------------------------------
 
 // Genera el resultado final
-// utilizando todos los errores registrados
-// durante la repetición.
+// de una repetición.
 function clasificarRepeticion(
   numero: number,
   errorCodo: boolean,
   errorTronco: boolean
 ): ResultadoRepeticion {
+  // Por defecto suponemos
+  // que es correcta.
   let resultado =
     "Correcta";
 
 
-  // Se detectaron los dos errores.
+  // Ambos errores.
   if (
     errorCodo &&
     errorTronco
@@ -472,13 +547,17 @@ function clasificarRepeticion(
   }
 
   // Solo error de codo.
-  else if (errorCodo) {
+  else if (
+    errorCodo
+  ) {
     resultado =
       "Error de codo";
   }
 
   // Solo balanceo.
-  else if (errorTronco) {
+  else if (
+    errorTronco
+  ) {
     resultado =
       "Balanceo de tronco";
   }
@@ -501,38 +580,36 @@ function clasificarRepeticion(
 
 
 // --------------------------------------------------
-// ANALIZAR UN FRAME DEL CURL
+// ANALIZAR FRAME DEL CURL
 // --------------------------------------------------
 
-// Esta es la función principal del archivo.
+// Esta función contiene toda
+// la lógica del ejercicio.
 //
-// Recibe:
+// Puede utilizarse desde:
 //
-// - estado del curl;
-// - hombro;
-// - codo;
-// - muñeca;
-// - cadera.
+// - cámara;
+// - vídeo;
+// - cualquier futura fuente.
 //
-// Y devuelve toda la información
-// necesaria para la interfaz.
+// El último parámetro permite utilizar
+// diferentes tolerancias.
 //
-// IMPORTANTE:
-//
-// Esta función NO sabe si la imagen
-// procede de una webcam o de un vídeo.
-//
-// Ese desacoplamiento es precisamente
-// lo que queremos conseguir con la refactorización.
+// Si NO enviamos configuración,
+// utilizamos automáticamente
+// la configuración de cámara.
 export function analizarFrameCurl(
   estado: EstadoCurl,
   hombro: Punto,
   codo: Punto,
   muneca: Punto,
-  cadera: Punto | null
+  cadera: Punto | null,
+  configuracion:
+    ConfiguracionCurl =
+    CONFIGURACION_CURL_CAMARA
 ): ResultadoFrameCurl {
-  // Guardamos la fase existente al empezar
-  // a analizar este frame.
+  // Guardamos la fase
+  // existente al empezar.
   const faseAntes =
     estado.fase;
 
@@ -549,11 +626,8 @@ export function analizarFrameCurl(
     );
 
 
-  // Calculamos el feedback antes
-  // de cambiar la fase.
-  //
-  // Así conservamos el comportamiento
-  // que ya habíamos probado.
+  // Calculamos el feedback
+  // antes de cambiar de fase.
   const feedbackMovimiento =
     obtenerFeedbackMovimiento(
       anguloCodo,
@@ -574,16 +648,22 @@ export function analizarFrameCurl(
     null;
 
 
-  // Con el brazo extendido calibramos
-  // la posición inicial.
-  if (anguloCodo >= 160) {
+  // Con brazo extendido
+  // calibramos la referencia.
+  if (
+    anguloCodo >=
+    160
+  ) {
     // Calibramos:
     //
     // - la primera vez;
-    // - cuando terminamos una repetición.
+    // - cuando terminamos
+    //   una repetición.
     if (
-      estado.referenciaCodo === null ||
-      faseAntes === "arriba"
+      estado.referenciaCodo ===
+        null ||
+      faseAntes ===
+        "arriba"
     ) {
       estado.referenciaCodo =
         crearReferenciaPosicion(
@@ -601,15 +681,17 @@ export function analizarFrameCurl(
       "Codo estable";
   }
 
-  // Todavía no existe referencia.
+  // Todavía no existe
+  // referencia.
   else if (
-    estado.referenciaCodo === null
+    estado.referenciaCodo ===
+    null
   ) {
     feedbackCodo =
       "Extiende el brazo para calibrar el codo";
   }
 
-  // Ya podemos analizarlo.
+  // Analizamos normalmente.
   else {
     desplazamientoCodo =
       calcularDesplazamientoRelativo(
@@ -619,18 +701,27 @@ export function analizarFrameCurl(
       );
 
 
+    // IMPORTANTE:
+    //
+    // Ya no utilizamos aquí
+    // directamente 25 %.
+    //
+    // Utilizamos el valor
+    // recibido en la configuración.
     if (
       desplazamientoCodo >
-      DESPLAZAMIENTO_MAXIMO_CODO
+      configuracion
+        .desplazamientoMaximoCodo
     ) {
       feedbackCodo =
         "Mantén el codo estable";
 
 
-      // Guardamos el error hasta
-      // terminar la repetición.
+      // Guardamos el error
+      // durante toda la repetición.
       estado.errorCodoRepeticion =
         true;
+
     } else {
       feedbackCodo =
         "Codo estable";
@@ -651,21 +742,28 @@ export function analizarFrameCurl(
     null;
 
 
-  // Si MediaPipe no ve correctamente
-  // la cadera no podemos analizar el torso.
-  //
-  // El curl seguirá contando igualmente.
-  if (cadera === null) {
+  // Si MediaPipe no puede ver
+  // correctamente la cadera,
+  // no evaluamos el tronco.
+  if (
+    cadera ===
+    null
+  ) {
     feedbackHombro =
       "Asegúrate de que la cadera sea visible";
   }
 
-  // Brazo extendido:
-  // calibramos hombro respecto a cadera.
-  else if (anguloCodo >= 160) {
+  // Calibramos con
+  // el brazo extendido.
+  else if (
+    anguloCodo >=
+    160
+  ) {
     if (
-      estado.referenciaHombro === null ||
-      faseAntes === "arriba"
+      estado.referenciaHombro ===
+        null ||
+      faseAntes ===
+        "arriba"
     ) {
       estado.referenciaHombro =
         crearReferenciaPosicion(
@@ -683,15 +781,17 @@ export function analizarFrameCurl(
       "Tronco estable";
   }
 
-  // Todavía no existe referencia.
+  // Todavía no existe
+  // referencia.
   else if (
-    estado.referenciaHombro === null
+    estado.referenciaHombro ===
+    null
   ) {
     feedbackHombro =
       "Extiende el brazo para calibrar el tronco";
   }
 
-  // Analizamos el balanceo.
+  // Analizamos normalmente.
   else {
     desplazamientoHombro =
       calcularDesplazamientoRelativo(
@@ -701,18 +801,20 @@ export function analizarFrameCurl(
       );
 
 
+    // Utilizamos el límite
+    // correspondiente a la fuente.
     if (
       desplazamientoHombro >
-      DESPLAZAMIENTO_MAXIMO_HOMBRO
+      configuracion
+        .desplazamientoMaximoHombro
     ) {
       feedbackHombro =
         "Evita balancear el tronco";
 
 
-      // Guardamos el error durante
-      // toda la repetición.
       estado.errorTroncoRepeticion =
         true;
+
     } else {
       feedbackHombro =
         "Tronco estable";
@@ -741,15 +843,16 @@ export function analizarFrameCurl(
   // VUELTA ABAJO
   // --------------------------------------------------
 
-  // Al llegar a 160 grados
-  // después de haber estado arriba,
-  // consideramos terminada toda la repetición.
-  if (anguloCodo >= 160) {
+  if (
+    anguloCodo >=
+    160
+  ) {
     if (
-      estado.fase === "arriba"
+      estado.fase ===
+      "arriba"
     ) {
-      // Guardamos el resultado completo
-      // antes de limpiar los errores.
+      // Hemos completado
+      // subida + bajada.
       repeticionFinalizada =
         clasificarRepeticion(
           estado.repeticiones,
@@ -758,24 +861,24 @@ export function analizarFrameCurl(
         );
 
 
-      // Limpiamos los errores para
-      // preparar la siguiente repetición.
+      // Limpiamos errores.
       estado.errorCodoRepeticion =
         false;
+
 
       estado.errorTroncoRepeticion =
         false;
 
 
-      // Cambiamos de fase.
+      // Volvemos abajo.
       estado.fase =
         "abajo";
 
 
       cambioFase =
         true;
+
     } else {
-      // Permanecemos abajo.
       estado.fase =
         "abajo";
     }
@@ -786,20 +889,19 @@ export function analizarFrameCurl(
   // LLEGADA ARRIBA
   // --------------------------------------------------
 
-  // 50 grados o menos completa la subida.
-  //
-  // Solo se cuenta si veníamos
-  // de la fase inferior.
   if (
-    anguloCodo <= 50 &&
-    estado.fase === "abajo"
+    anguloCodo <=
+      50 &&
+    estado.fase ===
+      "abajo"
   ) {
     estado.fase =
       "arriba";
 
 
     estado.repeticiones =
-      estado.repeticiones + 1;
+      estado.repeticiones +
+      1;
 
 
     cambioFase =
@@ -812,7 +914,7 @@ export function analizarFrameCurl(
 
 
   // --------------------------------------------------
-  // RESULTADO DEL FRAME
+  // DEVOLVER RESULTADO
   // --------------------------------------------------
 
   return {
@@ -853,13 +955,9 @@ export function analizarFrameCurl(
 // RESUMEN DE SESIÓN
 // --------------------------------------------------
 
-// Calcula todas las estadísticas
-// utilizando únicamente el historial.
-//
-// También es totalmente independiente
-// de la cámara.
 export function calcularResumenSesion(
-  historial: ResultadoRepeticion[]
+  historial:
+    ResultadoRepeticion[]
 ): ResumenSesion {
   // Número total de repeticiones
   // completamente analizadas.
@@ -867,7 +965,7 @@ export function calcularResumenSesion(
     historial.length;
 
 
-  // Repeticiones sin ningún error.
+  // Repeticiones correctas.
   const correctas =
     historial.filter(
       function (repeticion) {
@@ -879,8 +977,7 @@ export function calcularResumenSesion(
     ).length;
 
 
-  // Repeticiones en las que
-  // apareció error de codo.
+  // Errores de codo.
   const erroresCodo =
     historial.filter(
       function (repeticion) {
@@ -891,8 +988,7 @@ export function calcularResumenSesion(
     ).length;
 
 
-  // Repeticiones donde apareció
-  // balanceo del tronco.
+  // Balanceos.
   const erroresTronco =
     historial.filter(
       function (repeticion) {
@@ -903,28 +999,31 @@ export function calcularResumenSesion(
     ).length;
 
 
-  // Evitamos dividir entre cero
-  // antes de realizar la primera repetición.
+  // Porcentaje de técnica correcta.
   let porcentajeCorrectas =
     0;
 
 
-  if (total > 0) {
+  if (
+    total >
+    0
+  ) {
     porcentajeCorrectas =
       Math.round(
-        (correctas / total) *
+        (
+          correctas /
+          total
+        ) *
         100
       );
   }
 
 
-  // Por defecto no existe
-  // un error más frecuente.
+  // Error más frecuente.
   let errorMasFrecuente =
     "Ninguno";
 
 
-  // Predominan errores del codo.
   if (
     erroresCodo >
     erroresTronco
@@ -934,7 +1033,6 @@ export function calcularResumenSesion(
   }
 
 
-  // Predomina el balanceo.
   if (
     erroresTronco >
     erroresCodo
@@ -944,11 +1042,11 @@ export function calcularResumenSesion(
   }
 
 
-  // Hay empate entre los dos errores.
   if (
     erroresCodo ===
       erroresTronco &&
-    erroresCodo > 0
+    erroresCodo >
+      0
   ) {
     errorMasFrecuente =
       "Codo y tronco por igual";
