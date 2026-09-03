@@ -1,5 +1,6 @@
 // Importamos los hooks necesarios de React.
 import {
+  useEffect,
   useRef,
   useState
 } from "react";
@@ -23,9 +24,6 @@ function App() {
   // --------------------------------------------------
 
   // Controla si la cámara está visible.
-  //
-  // Conservamos exactamente el funcionamiento
-  // que ya teníamos y sabemos que funciona.
   const [
     mostrarCamara,
     setMostrarCamara
@@ -39,25 +37,39 @@ function App() {
   // VÍDEO
   // --------------------------------------------------
 
-  // Referencia al input de archivos.
-  //
-  // El input estará oculto y lo abriremos
-  // utilizando el botón "Cargar vídeo".
+  // Referencia al input oculto de archivos.
   const inputVideoRef =
     useRef<HTMLInputElement | null>(
       null
     );
 
 
-  // Guardamos únicamente el nombre
-  // del vídeo seleccionado.
+  // Guarda la URL temporal del vídeo.
   //
-  // TODAVÍA no vamos a reproducirlo.
+  // Esta URL permite reproducir un archivo local
+  // sin subirlo a ningún servidor.
+  const urlVideoRef =
+    useRef<string | null>(
+      null
+    );
+
+
+  // Nombre del archivo seleccionado.
   const [
     nombreVideo,
     setNombreVideo
   ] =
     useState<string>("");
+
+
+  // URL utilizada por el elemento <video>.
+  const [
+    urlVideo,
+    setUrlVideo
+  ] =
+    useState<string | null>(
+      null
+    );
 
 
   // --------------------------------------------------
@@ -76,8 +88,6 @@ function App() {
   // --------------------------------------------------
 
   function abrirSelectorVideo() {
-    // Simulamos un clic sobre
-    // el input oculto.
     if (
       inputVideoRef.current
     ) {
@@ -94,7 +104,7 @@ function App() {
     evento:
       ChangeEvent<HTMLInputElement>
   ) {
-    // Recuperamos el primer archivo seleccionado.
+    // Recuperamos el primer archivo.
     const archivo =
       evento.target.files?.[0];
 
@@ -106,7 +116,8 @@ function App() {
     }
 
 
-    // Comprobamos que sea un archivo de vídeo.
+    // Comprobamos que realmente
+    // sea un archivo de vídeo.
     if (
       !archivo.type.startsWith(
         "video/"
@@ -120,8 +131,47 @@ function App() {
     }
 
 
-    // De momento solamente guardamos
-    // el nombre del archivo.
+    // ----------------------------------------------
+    // ELIMINAMOS LA URL ANTERIOR
+    // ----------------------------------------------
+
+    // Si antes habíamos seleccionado otro vídeo,
+    // liberamos la URL temporal anterior.
+    if (
+      urlVideoRef.current !==
+      null
+    ) {
+      URL.revokeObjectURL(
+        urlVideoRef.current
+      );
+    }
+
+
+    // ----------------------------------------------
+    // CREAMOS LA URL DEL NUEVO VÍDEO
+    // ----------------------------------------------
+
+    // URL.createObjectURL permite al navegador
+    // utilizar directamente el archivo local.
+    const nuevaUrl =
+      URL.createObjectURL(
+        archivo
+      );
+
+
+    // Guardamos la URL en la referencia.
+    urlVideoRef.current =
+      nuevaUrl;
+
+
+    // Guardamos la URL en React
+    // para mostrar el vídeo.
+    setUrlVideo(
+      nuevaUrl
+    );
+
+
+    // Guardamos el nombre.
     setNombreVideo(
       archivo.name
     );
@@ -129,9 +179,33 @@ function App() {
 
     console.log(
       "Vídeo seleccionado:",
-      archivo
+      archivo.name
     );
   }
+
+
+  // --------------------------------------------------
+  // LIMPIEZA DE LA URL
+  // --------------------------------------------------
+
+  useEffect(function () {
+    // Cuando App desaparezca,
+    // eliminamos la URL temporal.
+    return function limpiarUrlVideo() {
+      if (
+        urlVideoRef.current !==
+        null
+      ) {
+        URL.revokeObjectURL(
+          urlVideoRef.current
+        );
+
+
+        urlVideoRef.current =
+          null;
+      }
+    };
+  }, []);
 
 
   // --------------------------------------------------
@@ -141,14 +215,16 @@ function App() {
   return (
     <main>
 
-      {/* Título principal. */}
+      {/* ----------------------------------------------
+          TÍTULO
+          ---------------------------------------------- */}
       <h1>
         Visión Fit
       </h1>
 
 
       {/* ----------------------------------------------
-          CONTROL DE CÁMARA
+          BOTÓN DE CÁMARA
           ---------------------------------------------- */}
       <button
         type="button"
@@ -163,15 +239,8 @@ function App() {
 
 
       {/* ----------------------------------------------
-          CARGAR VÍDEO
+          BOTÓN PARA CARGAR VÍDEO
           ---------------------------------------------- */}
-
-      {/* Este botón solamente abre
-          el selector de archivos.
-
-          NO apaga la cámara.
-          NO reproduce el vídeo.
-          NO toca MediaPipe. */}
       <button
         type="button"
         onClick={
@@ -185,10 +254,9 @@ function App() {
       </button>
 
 
-      {/* Input real de archivos.
-
-          Está oculto porque lo abrimos
-          desde el botón anterior. */}
+      {/* ----------------------------------------------
+          INPUT OCULTO
+          ---------------------------------------------- */}
       <input
         ref={
           inputVideoRef
@@ -204,15 +272,53 @@ function App() {
       />
 
 
-      {/* Si seleccionamos un archivo,
-          mostramos únicamente su nombre. */}
-      {nombreVideo !== "" ? (
-        <p>
-          <strong>
-            Vídeo seleccionado:
-          </strong>{" "}
-          {nombreVideo}
-        </p>
+      {/* ----------------------------------------------
+          VÍDEO SELECCIONADO
+          ---------------------------------------------- */}
+
+      {urlVideo !== null ? (
+
+        <section
+          style={{
+            marginTop: "20px",
+            marginBottom: "20px"
+          }}
+        >
+
+          <p>
+            <strong>
+              Vídeo seleccionado:
+            </strong>{" "}
+            {nombreVideo}
+          </p>
+
+
+          <video
+            // URL del archivo seleccionado.
+            src={
+              urlVideo
+            }
+
+            // Controles normales:
+            // play, pausa, volumen,
+            // barra de tiempo...
+            controls
+
+            // Evita comportamientos extraños
+            // en dispositivos móviles.
+            playsInline
+
+            // En este paso solo queremos
+            // comprobar que se reproduce bien.
+            style={{
+              width: "100%",
+              maxWidth: "640px",
+              display: "block"
+            }}
+          />
+
+        </section>
+
       ) : null}
 
 
@@ -220,8 +326,11 @@ function App() {
           CÁMARA
           ---------------------------------------------- */}
 
-      {/* Conservamos exactamente
-          el comportamiento anterior. */}
+      {/* La cámara continúa exactamente
+          como antes.
+
+          Seleccionar un vídeo NO modifica
+          CameraPreview. */}
       {mostrarCamara ? (
         <CameraPreview />
       ) : null}
