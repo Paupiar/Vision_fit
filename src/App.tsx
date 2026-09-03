@@ -24,12 +24,16 @@ function App() {
   // --------------------------------------------------
 
   // Controla si la cámara está visible.
+  //
+  // false -> la cámara empieza apagada.
+  // true  -> CameraPreview se monta y
+  //          solicita acceso a la webcam.
   const [
     mostrarCamara,
     setMostrarCamara
   ] =
     useState<boolean>(
-      true
+      false
     );
 
 
@@ -37,32 +41,34 @@ function App() {
   // VÍDEO
   // --------------------------------------------------
 
-  // Referencia al input oculto de archivos.
+  // Referencia al input oculto
+  // utilizado para seleccionar archivos.
   const inputVideoRef =
     useRef<HTMLInputElement | null>(
       null
     );
 
 
-  // Guarda la URL temporal del vídeo.
-  //
-  // Esta URL permite reproducir un archivo local
-  // sin subirlo a ningún servidor.
+  // Guarda internamente la URL temporal
+  // del vídeo seleccionado.
   const urlVideoRef =
     useRef<string | null>(
       null
     );
 
 
-  // Nombre del archivo seleccionado.
+  // Nombre original del archivo.
   const [
     nombreVideo,
     setNombreVideo
   ] =
-    useState<string>("");
+    useState<string>(
+      ""
+    );
 
 
-  // URL utilizada por el elemento <video>.
+  // URL temporal utilizada
+  // por el elemento <video>.
   const [
     urlVideo,
     setUrlVideo
@@ -77,6 +83,10 @@ function App() {
   // --------------------------------------------------
 
   function cambiarCamara() {
+    // Cambiamos entre:
+    //
+    // false -> cámara apagada.
+    // true  -> cámara encendida.
     setMostrarCamara(
       !mostrarCamara
     );
@@ -88,6 +98,10 @@ function App() {
   // --------------------------------------------------
 
   function abrirSelectorVideo() {
+    // El input está oculto visualmente.
+    //
+    // Este botón provoca el clic
+    // sobre el input real.
     if (
       inputVideoRef.current
     ) {
@@ -104,20 +118,25 @@ function App() {
     evento:
       ChangeEvent<HTMLInputElement>
   ) {
-    // Recuperamos el primer archivo.
+    // Recuperamos el primer archivo
+    // seleccionado por el usuario.
     const archivo =
       evento.target.files?.[0];
 
 
-    // Si el usuario cancela,
-    // no hacemos nada.
+    // Si el usuario cancela
+    // el selector, no hacemos nada.
     if (!archivo) {
       return;
     }
 
 
-    // Comprobamos que realmente
-    // sea un archivo de vídeo.
+    // ------------------------------------------------
+    // COMPROBAR TIPO DE ARCHIVO
+    // ------------------------------------------------
+
+    // Solo aceptamos archivos cuyo tipo MIME
+    // empiece por "video/".
     if (
       !archivo.type.startsWith(
         "video/"
@@ -131,12 +150,12 @@ function App() {
     }
 
 
-    // ----------------------------------------------
-    // ELIMINAMOS LA URL ANTERIOR
-    // ----------------------------------------------
+    // ------------------------------------------------
+    // ELIMINAR URL ANTERIOR
+    // ------------------------------------------------
 
-    // Si antes habíamos seleccionado otro vídeo,
-    // liberamos la URL temporal anterior.
+    // Si ya habíamos cargado otro vídeo,
+    // liberamos su URL temporal.
     if (
       urlVideoRef.current !==
       null
@@ -147,19 +166,23 @@ function App() {
     }
 
 
-    // ----------------------------------------------
-    // CREAMOS LA URL DEL NUEVO VÍDEO
-    // ----------------------------------------------
+    // ------------------------------------------------
+    // CREAR URL DEL NUEVO VÍDEO
+    // ------------------------------------------------
 
-    // URL.createObjectURL permite al navegador
-    // utilizar directamente el archivo local.
+    // Creamos una URL temporal
+    // para reproducir directamente
+    // el archivo local.
+    //
+    // El vídeo no se sube
+    // a ningún servidor.
     const nuevaUrl =
       URL.createObjectURL(
         archivo
       );
 
 
-    // Guardamos la URL en la referencia.
+    // Guardamos la URL internamente.
     urlVideoRef.current =
       nuevaUrl;
 
@@ -171,9 +194,23 @@ function App() {
     );
 
 
-    // Guardamos el nombre.
+    // Guardamos el nombre original.
     setNombreVideo(
       archivo.name
+    );
+
+
+    // ------------------------------------------------
+    // APAGAR CÁMARA
+    // ------------------------------------------------
+
+    // Si el usuario selecciona un vídeo,
+    // la cámara se apaga automáticamente.
+    //
+    // CameraPreview desaparecerá
+    // y ejecutará su limpieza.
+    setMostrarCamara(
+      false
     );
 
 
@@ -185,12 +222,12 @@ function App() {
 
 
   // --------------------------------------------------
-  // LIMPIEZA DE LA URL
+  // LIMPIEZA DE LA URL DEL VÍDEO
   // --------------------------------------------------
 
   useEffect(function () {
     // Cuando App desaparezca,
-    // eliminamos la URL temporal.
+    // liberamos la URL temporal.
     return function limpiarUrlVideo() {
       if (
         urlVideoRef.current !==
@@ -255,17 +292,28 @@ function App() {
 
 
       {/* ----------------------------------------------
-          INPUT OCULTO
+          INPUT DE ARCHIVOS
           ---------------------------------------------- */}
+
+      {/* El input real está oculto.
+
+          El botón "Cargar vídeo"
+          lo abre utilizando inputVideoRef. */}
       <input
         ref={
           inputVideoRef
         }
+
         type="file"
+
+        // Pedimos al sistema que muestre
+        // archivos de vídeo.
         accept="video/*"
+
         onChange={
           seleccionarVideo
         }
+
         style={{
           display: "none"
         }}
@@ -276,7 +324,15 @@ function App() {
           VÍDEO SELECCIONADO
           ---------------------------------------------- */}
 
-      {urlVideo !== null ? (
+      {/* El vídeo aparece solamente cuando:
+
+          1. existe un vídeo seleccionado;
+          2. la cámara está apagada.
+
+          Así no mostramos cámara
+          y vídeo simultáneamente. */}
+      {urlVideo !== null &&
+      mostrarCamara === false ? (
 
         <section
           style={{
@@ -285,6 +341,7 @@ function App() {
           }}
         >
 
+          {/* Nombre del archivo seleccionado. */}
           <p>
             <strong>
               Vídeo seleccionado:
@@ -293,8 +350,10 @@ function App() {
           </p>
 
 
+          {/* Reproductor del vídeo local. */}
           <video
-            // URL del archivo seleccionado.
+            // URL temporal generada
+            // con URL.createObjectURL().
             src={
               urlVideo
             }
@@ -304,12 +363,12 @@ function App() {
             // barra de tiempo...
             controls
 
-            // Evita comportamientos extraños
+            // Mejora el funcionamiento
             // en dispositivos móviles.
             playsInline
 
-            // En este paso solo queremos
-            // comprobar que se reproduce bien.
+            // De momento solo controlamos
+            // el tamaño del vídeo.
             style={{
               width: "100%",
               maxWidth: "640px",
@@ -326,11 +385,12 @@ function App() {
           CÁMARA
           ---------------------------------------------- */}
 
-      {/* La cámara continúa exactamente
-          como antes.
+      {/* CameraPreview solamente existe
+          cuando mostrarCamara es true.
 
-          Seleccionar un vídeo NO modifica
-          CameraPreview. */}
+          Como el estado inicial es false,
+          la webcam NO se enciende
+          al abrir la aplicación. */}
       {mostrarCamara ? (
         <CameraPreview />
       ) : null}
@@ -340,5 +400,5 @@ function App() {
 }
 
 
-// Exportamos el componente.
+// Exportamos el componente principal.
 export default App;
