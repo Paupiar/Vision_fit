@@ -2,27 +2,212 @@
    ESTILOS GENERALES
    -------------------------------------------------- */
 
+/*
+  Aplicamos un pequeño margen interior
+  a toda la aplicación.
+*/
 main {
   padding: 20px;
 }
 
 
 /* --------------------------------------------------
-   DISTRIBUCIÓN PRINCIPAL DE VISIÓN FIT
+   CABECERA DE VISIÓN FIT
    -------------------------------------------------- */
 
 /*
-  En escritorio utilizamos dos columnas:
+  Centramos únicamente la parte inicial:
 
-  izquierda -> cámara
-  derecha   -> información y análisis
+  - título;
+  - selección de ejercicio;
+  - selección de fuente.
+
+  La cámara, el vídeo y los datos técnicos
+  mantienen después su distribución
+  en dos columnas.
+*/
+.vision-fit-header {
+  width: 100%;
+
+  text-align: center;
+
+  margin-bottom: 32px;
+}
+
+
+/*
+  Separación entre el título principal
+  y la selección de ejercicio.
+*/
+.vision-fit-header h1 {
+  margin-top: 0;
+
+  margin-bottom: 32px;
+}
+
+
+/* --------------------------------------------------
+   SELECCIÓN DE EJERCICIO
+   -------------------------------------------------- */
+
+.exercise-selector {
+  width: 100%;
+
+  margin-bottom: 28px;
+}
+
+
+/*
+  Título:
+
+  "Selecciona un ejercicio"
+*/
+.exercise-selector h2 {
+  margin-top: 0;
+
+  margin-bottom: 16px;
+}
+
+
+/*
+  Contenedor de los botones
+  de ejercicios.
+
+  justify-content: center
+  permite centrarlos horizontalmente.
+*/
+.exercise-buttons {
+  display: flex;
+
+  justify-content: center;
+
+  align-items: center;
+
+  flex-wrap: wrap;
+
+  gap: 12px;
+}
+
+
+/*
+  Botón normal de ejercicio.
+*/
+.exercise-button {
+  padding: 10px 16px;
+
+  font-size: 16px;
+
+  cursor: pointer;
+}
+
+
+/*
+  Ejercicio seleccionado actualmente.
+*/
+.exercise-button-active {
+  font-weight: bold;
+
+  outline: 2px solid currentColor;
+}
+
+
+/*
+  Ejercicios que todavía
+  no hemos implementado.
+
+  Por ejemplo:
+
+  - sentadilla;
+  - press de hombro.
+*/
+.exercise-button:disabled {
+  cursor: not-allowed;
+
+  opacity: 0.5;
+}
+
+
+/* --------------------------------------------------
+   FUENTE DE ANÁLISIS
+   -------------------------------------------------- */
+
+/*
+  Esta sección aparece únicamente
+  después de seleccionar un ejercicio.
+*/
+.analysis-source-selector {
+  width: 100%;
+
+  margin-top: 24px;
+
+  margin-bottom: 20px;
+}
+
+
+/*
+  Título:
+
+  "Fuente de análisis"
+*/
+.analysis-source-selector h2 {
+  margin-top: 0;
+
+  margin-bottom: 16px;
+}
+
+
+/*
+  Contenedor de:
+
+  - Encender cámara;
+  - Cargar vídeo.
+*/
+.analysis-source-buttons {
+  display: flex;
+
+  justify-content: center;
+
+  align-items: center;
+
+  flex-wrap: wrap;
+
+  gap: 12px;
+}
+
+
+/* --------------------------------------------------
+   BOTONES GENERALES
+   -------------------------------------------------- */
+
+button {
+  padding: 10px 16px;
+
+  font-size: 16px;
+
+  cursor: pointer;
+}
+
+
+/* --------------------------------------------------
+   DISTRIBUCIÓN PRINCIPAL
+   -------------------------------------------------- */
+
+/*
+  Una vez comienza el análisis,
+  utilizamos dos columnas:
+
+  izquierda -> cámara o vídeo;
+  derecha   -> información técnica.
 */
 .vision-fit-layout {
   display: grid;
 
   /*
-    La cámara ocupa más espacio
-    que la columna de información.
+    Primera columna:
+    máximo aproximado de 640 px.
+
+    Segunda columna:
+    espacio restante para los datos.
   */
   grid-template-columns:
     minmax(0, 640px)
@@ -37,7 +222,7 @@ main {
 
 
 /* --------------------------------------------------
-   COLUMNA DE LA CÁMARA
+   COLUMNA DE CÁMARA / VÍDEO
    -------------------------------------------------- */
 
 .vision-fit-camera-column {
@@ -45,11 +230,16 @@ main {
 }
 
 
+/* --------------------------------------------------
+   CÁMARA
+   -------------------------------------------------- */
+
 /*
-  Contenedor común de vídeo y canvas.
+  Contenedor común del vídeo
+  de la webcam y su canvas.
 
   position: relative permite colocar
-  el canvas exactamente encima del vídeo.
+  el canvas exactamente encima.
 */
 .camera-container {
   position: relative;
@@ -61,7 +251,7 @@ main {
 
 
 /* --------------------------------------------------
-   VÍDEO
+   VÍDEO DE LA WEBCAM
    -------------------------------------------------- */
 
 .camera-video {
@@ -77,27 +267,26 @@ main {
 
 
   /*
-    Invertimos horizontalmente la cámara
-    para que funcione como un espejo.
+    La webcam funciona como un espejo.
   */
   transform: scaleX(-1);
 
 
   /*
-    Un pequeño redondeo mejora
-    la presentación visual.
+    Redondeamos ligeramente
+    las esquinas.
   */
   border-radius: 8px;
 }
 
 
 /* --------------------------------------------------
-   CANVAS
+   CANVAS DE LA WEBCAM
    -------------------------------------------------- */
 
 .camera-canvas {
   /*
-    Colocamos el canvas exactamente
+    Lo situamos exactamente
     encima del vídeo.
   */
   position: absolute;
@@ -116,37 +305,38 @@ main {
 
 
   /*
-    El canvas no debe impedir
-    interactuar con otros elementos.
+    Evita que el canvas bloquee
+    cualquier interacción.
   */
   pointer-events: none;
 
 
   /*
-    Como el vídeo está invertido,
+    Como el vídeo de la webcam
+    está invertido horizontalmente,
     el canvas también debe estarlo.
 
-    De este modo los landmarks siguen
-    alineados con la persona.
+    Así los landmarks coinciden
+    con el cuerpo.
   */
   transform: scaleX(-1);
 
 
-  /*
-    Mantenemos el mismo borde
-    que el vídeo.
-  */
   border-radius: 8px;
 }
 
 
 /* --------------------------------------------------
-   COLUMNA DE DATOS
+   COLUMNA DE INFORMACIÓN
    -------------------------------------------------- */
 
 .vision-fit-data-column {
   width: 100%;
 
+  /*
+    Evita problemas de desbordamiento
+    dentro del grid.
+  */
   min-width: 0;
 }
 
@@ -155,16 +345,29 @@ main {
    BLOQUES DE ANÁLISIS
    -------------------------------------------------- */
 
+/*
+  Cada grupo de información:
+
+  - movimiento;
+  - técnica;
+  - resumen;
+  - historial.
+
+  aparece como una sección diferenciada.
+*/
 .analysis-section {
   margin-bottom: 24px;
 
   padding-bottom: 16px;
 
-  border-bottom:
-    1px solid #dddddd;
+  border-bottom: 1px solid #dddddd;
 }
 
 
+/*
+  Quitamos espacio superior innecesario
+  en los títulos de cada sección.
+*/
 .analysis-section h2,
 .analysis-section h3 {
   margin-top: 0;
@@ -173,6 +376,10 @@ main {
 }
 
 
+/*
+  Reducimos un poco el espacio
+  entre cada dato.
+*/
 .analysis-section p {
   margin-top: 6px;
 
@@ -181,7 +388,7 @@ main {
 
 
 /* --------------------------------------------------
-   HISTORIAL
+   HISTORIAL DE REPETICIONES
    -------------------------------------------------- */
 
 .repetition-history {
@@ -191,21 +398,12 @@ main {
 }
 
 
+/*
+  Separamos ligeramente
+  cada repetición.
+*/
 .repetition-history li {
   margin-bottom: 8px;
-}
-
-
-/* --------------------------------------------------
-   BOTONES
-   -------------------------------------------------- */
-
-button {
-  padding: 10px 16px;
-
-  font-size: 16px;
-
-  cursor: pointer;
 }
 
 
@@ -214,11 +412,16 @@ button {
    -------------------------------------------------- */
 
 /*
-  En pantallas más pequeñas dejamos
-  de utilizar dos columnas.
+  En pantallas medianas o pequeñas
+  dejamos de mostrar:
 
-  La cámara aparecerá arriba
-  y los datos debajo.
+  cámara/vídeo | datos
+
+  y pasamos a:
+
+  cámara/vídeo
+       ↓
+     datos
 */
 @media (max-width: 900px) {
   .vision-fit-layout {
@@ -230,5 +433,57 @@ button {
 
   .camera-container {
     max-width: 640px;
+  }
+}
+
+
+/*
+  En móviles hacemos también
+  verticales los botones iniciales.
+*/
+@media (max-width: 600px) {
+  main {
+    padding: 16px;
+  }
+
+
+  /* ----------------------------------------------
+     EJERCICIOS
+     ---------------------------------------------- */
+
+  .exercise-buttons {
+    flex-direction: column;
+  }
+
+
+  .exercise-button {
+    width: 100%;
+
+    max-width: 320px;
+  }
+
+
+  /* ----------------------------------------------
+     FUENTE
+     ---------------------------------------------- */
+
+  .analysis-source-buttons {
+    flex-direction: column;
+  }
+
+
+  .analysis-source-buttons button {
+    width: 100%;
+
+    max-width: 320px;
+  }
+
+
+  /* ----------------------------------------------
+     CABECERA
+     ---------------------------------------------- */
+
+  .vision-fit-header h1 {
+    margin-bottom: 24px;
   }
 }

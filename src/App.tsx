@@ -1,4 +1,4 @@
-// Importamos los hooks necesarios de React.
+// Importamos los hooks necesarios.
 import {
   useEffect,
   useRef,
@@ -14,19 +14,52 @@ import type {
 // Estilos generales.
 import "./App.css";
 
-// Componente de cámara.
+// Componente encargado
+// de analizar la webcam.
 import CameraPreview from "./components/CameraPreview";
 
-// Componente de vídeo.
+// Componente encargado
+// de analizar vídeos grabados.
 import VideoPreview from "./components/VideoPreview";
+
+// --------------------------------------------------
+// EJERCICIOS
+// --------------------------------------------------
+
+import {
+  EJERCICIOS
+} from "./ejercicios/tipos";
+
+import type {
+  EjercicioId
+} from "./ejercicios/tipos";
 
 
 function App() {
   // ==================================================
+  // EJERCICIO
+  // ==================================================
+
+  // Al abrir Visión Fit todavía
+  // no hay ningún ejercicio seleccionado.
+  //
+  // Esto permite que la fuente de análisis
+  // aparezca únicamente después
+  // de elegir un ejercicio.
+  const [
+    ejercicioSeleccionado,
+    setEjercicioSeleccionado
+  ] =
+    useState<EjercicioId | null>(
+      null
+    );
+
+
+  // ==================================================
   // CÁMARA
   // ==================================================
 
-  // La cámara empieza apagada.
+  // La cámara comienza apagada.
   const [
     mostrarCamara,
     setMostrarCamara
@@ -37,11 +70,11 @@ function App() {
 
 
   // ==================================================
-  // SELECCIÓN DE VÍDEO
+  // VÍDEO
   // ==================================================
 
   // Input oculto utilizado
-  // para seleccionar el archivo.
+  // para seleccionar archivos.
   const inputVideoRef =
     useRef<HTMLInputElement | null>(
       null
@@ -55,7 +88,7 @@ function App() {
     );
 
 
-  // Nombre del archivo.
+  // Nombre original del vídeo.
   const [
     nombreVideo,
     setNombreVideo
@@ -76,16 +109,55 @@ function App() {
 
 
   // ==================================================
+  // SELECCIONAR EJERCICIO
+  // ==================================================
+
+  function seleccionarEjercicio(
+    ejercicio: EjercicioId
+  ) {
+    // Buscamos el ejercicio
+    // dentro de nuestra lista.
+    const ejercicioEncontrado =
+      EJERCICIOS.find(
+        function (elemento) {
+          return (
+            elemento.id ===
+            ejercicio
+          );
+        }
+      );
+
+
+    // Si no existe o todavía
+    // no está disponible,
+    // no hacemos nada.
+    if (
+      !ejercicioEncontrado ||
+      !ejercicioEncontrado.disponible
+    ) {
+      return;
+    }
+
+
+    // Si estaba funcionando la cámara,
+    // la apagamos antes de cambiar.
+    setMostrarCamara(
+      false
+    );
+
+
+    // Guardamos el ejercicio seleccionado.
+    setEjercicioSeleccionado(
+      ejercicio
+    );
+  }
+
+
+  // ==================================================
   // CÁMARA
   // ==================================================
 
   function cambiarCamara() {
-    // Simplemente mostramos
-    // u ocultamos CameraPreview.
-    //
-    // VideoPreview recibirá también
-    // esta información para detener
-    // su reproducción si es necesario.
     setMostrarCamara(
       !mostrarCamara
     );
@@ -157,10 +229,10 @@ function App() {
     // CREAR NUEVA URL
     // ------------------------------------------------
 
-    // El archivo permanece en el dispositivo.
+    // Creamos una URL temporal.
     //
-    // Creamos únicamente una URL temporal
-    // para que el navegador pueda reproducirlo.
+    // El vídeo permanece
+    // en el dispositivo del usuario.
     const nuevaUrl =
       URL.createObjectURL(
         archivo
@@ -181,8 +253,8 @@ function App() {
     );
 
 
-    // Al seleccionar un vídeo
-    // apagamos la webcam.
+    // Si la cámara estaba activa,
+    // la apagamos.
     setMostrarCamara(
       false
     );
@@ -226,51 +298,150 @@ function App() {
   return (
     <main>
 
-      {/* ----------------------------------------------
-          TÍTULO
-          ---------------------------------------------- */}
-      <h1>
-        Visión Fit
-      </h1>
+      {/* ==============================================
+          CABECERA
+          ============================================== */}
+
+      <div className="vision-fit-header">
+
+        <h1>
+          Visión Fit
+        </h1>
 
 
-      {/* ----------------------------------------------
-          ENCENDER / APAGAR CÁMARA
-          ---------------------------------------------- */}
-      <button
-        type="button"
+        {/* ============================================
+            SELECCIÓN DE EJERCICIO
+            ============================================ */}
 
-        onClick={
-          cambiarCamara
-        }
-      >
-        {mostrarCamara
-          ? "Apagar cámara"
-          : "Encender cámara"}
-      </button>
+        <section className="exercise-selector">
+
+          <h2>
+            Selecciona un ejercicio
+          </h2>
 
 
-      {/* ----------------------------------------------
-          CARGAR VÍDEO
-          ---------------------------------------------- */}
-      <button
-        type="button"
+          <div className="exercise-buttons">
 
-        onClick={
-          abrirSelectorVideo
-        }
-
-        style={{
-          marginLeft: "12px"
-        }}
-      >
-        Cargar vídeo
-      </button>
+            {EJERCICIOS.map(
+              function (ejercicio) {
+                // Comprobamos si este
+                // es el ejercicio actual.
+                const seleccionado =
+                  ejercicio.id ===
+                  ejercicioSeleccionado;
 
 
-      {/* ----------------------------------------------
-          INPUT OCULTO
-          ---------------------------------------------- */}
+                return (
+                  <button
+                    key={
+                      ejercicio.id
+                    }
+
+                    type="button"
+
+                    // Los ejercicios todavía
+                    // no implementados quedan
+                    // desactivados.
+                    disabled={
+                      !ejercicio.disponible
+                    }
+
+                    onClick={
+                      function () {
+                        seleccionarEjercicio(
+                          ejercicio.id
+                        );
+                      }
+                    }
+
+                    className={
+                      seleccionado
+                        ? "exercise-button exercise-button-active"
+                        : "exercise-button"
+                    }
+                  >
+                    {ejercicio.nombre}
+
+
+                    {!ejercicio.disponible ? (
+                      <>
+                        {" "}
+                        (próximamente)
+                      </>
+                    ) : null}
+
+                  </button>
+                );
+              }
+            )}
+
+          </div>
+
+        </section>
+
+
+        {/* ============================================
+            FUENTE DE ANÁLISIS
+            ============================================ */}
+
+        {/* Esta sección solamente aparece
+            después de seleccionar
+            un ejercicio disponible. */}
+        {ejercicioSeleccionado !== null ? (
+
+          <section className="analysis-source-selector">
+
+            <h2>
+              Fuente de análisis
+            </h2>
+
+
+            <div className="analysis-source-buttons">
+
+              {/* --------------------------------------
+                  CÁMARA
+                  -------------------------------------- */}
+
+              <button
+                type="button"
+
+                onClick={
+                  cambiarCamara
+                }
+              >
+                {mostrarCamara
+                  ? "Apagar cámara"
+                  : "Encender cámara"}
+              </button>
+
+
+              {/* --------------------------------------
+                  VÍDEO
+                  -------------------------------------- */}
+
+              <button
+                type="button"
+
+                onClick={
+                  abrirSelectorVideo
+                }
+              >
+                Cargar vídeo
+              </button>
+
+            </div>
+
+          </section>
+
+        ) : null}
+
+      </div>
+
+
+      {/* ==============================================
+          INPUT DE VÍDEO
+          ============================================== */}
+
       <input
         ref={
           inputVideoRef
@@ -294,10 +465,12 @@ function App() {
           CÁMARA
           ============================================== */}
 
-      {/* CameraPreview únicamente existe
-          mientras la cámara está activa. */}
-      {mostrarCamara ? (
+      {mostrarCamara &&
+      ejercicioSeleccionado ===
+        "curl" ? (
+
         <CameraPreview />
+
       ) : null}
 
 
@@ -305,16 +478,10 @@ function App() {
           VÍDEO
           ============================================== */}
 
-      {/* VideoPreview permanece montado
-          mientras exista un vídeo seleccionado.
+      {urlVideo !== null &&
+      ejercicioSeleccionado ===
+        "curl" ? (
 
-          Cuando la cámara está activa
-          recibe visible=false y se oculta.
-
-          De esta forma toda la lógica
-          relacionada con vídeo deja
-          de estar dentro de App.tsx. */}
-      {urlVideo !== null ? (
         <VideoPreview
           urlVideo={
             urlVideo
@@ -328,6 +495,7 @@ function App() {
             !mostrarCamara
           }
         />
+
       ) : null}
 
     </main>
