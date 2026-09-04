@@ -69,6 +69,22 @@ function SentadillaPreview() {
     );
 
 
+  // --------------------------------------------------
+  // EFECTO VERDE
+  // --------------------------------------------------
+
+  // Guarda hasta qué instante
+  // queremos mantener los landmarks
+  // y conexiones en verde.
+  //
+  // Igual que en el curl,
+  // utilizaremos 300 ms.
+  const verdeHastaRef =
+    useRef<number>(
+      0
+    );
+
+
   // ==================================================
   // ESTADOS VISIBLES
   // ==================================================
@@ -118,8 +134,6 @@ function SentadillaPreview() {
     );
 
 
-  // Feedback técnico
-  // específico del tronco.
   const [
     feedbackTronco,
     setFeedbackTronco
@@ -379,7 +393,9 @@ function SentadillaPreview() {
     contexto:
       CanvasRenderingContext2D,
     punto:
-      PuntoSentadilla
+      PuntoSentadilla,
+    verde:
+      boolean
   ) {
     contexto.beginPath();
 
@@ -393,8 +409,16 @@ function SentadillaPreview() {
     );
 
 
+    // Normalmente los puntos
+    // aparecen en rojo.
+    //
+    // Cuando alcanzamos un rango válido
+    // los mostramos momentáneamente
+    // en verde.
     contexto.fillStyle =
-      "red";
+      verde
+        ? "limegreen"
+        : "red";
 
 
     contexto.fill();
@@ -411,7 +435,9 @@ function SentadillaPreview() {
     inicio:
       PuntoSentadilla,
     fin:
-      PuntoSentadilla
+      PuntoSentadilla,
+    verde:
+      boolean
   ) {
     contexto.beginPath();
 
@@ -432,8 +458,14 @@ function SentadillaPreview() {
       4;
 
 
+    // Igual que en el curl:
+    //
+    // azul normalmente;
+    // verde al alcanzar el rango.
     contexto.strokeStyle =
-      "blue";
+      verde
+        ? "limegreen"
+        : "blue";
 
 
     contexto.stroke();
@@ -454,7 +486,9 @@ function SentadillaPreview() {
     rodilla:
       PuntoSentadilla,
     tobillo:
-      PuntoSentadilla
+      PuntoSentadilla,
+    verde:
+      boolean
   ) {
     // ----------------------------------------------
     // TRONCO
@@ -467,13 +501,15 @@ function SentadillaPreview() {
       dibujarConexion(
         contexto,
         hombro,
-        cadera
+        cadera,
+        verde
       );
 
 
       dibujarLandmark(
         contexto,
-        hombro
+        hombro,
+        verde
       );
     }
 
@@ -485,32 +521,37 @@ function SentadillaPreview() {
     dibujarConexion(
       contexto,
       cadera,
-      rodilla
+      rodilla,
+      verde
     );
 
 
     dibujarConexion(
       contexto,
       rodilla,
-      tobillo
+      tobillo,
+      verde
     );
 
 
     dibujarLandmark(
       contexto,
-      cadera
+      cadera,
+      verde
     );
 
 
     dibujarLandmark(
       contexto,
-      rodilla
+      rodilla,
+      verde
     );
 
 
     dibujarLandmark(
       contexto,
-      tobillo
+      tobillo,
+      verde
     );
   }
 
@@ -549,8 +590,6 @@ function SentadillaPreview() {
       poseLandmarkerRef.current;
 
 
-    // Esperamos a tener
-    // una imagen válida.
     if (
       video.readyState <
       2
@@ -595,7 +634,7 @@ function SentadillaPreview() {
     }
 
 
-    // Eliminamos los dibujos
+    // Limpiamos los landmarks
     // del frame anterior.
     contexto.clearRect(
       0,
@@ -703,10 +742,6 @@ function SentadillaPreview() {
               null;
 
 
-            // El hombro es opcional.
-            //
-            // Si se pierde momentáneamente,
-            // seguimos analizando la pierna.
             if (
               hombroNormalizado &&
               esLandmarkValido(
@@ -730,6 +765,25 @@ function SentadillaPreview() {
             }
 
 
+            // ====================================
+            // PROFUNDIDAD ANTES DEL ANÁLISIS
+            // ====================================
+
+            // Guardamos si ya habíamos
+            // alcanzado profundidad antes
+            // de analizar este frame.
+            //
+            // Nos permitirá detectar
+            // exactamente el instante
+            // en que pasamos de:
+            //
+            // no alcanzada -> alcanzada.
+            const profundidadAntes =
+              estadoSentadillaRef
+                .current
+                .profundidadAlcanzada;
+
+
             // ------------------------------------
             // ANALIZAR SENTADILLA
             // ------------------------------------
@@ -742,6 +796,61 @@ function SentadillaPreview() {
                 rodilla,
                 tobillo
               );
+
+
+            // ====================================
+            // EFECTO VERDE
+            // ====================================
+
+            // Después del análisis comprobamos
+            // si acabamos de alcanzar
+            // suficiente profundidad.
+            const profundidadDespues =
+              estadoSentadillaRef
+                .current
+                .profundidadAlcanzada;
+
+
+            // ------------------------------------
+            // LLEGAR ABAJO
+            // ------------------------------------
+
+            // Si antes no teníamos profundidad
+            // y ahora sí:
+            //
+            // acabamos de llegar a <= 100°.
+            if (
+              !profundidadAntes &&
+              profundidadDespues
+            ) {
+              verdeHastaRef.current =
+                timestamp +
+                300;
+            }
+
+
+            // ------------------------------------
+            // VOLVER ARRIBA
+            // ------------------------------------
+
+            // Cuando se completa la repetición
+            // significa que hemos vuelto
+            // a >= 160°.
+            if (
+              analisis.repeticionSumada
+            ) {
+              verdeHastaRef.current =
+                timestamp +
+                300;
+            }
+
+
+            // Mientras no hayan pasado
+            // esos 300 ms mostramos
+            // todo el esqueleto en verde.
+            const mostrarVerde =
+              timestamp <
+              verdeHastaRef.current;
 
 
             // ------------------------------------
@@ -803,8 +912,6 @@ function SentadillaPreview() {
               );
 
 
-              // Copiamos el array para que
-              // React detecte el cambio.
               setHistorial(
                 [
                   ...analisis.historial
@@ -828,7 +935,8 @@ function SentadillaPreview() {
               hombro,
               cadera,
               rodilla,
-              tobillo
+              tobillo,
+              mostrarVerde
             );
 
           } else {
@@ -847,7 +955,7 @@ function SentadillaPreview() {
     }
 
 
-    // Analizamos el siguiente frame.
+    // Siguiente frame.
     animationFrameRef.current =
       requestAnimationFrame(
         analizarFrame
@@ -867,8 +975,6 @@ function SentadillaPreview() {
     }
 
 
-    // Evitamos tener dos
-    // bucles simultáneos.
     if (
       animationFrameRef.current !==
       null
