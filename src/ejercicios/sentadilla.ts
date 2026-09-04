@@ -5,25 +5,28 @@
 // Este archivo contiene toda la lógica
 // específica del análisis de sentadilla.
 //
-// Queremos que esta lógica sea independiente
-// de la fuente de imagen:
-//
-// - cámara;
-// - vídeo grabado.
-//
 // Actualmente analizamos:
 //
 // - ángulo de rodilla;
 // - inicio y final de repetición;
 // - conteo de repeticiones;
 // - profundidad;
+// - inclinación del tronco;
+// - clasificación técnica;
 // - historial;
 // - resumen de sesión.
+//
+// Esta lógica es independiente
+// de la fuente de imagen para poder
+// reutilizarla más adelante con:
+//
+// - cámara;
+// - vídeo grabado.
 // --------------------------------------------------
 
 
 // --------------------------------------------------
-// UMBRALES
+// UMBRALES DE MOVIMIENTO
 // --------------------------------------------------
 
 // Después de realizar pruebas reales:
@@ -31,9 +34,8 @@
 // de pie -> aproximadamente 170°
 // abajo  -> aproximadamente 90°
 //
-// Utilizamos márgenes para evitar que
-// pequeñas variaciones de MediaPipe
-// afecten al conteo.
+// Dejamos margen para compensar
+// pequeñas variaciones de MediaPipe.
 
 
 // Consideramos que el usuario
@@ -43,25 +45,43 @@ export const ANGULO_SENTADILLA_ARRIBA =
 
 
 // A partir de este ángulo consideramos
-// que realmente ha empezado una repetición.
-//
-// Esto evita contar pequeños movimientos
-// de rodilla como sentadillas.
+// que realmente ha empezado
+// una repetición.
 export const ANGULO_INICIO_SENTADILLA =
   140;
 
 
-// Para considerar que la sentadilla
-// ha alcanzado suficiente profundidad.
+// Profundidad mínima necesaria
+// para considerar correcta
+// la bajada.
 export const ANGULO_SENTADILLA_ABAJO =
   100;
+
+
+// --------------------------------------------------
+// UMBRAL TÉCNICO DEL TRONCO
+// --------------------------------------------------
+
+// En las pruebas realizadas observamos:
+//
+// sentadillas normales:
+// aproximadamente 31° - 45°
+//
+// inclinación exagerada:
+// aproximadamente 52° - 57°
+//
+// Por eso utilizamos 50°
+// como límite provisional.
+export const INCLINACION_MAXIMA_TRONCO =
+  50;
 
 
 // --------------------------------------------------
 // PUNTO
 // --------------------------------------------------
 
-// Representa un landmark de MediaPipe.
+// Representa un landmark
+// detectado por MediaPipe.
 export interface PuntoSentadilla {
   x: number;
 
@@ -75,20 +95,6 @@ export interface PuntoSentadilla {
 // FASE
 // --------------------------------------------------
 
-// "arriba":
-// todavía no hemos iniciado una repetición.
-//
-// "abajo":
-// la repetición ya está en curso.
-//
-// Importante:
-//
-// estar en fase "abajo" NO significa
-// necesariamente haber alcanzado ya
-// una profundidad correcta.
-//
-// Para eso utilizamos:
-// profundidadAlcanzada.
 export type FaseSentadilla =
   "arriba" |
   "abajo";
@@ -102,18 +108,37 @@ export interface ResultadoRepeticionSentadilla {
   // Número de repetición.
   numero: number;
 
-  // Ángulo más pequeño alcanzado
-  // durante la repetición.
+  // Menor ángulo de rodilla
+  // alcanzado durante la repetición.
   anguloMinimo: number;
 
-  // Indica si alcanzó
-  // una profundidad correcta.
+  // Mayor inclinación del tronco
+  // durante la repetición.
+  //
+  // null significa que no pudimos
+  // analizar correctamente el hombro.
+  inclinacionTroncoMaxima:
+    number | null;
+
+  // Indica si alcanzamos
+  // suficiente profundidad.
   profundidadCorrecta: boolean;
 
-  // Texto que mostramos al usuario.
+  // Error específico
+  // de profundidad.
+  errorProfundidad: boolean;
+
+  // Error específico
+  // de inclinación del tronco.
+  errorTronco: boolean;
+
+  // Texto final
+  // de clasificación.
   resultado:
     "Correcta" |
-    "Profundidad insuficiente";
+    "Profundidad insuficiente" |
+    "Exceso de inclinación del tronco" |
+    "Profundidad insuficiente + exceso de inclinación del tronco";
 }
 
 
@@ -121,23 +146,27 @@ export interface ResultadoRepeticionSentadilla {
 // ESTADO INTERNO
 // --------------------------------------------------
 
-// Este estado se mantiene
-// entre un frame y el siguiente.
 export interface EstadoSentadilla {
   // Fase actual.
   fase: FaseSentadilla;
 
-  // Número total de repeticiones realizadas.
+  // Total de repeticiones.
   repeticiones: number;
 
-  // Indica si durante esta repetición
-  // se llegó a 100° o menos.
+  // Indica si durante la repetición
+  // hemos alcanzado 100° o menos.
   profundidadAlcanzada: boolean;
 
-  // Ángulo mínimo de la repetición actual.
+  // Ángulo mínimo de rodilla
+  // de la repetición actual.
   anguloMinimo: number;
 
-  // Historial completo de la sesión.
+  // Inclinación máxima del tronco
+  // de la repetición actual.
+  inclinacionTroncoMaxima:
+    number | null;
+
+  // Historial completo.
   historial:
     ResultadoRepeticionSentadilla[];
 }
@@ -151,22 +180,32 @@ export interface ResultadoSentadilla {
   // Ángulo actual de rodilla.
   anguloRodilla: number;
 
+  // Inclinación actual
+  // del tronco.
+  inclinacionTronco:
+    number | null;
+
   // Fase actual.
   fase: FaseSentadilla;
 
   // Total de repeticiones.
   repeticiones: number;
 
-  // Indica si hemos cambiado
-  // de fase en este frame.
+  // Indica si ha cambiado
+  // la fase en este frame.
   cambioFase: boolean;
 
   // Indica si acabamos
-  // de terminar una repetición.
+  // de completar una repetición.
   repeticionSumada: boolean;
 
-  // Feedback del movimiento.
+  // Feedback relacionado
+  // con bajar/subir.
   feedbackMovimiento: string;
+
+  // Feedback técnico
+  // del tronco en tiempo real.
+  feedbackTronco: string;
 
   // Historial completo.
   historial:
@@ -179,13 +218,23 @@ export interface ResultadoSentadilla {
 // --------------------------------------------------
 
 export interface ResumenSesionSentadilla {
+  // Repeticiones realizadas.
   total: number;
 
+  // Repeticiones sin ninguno
+  // de los errores analizados.
   correctas: number;
 
+  // Porcentaje de repeticiones correctas.
   porcentajeCorrectas: number;
 
+  // Número de repeticiones
+  // que no alcanzaron profundidad.
   profundidadInsuficiente: number;
+
+  // Número de repeticiones
+  // con demasiado tronco hacia delante.
+  excesoInclinacionTronco: number;
 }
 
 
@@ -196,26 +245,21 @@ export interface ResumenSesionSentadilla {
 export function crearEstadoSentadilla():
   EstadoSentadilla {
   return {
-    // Empezamos suponiendo
-    // que el usuario está arriba.
     fase:
       "arriba",
 
-    // Todavía no hay repeticiones.
     repeticiones:
       0,
 
-    // No hemos alcanzado profundidad.
     profundidadAlcanzada:
       false,
 
-    // Inicializamos con 180°
-    // porque buscamos posteriormente
-    // el ángulo mínimo.
     anguloMinimo:
       180,
 
-    // Historial inicialmente vacío.
+    inclinacionTroncoMaxima:
+      null,
+
     historial:
       []
   };
@@ -262,15 +306,15 @@ export function calcularAnguloRodilla(
     );
 
 
-  // Convertimos radianes
+  // Convertimos de radianes
   // a grados.
   angulo =
     angulo *
     (180 / Math.PI);
 
 
-  // Queremos un resultado
-  // siempre entre 0° y 180°.
+  // Queremos siempre
+  // un valor entre 0° y 180°.
   if (
     angulo >
     180
@@ -286,7 +330,58 @@ export function calcularAnguloRodilla(
 
 
 // --------------------------------------------------
-// FEEDBACK
+// CALCULAR INCLINACIÓN DEL TRONCO
+// --------------------------------------------------
+
+// Utilizamos:
+//
+// hombro -> cadera
+//
+// y calculamos cuánto se separa
+// esa línea de la vertical.
+//
+// Aproximadamente:
+//
+// 0°  -> tronco vertical
+// 30° -> inclinación moderada
+// 50° -> límite actual
+// >50° -> exceso de inclinación
+export function calcularInclinacionTronco(
+  hombro: PuntoSentadilla,
+  cadera: PuntoSentadilla
+): number {
+  // Distancia horizontal.
+  const diferenciaX =
+    Math.abs(
+      hombro.x -
+      cadera.x
+    );
+
+
+  // Distancia vertical.
+  const diferenciaY =
+    Math.abs(
+      hombro.y -
+      cadera.y
+    );
+
+
+  // Ángulo respecto
+  // a la vertical.
+  const inclinacion =
+    Math.atan2(
+      diferenciaX,
+      diferenciaY
+    ) *
+    (180 / Math.PI);
+
+
+  return inclinacion;
+}
+
+
+// --------------------------------------------------
+// FEEDBACK DE MOVIMIENTO
 // --------------------------------------------------
 
 export function obtenerFeedbackSentadilla(
@@ -295,7 +390,7 @@ export function obtenerFeedbackSentadilla(
   profundidadAlcanzada: boolean,
   repeticionSumada: boolean
 ): string {
-  // Si acabamos de terminar
+  // Acabamos de terminar
   // una repetición.
   if (
     repeticionSumada
@@ -324,8 +419,6 @@ export function obtenerFeedbackSentadilla(
   // REPETICIÓN EN CURSO
   // ------------------------------------------------
 
-  // Todavía no hemos alcanzado
-  // suficiente profundidad.
   if (
     !profundidadAlcanzada
   ) {
@@ -335,7 +428,7 @@ export function obtenerFeedbackSentadilla(
   }
 
 
-  // Acabamos de llegar
+  // Hemos llegado
   // a suficiente profundidad.
   if (
     anguloRodilla <=
@@ -348,9 +441,98 @@ export function obtenerFeedbackSentadilla(
 
 
   // Ya hemos alcanzado profundidad
-  // y estamos volviendo arriba.
+  // y estamos subiendo.
   return (
     "Sigue subiendo"
+  );
+}
+
+
+// --------------------------------------------------
+// FEEDBACK DEL TRONCO
+// --------------------------------------------------
+
+export function obtenerFeedbackTronco(
+  inclinacionTronco:
+    number | null
+): string {
+  // No podemos analizarlo
+  // si falta el hombro.
+  if (
+    inclinacionTronco ===
+    null
+  ) {
+    return (
+      "No se puede analizar el tronco"
+    );
+  }
+
+
+  // Dentro del límite
+  // que hemos calibrado.
+  if (
+    inclinacionTronco <=
+    INCLINACION_MAXIMA_TRONCO
+  ) {
+    return (
+      "Inclinación correcta"
+    );
+  }
+
+
+  // Supera los 50°.
+  return (
+    "Reduce la inclinación hacia delante"
+  );
+}
+
+
+// --------------------------------------------------
+// CLASIFICAR REPETICIÓN
+// --------------------------------------------------
+
+// Separamos la clasificación
+// del resto del análisis para
+// mantener el código más claro.
+export function clasificarRepeticionSentadilla(
+  errorProfundidad: boolean,
+  errorTronco: boolean
+):
+  ResultadoRepeticionSentadilla["resultado"] {
+  // Dos errores.
+  if (
+    errorProfundidad &&
+    errorTronco
+  ) {
+    return (
+      "Profundidad insuficiente + exceso de inclinación del tronco"
+    );
+  }
+
+
+  // Solo profundidad.
+  if (
+    errorProfundidad
+  ) {
+    return (
+      "Profundidad insuficiente"
+    );
+  }
+
+
+  // Solo tronco.
+  if (
+    errorTronco
+  ) {
+    return (
+      "Exceso de inclinación del tronco"
+    );
+  }
+
+
+  // Ningún error.
+  return (
+    "Correcta"
   );
 }
 
@@ -361,12 +543,13 @@ export function obtenerFeedbackSentadilla(
 
 export function analizarSentadilla(
   estado: EstadoSentadilla,
+  hombro: PuntoSentadilla | null,
   cadera: PuntoSentadilla,
   rodilla: PuntoSentadilla,
   tobillo: PuntoSentadilla
 ): ResultadoSentadilla {
   // ------------------------------------------------
-  // ÁNGULO ACTUAL
+  // ÁNGULO DE RODILLA
   // ------------------------------------------------
 
   const anguloRodilla =
@@ -376,6 +559,31 @@ export function analizarSentadilla(
       tobillo
     );
 
+
+  // ------------------------------------------------
+  // INCLINACIÓN ACTUAL DEL TRONCO
+  // ------------------------------------------------
+
+  let inclinacionTronco:
+    number | null =
+    null;
+
+
+  if (
+    hombro !==
+    null
+  ) {
+    inclinacionTronco =
+      calcularInclinacionTronco(
+        hombro,
+        cadera
+      );
+  }
+
+
+  // ------------------------------------------------
+  // VARIABLES DEL FRAME
+  // ------------------------------------------------
 
   let cambioFase =
     false;
@@ -389,10 +597,6 @@ export function analizarSentadilla(
   // INICIO DE REPETICIÓN
   // ------------------------------------------------
 
-  // Si estamos arriba y la rodilla
-  // baja hasta 140° o menos,
-  // consideramos que ha empezado
-  // una repetición real.
   if (
     estado.fase ===
       "arriba" &&
@@ -403,13 +607,23 @@ export function analizarSentadilla(
       "abajo";
 
 
+    // Primer valor de rodilla
+    // de la nueva repetición.
     estado.anguloMinimo =
       anguloRodilla;
 
 
+    // Comprobamos si ya
+    // ha alcanzado profundidad.
     estado.profundidadAlcanzada =
       anguloRodilla <=
       ANGULO_SENTADILLA_ABAJO;
+
+
+    // Primera medición
+    // de inclinación.
+    estado.inclinacionTroncoMaxima =
+      inclinacionTronco;
 
 
     cambioFase =
@@ -425,8 +639,10 @@ export function analizarSentadilla(
     estado.fase ===
     "abajo"
   ) {
-    // Guardamos el ángulo
-    // más pequeño alcanzado.
+    // ----------------------------------------------
+    // ÁNGULO MÍNIMO
+    // ----------------------------------------------
+
     if (
       anguloRodilla <
       estado.anguloMinimo
@@ -436,8 +652,10 @@ export function analizarSentadilla(
     }
 
 
-    // Si llegamos a 100° o menos,
-    // marcamos profundidad correcta.
+    // ----------------------------------------------
+    // PROFUNDIDAD
+    // ----------------------------------------------
+
     if (
       anguloRodilla <=
       ANGULO_SENTADILLA_ABAJO
@@ -447,40 +665,89 @@ export function analizarSentadilla(
     }
 
 
+    // ----------------------------------------------
+    // INCLINACIÓN MÁXIMA
+    // ----------------------------------------------
+
+    if (
+      inclinacionTronco !==
+      null
+    ) {
+      // Primera medición válida.
+      if (
+        estado.inclinacionTroncoMaxima ===
+        null
+      ) {
+        estado.inclinacionTroncoMaxima =
+          inclinacionTronco;
+      }
+
+      // Nueva inclinación máxima.
+      else if (
+        inclinacionTronco >
+        estado.inclinacionTroncoMaxima
+      ) {
+        estado.inclinacionTroncoMaxima =
+          inclinacionTronco;
+      }
+    }
+
+
     // ------------------------------------------------
     // FINAL DE REPETICIÓN
     // ------------------------------------------------
 
-    // La repetición termina
-    // cuando volvemos completamente arriba.
     if (
       anguloRodilla >=
       ANGULO_SENTADILLA_ARRIBA
     ) {
-      // Sumamos una repetición,
-      // sea correcta o incorrecta.
+      // Sumamos la repetición.
       estado.repeticiones =
         estado.repeticiones +
         1;
 
 
       // --------------------------------------------
-      // CLASIFICAR
+      // ERROR DE PROFUNDIDAD
       // --------------------------------------------
 
-      const profundidadCorrecta =
-        estado.profundidadAlcanzada;
+      const errorProfundidad =
+        !estado.profundidadAlcanzada;
 
 
-      const resultado:
-        ResultadoRepeticionSentadilla["resultado"] =
-        profundidadCorrecta
-          ? "Correcta"
-          : "Profundidad insuficiente";
+      // --------------------------------------------
+      // ERROR DE TRONCO
+      // --------------------------------------------
+
+      // Si hemos conseguido medir
+      // la inclinación durante la repetición,
+      // comprobamos el límite de 50°.
+      //
+      // Si no se pudo medir el hombro,
+      // no marcamos automáticamente
+      // la repetición como incorrecta.
+      const errorTronco =
+        estado.inclinacionTroncoMaxima !==
+          null &&
+        estado.inclinacionTroncoMaxima >
+          INCLINACION_MAXIMA_TRONCO;
 
 
-      // Creamos el registro
-      // de esta repetición.
+      // --------------------------------------------
+      // CLASIFICACIÓN
+      // --------------------------------------------
+
+      const resultado =
+        clasificarRepeticionSentadilla(
+          errorProfundidad,
+          errorTronco
+        );
+
+
+      // --------------------------------------------
+      // GUARDAR EN HISTORIAL
+      // --------------------------------------------
+
       const nuevaRepeticion:
         ResultadoRepeticionSentadilla = {
         numero:
@@ -489,23 +756,30 @@ export function analizarSentadilla(
         anguloMinimo:
           estado.anguloMinimo,
 
+        inclinacionTroncoMaxima:
+          estado.inclinacionTroncoMaxima,
+
         profundidadCorrecta:
-          profundidadCorrecta,
+          !errorProfundidad,
+
+        errorProfundidad:
+          errorProfundidad,
+
+        errorTronco:
+          errorTronco,
 
         resultado:
           resultado
       };
 
 
-      // Añadimos la repetición
-      // al historial.
       estado.historial.push(
         nuevaRepeticion
       );
 
 
       // --------------------------------------------
-      // PREPARAR SIGUIENTE REPETICIÓN
+      // REINICIAR PARA LA SIGUIENTE
       // --------------------------------------------
 
       estado.fase =
@@ -518,6 +792,10 @@ export function analizarSentadilla(
 
       estado.anguloMinimo =
         180;
+
+
+      estado.inclinacionTroncoMaxima =
+        null;
 
 
       cambioFase =
@@ -543,13 +821,22 @@ export function analizarSentadilla(
     );
 
 
+  const feedbackTronco =
+    obtenerFeedbackTronco(
+      inclinacionTronco
+    );
+
+
   // ------------------------------------------------
-  // RESULTADO
+  // RESULTADO DEL FRAME
   // ------------------------------------------------
 
   return {
     anguloRodilla:
       anguloRodilla,
+
+    inclinacionTronco:
+      inclinacionTronco,
 
     fase:
       estado.fase,
@@ -566,6 +853,9 @@ export function analizarSentadilla(
     feedbackMovimiento:
       feedbackMovimiento,
 
+    feedbackTronco:
+      feedbackTronco,
+
     historial:
       estado.historial
   };
@@ -573,7 +863,7 @@ export function analizarSentadilla(
 
 
 // --------------------------------------------------
-// CALCULAR RESUMEN
+// RESUMEN DE SESIÓN
 // --------------------------------------------------
 
 export function calcularResumenSesionSentadilla(
@@ -585,30 +875,56 @@ export function calcularResumenSesionSentadilla(
     historial.length;
 
 
-  // Contamos las correctas.
+  // ----------------------------------------------
+  // CORRECTAS
+  // ----------------------------------------------
+
+  // Una repetición solo es correcta
+  // si no tiene ninguno
+  // de los errores analizados.
   const correctas =
     historial.filter(
       function (repeticion) {
         return (
-          repeticion.profundidadCorrecta
+          !repeticion.errorProfundidad &&
+          !repeticion.errorTronco
         );
       }
     ).length;
 
 
-  // Contamos las repeticiones
-  // con poca profundidad.
+  // ----------------------------------------------
+  // PROFUNDIDAD
+  // ----------------------------------------------
+
   const profundidadInsuficiente =
     historial.filter(
       function (repeticion) {
         return (
-          !repeticion.profundidadCorrecta
+          repeticion.errorProfundidad
         );
       }
     ).length;
 
 
-  // Evitamos dividir entre cero.
+  // ----------------------------------------------
+  // TRONCO
+  // ----------------------------------------------
+
+  const excesoInclinacionTronco =
+    historial.filter(
+      function (repeticion) {
+        return (
+          repeticion.errorTronco
+        );
+      }
+    ).length;
+
+
+  // ----------------------------------------------
+  // PORCENTAJE CORRECTO
+  // ----------------------------------------------
+
   const porcentajeCorrectas =
     total ===
     0
@@ -631,6 +947,9 @@ export function calcularResumenSesionSentadilla(
       porcentajeCorrectas,
 
     profundidadInsuficiente:
-      profundidadInsuficiente
+      profundidadInsuficiente,
+
+    excesoInclinacionTronco:
+      excesoInclinacionTronco
   };
 }

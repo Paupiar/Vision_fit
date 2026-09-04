@@ -62,7 +62,7 @@ function SentadillaPreview() {
     );
 
 
-  // Estado interno del ejercicio.
+  // Estado interno de la sentadilla.
   const estadoSentadillaRef =
     useRef(
       crearEstadoSentadilla()
@@ -92,6 +92,15 @@ function SentadillaPreview() {
 
 
   const [
+    inclinacionTronco,
+    setInclinacionTronco
+  ] =
+    useState<number | null>(
+      null
+    );
+
+
+  const [
     fase,
     setFase
   ] =
@@ -109,6 +118,17 @@ function SentadillaPreview() {
     );
 
 
+  // Feedback técnico
+  // específico del tronco.
+  const [
+    feedbackTronco,
+    setFeedbackTronco
+  ] =
+    useState<string>(
+      "Esperando detección"
+    );
+
+
   const [
     mensaje,
     setMensaje
@@ -118,7 +138,15 @@ function SentadillaPreview() {
     );
 
 
-  // Historial de repeticiones.
+  const [
+    mensajeTronco,
+    setMensajeTronco
+  ] =
+    useState<string>(
+      "Esperando detección"
+    );
+
+
   const [
     historial,
     setHistorial
@@ -134,8 +162,6 @@ function SentadillaPreview() {
   // RESUMEN
   // ==================================================
 
-  // Se recalcula cada vez
-  // que cambia el historial.
   const resumen =
     calcularResumenSesionSentadilla(
       historial
@@ -143,7 +169,7 @@ function SentadillaPreview() {
 
 
   // ==================================================
-  // INICIAR SISTEMA
+  // INICIAR CÁMARA Y MEDIAPIPE
   // ==================================================
 
   useEffect(function () {
@@ -324,7 +350,7 @@ function SentadillaPreview() {
 
 
   // ==================================================
-  // VISIBILIDAD
+  // COMPROBAR VISIBILIDAD
   // ==================================================
 
   function esLandmarkValido(
@@ -415,12 +441,14 @@ function SentadillaPreview() {
 
 
   // ==================================================
-  // DIBUJAR PIERNA
+  // DIBUJAR CUERPO
   // ==================================================
 
-  function dibujarPierna(
+  function dibujarCuerpo(
     contexto:
       CanvasRenderingContext2D,
+    hombro:
+      PuntoSentadilla | null,
     cadera:
       PuntoSentadilla,
     rodilla:
@@ -428,7 +456,32 @@ function SentadillaPreview() {
     tobillo:
       PuntoSentadilla
   ) {
-    // Cadera -> rodilla.
+    // ----------------------------------------------
+    // TRONCO
+    // ----------------------------------------------
+
+    if (
+      hombro !==
+      null
+    ) {
+      dibujarConexion(
+        contexto,
+        hombro,
+        cadera
+      );
+
+
+      dibujarLandmark(
+        contexto,
+        hombro
+      );
+    }
+
+
+    // ----------------------------------------------
+    // PIERNA
+    // ----------------------------------------------
+
     dibujarConexion(
       contexto,
       cadera,
@@ -436,7 +489,6 @@ function SentadillaPreview() {
     );
 
 
-    // Rodilla -> tobillo.
     dibujarConexion(
       contexto,
       rodilla,
@@ -497,6 +549,8 @@ function SentadillaPreview() {
       poseLandmarkerRef.current;
 
 
+    // Esperamos a tener
+    // una imagen válida.
     if (
       video.readyState <
       2
@@ -511,8 +565,8 @@ function SentadillaPreview() {
     }
 
 
-    // Igualamos resolución
-    // de vídeo y canvas.
+    // Igualamos la resolución
+    // del canvas y del vídeo.
     if (
       canvas.width !==
         video.videoWidth ||
@@ -541,7 +595,8 @@ function SentadillaPreview() {
     }
 
 
-    // Limpiamos el frame anterior.
+    // Eliminamos los dibujos
+    // del frame anterior.
     contexto.clearRect(
       0,
       0,
@@ -570,20 +625,33 @@ function SentadillaPreview() {
           resultado.landmarks[0];
 
 
-        // 24 = cadera derecha.
+        // ----------------------------------------
+        // LANDMARKS DERECHOS
+        // ----------------------------------------
+
+        // 12 = hombro.
+        const hombroNormalizado =
+          landmarks[12];
+
+
+        // 24 = cadera.
         const caderaNormalizada =
           landmarks[24];
 
 
-        // 26 = rodilla derecha.
+        // 26 = rodilla.
         const rodillaNormalizada =
           landmarks[26];
 
 
-        // 28 = tobillo derecho.
+        // 28 = tobillo.
         const tobilloNormalizado =
           landmarks[28];
 
+
+        // ----------------------------------------
+        // PIERNA OBLIGATORIA
+        // ----------------------------------------
 
         if (
           caderaNormalizada &&
@@ -602,7 +670,7 @@ function SentadillaPreview() {
             )
           ) {
             // ------------------------------------
-            // CONVERTIR A PÍXELES
+            // CONVERTIR PIERNA
             // ------------------------------------
 
             const cadera =
@@ -627,12 +695,49 @@ function SentadillaPreview() {
 
 
             // ------------------------------------
-            // ANALIZAR
+            // HOMBRO
+            // ------------------------------------
+
+            let hombro:
+              PuntoSentadilla | null =
+              null;
+
+
+            // El hombro es opcional.
+            //
+            // Si se pierde momentáneamente,
+            // seguimos analizando la pierna.
+            if (
+              hombroNormalizado &&
+              esLandmarkValido(
+                hombroNormalizado
+              )
+            ) {
+              hombro =
+                convertirAPixeles(
+                  hombroNormalizado,
+                  canvas
+                );
+
+
+              setMensajeTronco(
+                "Tronco detectado correctamente"
+              );
+            } else {
+              setMensajeTronco(
+                "Asegúrate de que se vea el hombro"
+              );
+            }
+
+
+            // ------------------------------------
+            // ANALIZAR SENTADILLA
             // ------------------------------------
 
             const analisis =
               analizarSentadilla(
                 estadoSentadillaRef.current,
+                hombro,
                 cadera,
                 rodilla,
                 tobillo
@@ -650,6 +755,22 @@ function SentadillaPreview() {
             );
 
 
+            if (
+              analisis.inclinacionTronco !==
+              null
+            ) {
+              setInclinacionTronco(
+                Math.round(
+                  analisis.inclinacionTronco
+                )
+              );
+            } else {
+              setInclinacionTronco(
+                null
+              );
+            }
+
+
             setFase(
               analisis.fase
             );
@@ -657,6 +778,11 @@ function SentadillaPreview() {
 
             setFeedback(
               analisis.feedbackMovimiento
+            );
+
+
+            setFeedbackTronco(
+              analisis.feedbackTronco
             );
 
 
@@ -677,8 +803,8 @@ function SentadillaPreview() {
               );
 
 
-              // Creamos una copia del array
-              // para que React detecte el cambio.
+              // Copiamos el array para que
+              // React detecte el cambio.
               setHistorial(
                 [
                   ...analisis.historial
@@ -694,11 +820,12 @@ function SentadillaPreview() {
 
 
             // ------------------------------------
-            // DIBUJAR
+            // DIBUJAR LANDMARKS
             // ------------------------------------
 
-            dibujarPierna(
+            dibujarCuerpo(
               contexto,
+              hombro,
               cadera,
               rodilla,
               tobillo
@@ -720,7 +847,7 @@ function SentadillaPreview() {
     }
 
 
-    // Siguiente frame.
+    // Analizamos el siguiente frame.
     animationFrameRef.current =
       requestAnimationFrame(
         analizarFrame
@@ -740,7 +867,8 @@ function SentadillaPreview() {
     }
 
 
-    // Evitamos crear dos bucles.
+    // Evitamos tener dos
+    // bucles simultáneos.
     if (
       animationFrameRef.current !==
       null
@@ -764,7 +892,7 @@ function SentadillaPreview() {
 
 
   // ==================================================
-  // VÍDEO PREPARADO
+  // CÁMARA PREPARADA
   // ==================================================
 
   function videoPreparado() {
@@ -863,6 +991,19 @@ function SentadillaPreview() {
 
           <p>
             <strong>
+              Inclinación del tronco:
+            </strong>{" "}
+
+            {inclinacionTronco !==
+            null
+              ? inclinacionTronco +
+                "°"
+              : "No disponible"}
+          </p>
+
+
+          <p>
+            <strong>
               Fase:
             </strong>{" "}
             {fase}
@@ -879,9 +1020,25 @@ function SentadillaPreview() {
 
           <p>
             <strong>
-              Detección:
+              Técnica del tronco:
+            </strong>{" "}
+            {feedbackTronco}
+          </p>
+
+
+          <p>
+            <strong>
+              Pierna:
             </strong>{" "}
             {mensaje}
+          </p>
+
+
+          <p>
+            <strong>
+              Tronco:
+            </strong>{" "}
+            {mensajeTronco}
           </p>
 
         </section>
@@ -937,6 +1094,16 @@ function SentadillaPreview() {
               }
             </p>
 
+
+            <p>
+              <strong>
+                Exceso de inclinación:
+              </strong>{" "}
+              {
+                resumen.excesoInclinacionTronco
+              }
+            </p>
+
           </section>
 
         ) : null}
@@ -980,12 +1147,26 @@ function SentadillaPreview() {
 
                       {" — "}
 
-                      mínimo:{" "}
+                      rodilla mín.:{" "}
 
                       {Math.round(
                         repeticion.anguloMinimo
                       )}
                       °
+
+                      {" — "}
+
+                      tronco máx.:{" "}
+
+                      {repeticion
+                        .inclinacionTroncoMaxima !==
+                      null
+                        ? Math.round(
+                            repeticion
+                              .inclinacionTroncoMaxima
+                          ) +
+                          "°"
+                        : "N/D"}
                     </li>
                   );
                 }
