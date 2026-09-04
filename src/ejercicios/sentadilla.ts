@@ -2,20 +2,23 @@
 // SENTADILLA
 // --------------------------------------------------
 //
-// Toda la lógica específica de la sentadilla
-// estará dentro de este archivo.
+// Este archivo contiene toda la lógica
+// específica del análisis de sentadilla.
 //
-// Queremos que esta lógica pueda reutilizarse
-// más adelante tanto con:
+// Queremos que esta lógica sea independiente
+// de la fuente de imagen:
 //
 // - cámara;
 // - vídeo grabado.
 //
-// En esta fase añadimos:
+// Actualmente analizamos:
 //
 // - ángulo de rodilla;
-// - fases;
-// - conteo de repeticiones.
+// - inicio y final de repetición;
+// - conteo de repeticiones;
+// - profundidad;
+// - historial;
+// - resumen de sesión.
 // --------------------------------------------------
 
 
@@ -23,29 +26,42 @@
 // UMBRALES
 // --------------------------------------------------
 
-// Después de probar la sentadilla con cámara,
-// observamos aproximadamente:
+// Después de realizar pruebas reales:
 //
-// de pie  -> 170°
-// abajo   -> 90°
+// de pie -> aproximadamente 170°
+// abajo  -> aproximadamente 90°
 //
-// Dejamos un pequeño margen para evitar
-// problemas por pequeñas variaciones
-// de MediaPipe.
+// Utilizamos márgenes para evitar que
+// pequeñas variaciones de MediaPipe
+// afecten al conteo.
+
+
+// Consideramos que el usuario
+// está completamente arriba.
 export const ANGULO_SENTADILLA_ARRIBA =
   160;
 
 
+// A partir de este ángulo consideramos
+// que realmente ha empezado una repetición.
+//
+// Esto evita contar pequeños movimientos
+// de rodilla como sentadillas.
+export const ANGULO_INICIO_SENTADILLA =
+  140;
+
+
+// Para considerar que la sentadilla
+// ha alcanzado suficiente profundidad.
 export const ANGULO_SENTADILLA_ABAJO =
   100;
 
 
 // --------------------------------------------------
-// TIPOS
+// PUNTO
 // --------------------------------------------------
 
-// Representa un landmark detectado
-// por MediaPipe.
+// Representa un landmark de MediaPipe.
 export interface PuntoSentadilla {
   x: number;
 
@@ -55,53 +71,121 @@ export interface PuntoSentadilla {
 }
 
 
-// Fases posibles de la sentadilla.
-//
+// --------------------------------------------------
+// FASE
+// --------------------------------------------------
+
 // "arriba":
-// estamos esperando que el usuario baje.
+// todavía no hemos iniciado una repetición.
 //
 // "abajo":
-// el usuario ya ha alcanzado la profundidad
-// necesaria y debe volver a subir.
+// la repetición ya está en curso.
+//
+// Importante:
+//
+// estar en fase "abajo" NO significa
+// necesariamente haber alcanzado ya
+// una profundidad correcta.
+//
+// Para eso utilizamos:
+// profundidadAlcanzada.
 export type FaseSentadilla =
   "arriba" |
   "abajo";
 
 
-// Estado interno de la sentadilla.
-//
-// Este objeto se conserva entre
-// un frame y el siguiente.
-export interface EstadoSentadilla {
-  fase: FaseSentadilla;
+// --------------------------------------------------
+// RESULTADO DE UNA REPETICIÓN
+// --------------------------------------------------
 
-  repeticiones: number;
+export interface ResultadoRepeticionSentadilla {
+  // Número de repetición.
+  numero: number;
+
+  // Ángulo más pequeño alcanzado
+  // durante la repetición.
+  anguloMinimo: number;
+
+  // Indica si alcanzó
+  // una profundidad correcta.
+  profundidadCorrecta: boolean;
+
+  // Texto que mostramos al usuario.
+  resultado:
+    "Correcta" |
+    "Profundidad insuficiente";
 }
 
 
-// Resultado producido
-// después de analizar un frame.
-export interface ResultadoSentadilla {
-  // Ángulo actual de la rodilla.
-  anguloRodilla: number;
+// --------------------------------------------------
+// ESTADO INTERNO
+// --------------------------------------------------
 
-  // Fase después de analizar el frame.
+// Este estado se mantiene
+// entre un frame y el siguiente.
+export interface EstadoSentadilla {
+  // Fase actual.
   fase: FaseSentadilla;
 
-  // Número de repeticiones actuales.
+  // Número total de repeticiones realizadas.
   repeticiones: number;
 
-  // Nos indica si hemos cambiado
+  // Indica si durante esta repetición
+  // se llegó a 100° o menos.
+  profundidadAlcanzada: boolean;
+
+  // Ángulo mínimo de la repetición actual.
+  anguloMinimo: number;
+
+  // Historial completo de la sesión.
+  historial:
+    ResultadoRepeticionSentadilla[];
+}
+
+
+// --------------------------------------------------
+// RESULTADO DE UN FRAME
+// --------------------------------------------------
+
+export interface ResultadoSentadilla {
+  // Ángulo actual de rodilla.
+  anguloRodilla: number;
+
+  // Fase actual.
+  fase: FaseSentadilla;
+
+  // Total de repeticiones.
+  repeticiones: number;
+
+  // Indica si hemos cambiado
   // de fase en este frame.
   cambioFase: boolean;
 
-  // Nos indica si acabamos
-  // de completar una repetición.
+  // Indica si acabamos
+  // de terminar una repetición.
   repeticionSumada: boolean;
 
-  // Mensaje relacionado
-  // con el movimiento actual.
+  // Feedback del movimiento.
   feedbackMovimiento: string;
+
+  // Historial completo.
+  historial:
+    ResultadoRepeticionSentadilla[];
+}
+
+
+// --------------------------------------------------
+// RESUMEN DE SESIÓN
+// --------------------------------------------------
+
+export interface ResumenSesionSentadilla {
+  total: number;
+
+  correctas: number;
+
+  porcentajeCorrectas: number;
+
+  profundidadInsuficiente: number;
 }
 
 
@@ -109,18 +193,31 @@ export interface ResultadoSentadilla {
 // CREAR ESTADO INICIAL
 // --------------------------------------------------
 
-// La sentadilla empieza suponiendo
-// que el usuario está de pie.
-//
-// Todavía no contamos ninguna repetición.
 export function crearEstadoSentadilla():
   EstadoSentadilla {
   return {
+    // Empezamos suponiendo
+    // que el usuario está arriba.
     fase:
       "arriba",
 
+    // Todavía no hay repeticiones.
     repeticiones:
-      0
+      0,
+
+    // No hemos alcanzado profundidad.
+    profundidadAlcanzada:
+      false,
+
+    // Inicializamos con 180°
+    // porque buscamos posteriormente
+    // el ángulo mínimo.
+    anguloMinimo:
+      180,
+
+    // Historial inicialmente vacío.
+    historial:
+      []
   };
 }
 
@@ -133,8 +230,7 @@ export function crearEstadoSentadilla():
 //
 // cadera -> rodilla -> tobillo
 //
-// La rodilla es el vértice
-// del ángulo.
+// La rodilla es el vértice.
 export function calcularAnguloRodilla(
   cadera: PuntoSentadilla,
   rodilla: PuntoSentadilla,
@@ -166,15 +262,15 @@ export function calcularAnguloRodilla(
     );
 
 
-  // Convertimos de radianes
+  // Convertimos radianes
   // a grados.
   angulo =
     angulo *
     (180 / Math.PI);
 
 
-  // Queremos siempre
-  // un resultado entre 0° y 180°.
+  // Queremos un resultado
+  // siempre entre 0° y 180°.
   if (
     angulo >
     180
@@ -190,78 +286,71 @@ export function calcularAnguloRodilla(
 
 
 // --------------------------------------------------
-// FEEDBACK DE MOVIMIENTO
+// FEEDBACK
 // --------------------------------------------------
 
-// Genera un mensaje sencillo
-// dependiendo de:
-//
-// - ángulo actual;
-// - fase de la sentadilla.
 export function obtenerFeedbackSentadilla(
   anguloRodilla: number,
-  fase: FaseSentadilla
+  fase: FaseSentadilla,
+  profundidadAlcanzada: boolean,
+  repeticionSumada: boolean
 ): string {
+  // Si acabamos de terminar
+  // una repetición.
+  if (
+    repeticionSumada
+  ) {
+    return (
+      "Repetición completa"
+    );
+  }
+
+
   // ------------------------------------------------
-  // FASE ARRIBA
+  // ARRIBA
   // ------------------------------------------------
 
-  // Si estamos arriba,
-  // esperamos que el usuario baje.
   if (
     fase ===
     "arriba"
   ) {
-    // Está prácticamente de pie.
-    if (
-      anguloRodilla >=
-      ANGULO_SENTADILLA_ARRIBA
-    ) {
-      return (
-        "Empieza a bajar"
-      );
-    }
+    return (
+      "Empieza a bajar"
+    );
+  }
 
 
-    // Todavía no ha alcanzado
-    // suficiente profundidad.
-    if (
-      anguloRodilla >
-      ANGULO_SENTADILLA_ABAJO
-    ) {
-      return (
-        "Sigue bajando"
-      );
-    }
+  // ------------------------------------------------
+  // REPETICIÓN EN CURSO
+  // ------------------------------------------------
+
+  // Todavía no hemos alcanzado
+  // suficiente profundidad.
+  if (
+    !profundidadAlcanzada
+  ) {
+    return (
+      "Sigue bajando"
+    );
+  }
 
 
-    // Ha alcanzado
-    // la profundidad requerida.
+  // Acabamos de llegar
+  // a suficiente profundidad.
+  if (
+    anguloRodilla <=
+    ANGULO_SENTADILLA_ABAJO
+  ) {
     return (
       "Profundidad alcanzada"
     );
   }
 
 
-  // ------------------------------------------------
-  // FASE ABAJO
-  // ------------------------------------------------
-
-  // Una vez abajo,
-  // queremos que vuelva a subir.
-  if (
-    anguloRodilla <
-    ANGULO_SENTADILLA_ARRIBA
-  ) {
-    return (
-      "Sigue subiendo"
-    );
-  }
-
-
-  // Ha vuelto completamente arriba.
+  // Ya hemos alcanzado profundidad
+  // y estamos volviendo arriba.
   return (
-    "Repetición completa"
+    "Sigue subiendo"
   );
 }
 
@@ -270,15 +359,6 @@ export function obtenerFeedbackSentadilla(
 // ANALIZAR SENTADILLA
 // --------------------------------------------------
 
-// Esta función recibe:
-//
-// - estado actual;
-// - cadera;
-// - rodilla;
-// - tobillo.
-//
-// Y devuelve toda la información
-// necesaria para la interfaz.
 export function analizarSentadilla(
   estado: EstadoSentadilla,
   cadera: PuntoSentadilla,
@@ -286,7 +366,7 @@ export function analizarSentadilla(
   tobillo: PuntoSentadilla
 ): ResultadoSentadilla {
   // ------------------------------------------------
-  // ÁNGULO
+  // ÁNGULO ACTUAL
   // ------------------------------------------------
 
   const anguloRodilla =
@@ -297,23 +377,6 @@ export function analizarSentadilla(
     );
 
 
-  // Guardamos la fase existente
-  // antes de modificar nada.
-  const faseAntes =
-    estado.fase;
-
-
-  // Calculamos el feedback
-  // según la fase actual.
-  const feedbackMovimiento =
-    obtenerFeedbackSentadilla(
-      anguloRodilla,
-      faseAntes
-    );
-
-
-  // Variables que indican
-  // qué ha ocurrido en este frame.
   let cambioFase =
     false;
 
@@ -323,60 +386,161 @@ export function analizarSentadilla(
 
 
   // ------------------------------------------------
-  // LLEGAR ABAJO
+  // INICIO DE REPETICIÓN
   // ------------------------------------------------
 
-  // Solo cambiamos a "abajo"
-  // si antes estábamos arriba
-  // y alcanzamos 100° o menos.
+  // Si estamos arriba y la rodilla
+  // baja hasta 140° o menos,
+  // consideramos que ha empezado
+  // una repetición real.
   if (
     estado.fase ===
       "arriba" &&
     anguloRodilla <=
-      ANGULO_SENTADILLA_ABAJO
+      ANGULO_INICIO_SENTADILLA
   ) {
     estado.fase =
       "abajo";
 
 
+    estado.anguloMinimo =
+      anguloRodilla;
+
+
+    estado.profundidadAlcanzada =
+      anguloRodilla <=
+      ANGULO_SENTADILLA_ABAJO;
+
+
     cambioFase =
       true;
   }
 
 
   // ------------------------------------------------
-  // VOLVER ARRIBA
+  // REPETICIÓN EN CURSO
   // ------------------------------------------------
 
-  // Una repetición se considera completa
-  // únicamente cuando:
-  //
-  // 1. previamente alcanzamos la fase abajo;
-  // 2. volvemos a 160° o más.
   if (
     estado.fase ===
-      "abajo" &&
-    anguloRodilla >=
-      ANGULO_SENTADILLA_ARRIBA
+    "abajo"
   ) {
-    // Volvemos a la fase inicial.
-    estado.fase =
-      "arriba";
+    // Guardamos el ángulo
+    // más pequeño alcanzado.
+    if (
+      anguloRodilla <
+      estado.anguloMinimo
+    ) {
+      estado.anguloMinimo =
+        anguloRodilla;
+    }
 
 
-    // Sumamos una repetición.
-    estado.repeticiones =
-      estado.repeticiones +
-      1;
+    // Si llegamos a 100° o menos,
+    // marcamos profundidad correcta.
+    if (
+      anguloRodilla <=
+      ANGULO_SENTADILLA_ABAJO
+    ) {
+      estado.profundidadAlcanzada =
+        true;
+    }
 
 
-    cambioFase =
-      true;
+    // ------------------------------------------------
+    // FINAL DE REPETICIÓN
+    // ------------------------------------------------
+
+    // La repetición termina
+    // cuando volvemos completamente arriba.
+    if (
+      anguloRodilla >=
+      ANGULO_SENTADILLA_ARRIBA
+    ) {
+      // Sumamos una repetición,
+      // sea correcta o incorrecta.
+      estado.repeticiones =
+        estado.repeticiones +
+        1;
 
 
-    repeticionSumada =
-      true;
+      // --------------------------------------------
+      // CLASIFICAR
+      // --------------------------------------------
+
+      const profundidadCorrecta =
+        estado.profundidadAlcanzada;
+
+
+      const resultado:
+        ResultadoRepeticionSentadilla["resultado"] =
+        profundidadCorrecta
+          ? "Correcta"
+          : "Profundidad insuficiente";
+
+
+      // Creamos el registro
+      // de esta repetición.
+      const nuevaRepeticion:
+        ResultadoRepeticionSentadilla = {
+        numero:
+          estado.repeticiones,
+
+        anguloMinimo:
+          estado.anguloMinimo,
+
+        profundidadCorrecta:
+          profundidadCorrecta,
+
+        resultado:
+          resultado
+      };
+
+
+      // Añadimos la repetición
+      // al historial.
+      estado.historial.push(
+        nuevaRepeticion
+      );
+
+
+      // --------------------------------------------
+      // PREPARAR SIGUIENTE REPETICIÓN
+      // --------------------------------------------
+
+      estado.fase =
+        "arriba";
+
+
+      estado.profundidadAlcanzada =
+        false;
+
+
+      estado.anguloMinimo =
+        180;
+
+
+      cambioFase =
+        true;
+
+
+      repeticionSumada =
+        true;
+    }
   }
+
+
+  // ------------------------------------------------
+  // FEEDBACK
+  // ------------------------------------------------
+
+  const feedbackMovimiento =
+    obtenerFeedbackSentadilla(
+      anguloRodilla,
+      estado.fase,
+      estado.profundidadAlcanzada,
+      repeticionSumada
+    );
 
 
   // ------------------------------------------------
@@ -400,6 +564,73 @@ export function analizarSentadilla(
       repeticionSumada,
 
     feedbackMovimiento:
-      feedbackMovimiento
+      feedbackMovimiento,
+
+    historial:
+      estado.historial
+  };
+}
+
+
+// --------------------------------------------------
+// CALCULAR RESUMEN
+// --------------------------------------------------
+
+export function calcularResumenSesionSentadilla(
+  historial:
+    ResultadoRepeticionSentadilla[]
+): ResumenSesionSentadilla {
+  // Total de repeticiones.
+  const total =
+    historial.length;
+
+
+  // Contamos las correctas.
+  const correctas =
+    historial.filter(
+      function (repeticion) {
+        return (
+          repeticion.profundidadCorrecta
+        );
+      }
+    ).length;
+
+
+  // Contamos las repeticiones
+  // con poca profundidad.
+  const profundidadInsuficiente =
+    historial.filter(
+      function (repeticion) {
+        return (
+          !repeticion.profundidadCorrecta
+        );
+      }
+    ).length;
+
+
+  // Evitamos dividir entre cero.
+  const porcentajeCorrectas =
+    total ===
+    0
+      ? 0
+      : (
+          correctas /
+          total
+        ) *
+        100;
+
+
+  return {
+    total:
+      total,
+
+    correctas:
+      correctas,
+
+    porcentajeCorrectas:
+      porcentajeCorrectas,
+
+    profundidadInsuficiente:
+      profundidadInsuficiente
   };
 }

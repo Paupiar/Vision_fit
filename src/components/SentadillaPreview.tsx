@@ -15,64 +15,54 @@ import {
   crearPoseLandmarker
 } from "../mediapipe/pose";
 
+
 // --------------------------------------------------
 // LÓGICA DE SENTADILLA
 // --------------------------------------------------
 
 import {
   analizarSentadilla,
+  calcularResumenSesionSentadilla,
   crearEstadoSentadilla
 } from "../ejercicios/sentadilla";
 
 import type {
   FaseSentadilla,
-  PuntoSentadilla
+  PuntoSentadilla,
+  ResultadoRepeticionSentadilla
 } from "../ejercicios/sentadilla";
 
 
 function SentadillaPreview() {
   // ==================================================
-  // REFERENCIAS PRINCIPALES
+  // REFERENCIAS
   // ==================================================
 
-  // Elemento <video>
-  // utilizado por la webcam.
   const videoRef =
     useRef<HTMLVideoElement | null>(
       null
     );
 
 
-  // Canvas que colocamos
-  // encima de la cámara.
   const canvasRef =
     useRef<HTMLCanvasElement | null>(
       null
     );
 
 
-  // Detector de MediaPipe.
   const poseLandmarkerRef =
     useRef<PoseLandmarker | null>(
       null
     );
 
 
-  // requestAnimationFrame.
   const animationFrameRef =
     useRef<number | null>(
       null
     );
 
 
-  // ==================================================
-  // ESTADO INTERNO DE SENTADILLA
-  // ==================================================
-
-  // Conserva entre frames:
-  //
-  // - fase;
-  // - repeticiones.
+  // Estado interno del ejercicio.
   const estadoSentadillaRef =
     useRef(
       crearEstadoSentadilla()
@@ -80,10 +70,9 @@ function SentadillaPreview() {
 
 
   // ==================================================
-  // ESTADO VISIBLE
+  // ESTADOS VISIBLES
   // ==================================================
 
-  // Número de repeticiones.
   const [
     repeticiones,
     setRepeticiones
@@ -93,7 +82,6 @@ function SentadillaPreview() {
     );
 
 
-  // Ángulo de la rodilla.
   const [
     anguloRodilla,
     setAnguloRodilla
@@ -103,7 +91,6 @@ function SentadillaPreview() {
     );
 
 
-  // Fase actual.
   const [
     fase,
     setFase
@@ -113,7 +100,6 @@ function SentadillaPreview() {
     );
 
 
-  // Feedback del movimiento.
   const [
     feedback,
     setFeedback
@@ -123,8 +109,6 @@ function SentadillaPreview() {
     );
 
 
-  // Estado de detección
-  // de los landmarks.
   const [
     mensaje,
     setMensaje
@@ -134,20 +118,40 @@ function SentadillaPreview() {
     );
 
 
+  // Historial de repeticiones.
+  const [
+    historial,
+    setHistorial
+  ] =
+    useState<
+      ResultadoRepeticionSentadilla[]
+    >(
+      []
+    );
+
+
   // ==================================================
-  // INICIAR CÁMARA Y MEDIAPIPE
+  // RESUMEN
+  // ==================================================
+
+  // Se recalcula cada vez
+  // que cambia el historial.
+  const resumen =
+    calcularResumenSesionSentadilla(
+      historial
+    );
+
+
+  // ==================================================
+  // INICIAR SISTEMA
   // ==================================================
 
   useEffect(function () {
-    // Stream real de la webcam.
     let stream:
       MediaStream | null =
       null;
 
 
-    // Evita problemas si el componente
-    // desaparece mientras estamos
-    // esperando procesos async.
     let componenteActivo =
       true;
 
@@ -168,8 +172,6 @@ function SentadillaPreview() {
           });
 
 
-        // Si el componente ya desapareció,
-        // detenemos inmediatamente la cámara.
         if (
           !componenteActivo
         ) {
@@ -190,8 +192,6 @@ function SentadillaPreview() {
           nuevoStream;
 
 
-        // Conectamos el stream
-        // al elemento <video>.
         if (
           videoRef.current
         ) {
@@ -229,8 +229,6 @@ function SentadillaPreview() {
         );
 
 
-        // Si la cámara ya tiene datos,
-        // comenzamos directamente.
         if (
           videoRef.current &&
           videoRef.current.readyState >=
@@ -260,7 +258,6 @@ function SentadillaPreview() {
         false;
 
 
-      // Detenemos el bucle.
       if (
         animationFrameRef.current !==
         null
@@ -275,7 +272,6 @@ function SentadillaPreview() {
       }
 
 
-      // Apagamos la webcam.
       if (
         stream
       ) {
@@ -289,7 +285,6 @@ function SentadillaPreview() {
       }
 
 
-      // Desconectamos el vídeo.
       if (
         videoRef.current
       ) {
@@ -306,7 +301,7 @@ function SentadillaPreview() {
 
 
   // ==================================================
-  // CONVERTIR COORDENADAS
+  // CONVERTIR A PÍXELES
   // ==================================================
 
   function convertirAPixeles(
@@ -335,8 +330,6 @@ function SentadillaPreview() {
   function esLandmarkValido(
     punto: PuntoSentadilla
   ): boolean {
-    // Si visibility no existe,
-    // aceptamos el landmark.
     if (
       punto.visibility ===
       undefined
@@ -345,8 +338,6 @@ function SentadillaPreview() {
     }
 
 
-    // Mantenemos el mismo
-    // umbral del 70 %.
     return (
       punto.visibility >=
       0.7
@@ -453,7 +444,6 @@ function SentadillaPreview() {
     );
 
 
-    // Landmarks.
     dibujarLandmark(
       contexto,
       cadera
@@ -507,7 +497,6 @@ function SentadillaPreview() {
       poseLandmarkerRef.current;
 
 
-    // Esperamos una imagen válida.
     if (
       video.readyState <
       2
@@ -522,7 +511,8 @@ function SentadillaPreview() {
     }
 
 
-    // Igualamos la resolución.
+    // Igualamos resolución
+    // de vídeo y canvas.
     if (
       canvas.width !==
         video.videoWidth ||
@@ -544,7 +534,9 @@ function SentadillaPreview() {
       );
 
 
-    if (!contexto) {
+    if (
+      !contexto
+    ) {
       return;
     }
 
@@ -578,10 +570,6 @@ function SentadillaPreview() {
           resultado.landmarks[0];
 
 
-        // ----------------------------------------
-        // PIERNA DERECHA
-        // ----------------------------------------
-
         // 24 = cadera derecha.
         const caderaNormalizada =
           landmarks[24];
@@ -597,13 +585,11 @@ function SentadillaPreview() {
           landmarks[28];
 
 
-        // Comprobamos que existan.
         if (
           caderaNormalizada &&
           rodillaNormalizada &&
           tobilloNormalizado
         ) {
-          // Comprobamos visibilidad.
           if (
             esLandmarkValido(
               caderaNormalizada
@@ -641,7 +627,7 @@ function SentadillaPreview() {
 
 
             // ------------------------------------
-            // ANALIZAR SENTADILLA
+            // ANALIZAR
             // ------------------------------------
 
             const analisis =
@@ -691,6 +677,15 @@ function SentadillaPreview() {
               );
 
 
+              // Creamos una copia del array
+              // para que React detecte el cambio.
+              setHistorial(
+                [
+                  ...analisis.historial
+                ]
+              );
+
+
               console.log(
                 "Repetición de sentadilla:",
                 analisis.repeticiones
@@ -710,8 +705,6 @@ function SentadillaPreview() {
             );
 
           } else {
-            // Alguno de los landmarks
-            // tiene poca visibilidad.
             setMensaje(
               "Asegúrate de que se vea la pierna completa"
             );
@@ -747,8 +740,7 @@ function SentadillaPreview() {
     }
 
 
-    // Evitamos dos bucles
-    // simultáneos.
+    // Evitamos crear dos bucles.
     if (
       animationFrameRef.current !==
       null
@@ -772,7 +764,7 @@ function SentadillaPreview() {
 
 
   // ==================================================
-  // CÁMARA PREPARADA
+  // VÍDEO PREPARADO
   // ==================================================
 
   function videoPreparado() {
@@ -801,6 +793,7 @@ function SentadillaPreview() {
       {/* =============================================
           IZQUIERDA: CÁMARA
           ============================================= */}
+
       <div className="vision-fit-camera-column">
 
         <div className="camera-container">
@@ -836,15 +829,28 @@ function SentadillaPreview() {
 
 
       {/* =============================================
-          DERECHA: ANÁLISIS
+          DERECHA: INFORMACIÓN
           ============================================= */}
+
       <div className="vision-fit-data-column">
+
+        {/* ===========================================
+            MOVIMIENTO
+            =========================================== */}
 
         <section className="analysis-section">
 
           <h2>
-            Repeticiones: {repeticiones}
+            Sentadilla
           </h2>
+
+
+          <p>
+            <strong>
+              Repeticiones:
+            </strong>{" "}
+            {repeticiones}
+          </p>
 
 
           <p>
@@ -879,6 +885,117 @@ function SentadillaPreview() {
           </p>
 
         </section>
+
+
+        {/* ===========================================
+            RESUMEN
+            =========================================== */}
+
+        {historial.length >
+        0 ? (
+
+          <section className="analysis-section">
+
+            <h2>
+              Resumen de sesión
+            </h2>
+
+
+            <p>
+              <strong>
+                Repeticiones:
+              </strong>{" "}
+              {resumen.total}
+            </p>
+
+
+            <p>
+              <strong>
+                Correctas:
+              </strong>{" "}
+              {resumen.correctas}
+            </p>
+
+
+            <p>
+              <strong>
+                Técnica correcta:
+              </strong>{" "}
+              {Math.round(
+                resumen.porcentajeCorrectas
+              )}
+              %
+            </p>
+
+
+            <p>
+              <strong>
+                Profundidad insuficiente:
+              </strong>{" "}
+              {
+                resumen.profundidadInsuficiente
+              }
+            </p>
+
+          </section>
+
+        ) : null}
+
+
+        {/* ===========================================
+            HISTORIAL
+            =========================================== */}
+
+        {historial.length >
+        0 ? (
+
+          <section className="analysis-section">
+
+            <h2>
+              Historial
+            </h2>
+
+
+            <ol className="repetition-history">
+
+              {historial.map(
+                function (repeticion) {
+                  return (
+                    <li
+                      key={
+                        repeticion.numero
+                      }
+                    >
+                      <strong>
+                        Rep{" "}
+                        {
+                          repeticion.numero
+                        }
+                        :
+                      </strong>{" "}
+
+                      {
+                        repeticion.resultado
+                      }
+
+                      {" — "}
+
+                      mínimo:{" "}
+
+                      {Math.round(
+                        repeticion.anguloMinimo
+                      )}
+                      °
+                    </li>
+                  );
+                }
+              )}
+
+            </ol>
+
+          </section>
+
+        ) : null}
 
       </div>
 
