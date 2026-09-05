@@ -17,6 +17,22 @@ import {
 
 
 // --------------------------------------------------
+// UTILIDADES COMUNES DE MEDIAPIPE
+// --------------------------------------------------
+//
+// Estas funciones antes estaban definidas
+// directamente dentro de PressHombroVideoPreview.
+//
+// Ahora las reutilizamos desde dibujo.ts.
+import {
+  convertirAPixeles,
+  dibujarConexion,
+  dibujarLandmark,
+  esLandmarkValido
+} from "../mediapipe/dibujo";
+
+
+// --------------------------------------------------
 // LÓGICA DEL PRESS DE HOMBRO
 // --------------------------------------------------
 
@@ -420,131 +436,16 @@ function PressHombroVideoPreview(
 
 
   // ==================================================
-  // CONVERTIR A PÍXELES
-  // ==================================================
-
-  function convertirAPixeles(
-    punto: PuntoPressHombro,
-    canvas: HTMLCanvasElement
-  ): PuntoPressHombro {
-    return {
-      x:
-        punto.x *
-        canvas.width,
-
-      y:
-        punto.y *
-        canvas.height,
-
-      visibility:
-        punto.visibility
-    };
-  }
-
-
-  // ==================================================
-  // COMPROBAR VISIBILIDAD
-  // ==================================================
-
-  function esLandmarkValido(
-    punto: PuntoPressHombro
-  ): boolean {
-    if (
-      punto.visibility ===
-      undefined
-    ) {
-      return true;
-    }
-
-
-    // Mantenemos el mismo
-    // mínimo del 70 %.
-    return (
-      punto.visibility >=
-      0.7
-    );
-  }
-
-
-  // ==================================================
-  // DIBUJAR LANDMARK
-  // ==================================================
-
-  function dibujarLandmark(
-    contexto:
-      CanvasRenderingContext2D,
-    punto:
-      PuntoPressHombro,
-    verde:
-      boolean
-  ) {
-    contexto.beginPath();
-
-
-    contexto.arc(
-      punto.x,
-      punto.y,
-      8,
-      0,
-      Math.PI * 2
-    );
-
-
-    contexto.fillStyle =
-      verde
-        ? "limegreen"
-        : "red";
-
-
-    contexto.fill();
-  }
-
-
-  // ==================================================
-  // DIBUJAR CONEXIÓN
-  // ==================================================
-
-  function dibujarConexion(
-    contexto:
-      CanvasRenderingContext2D,
-    inicio:
-      PuntoPressHombro,
-    fin:
-      PuntoPressHombro,
-    verde:
-      boolean
-  ) {
-    contexto.beginPath();
-
-
-    contexto.moveTo(
-      inicio.x,
-      inicio.y
-    );
-
-
-    contexto.lineTo(
-      fin.x,
-      fin.y
-    );
-
-
-    contexto.lineWidth =
-      4;
-
-
-    contexto.strokeStyle =
-      verde
-        ? "limegreen"
-        : "blue";
-
-
-    contexto.stroke();
-  }
-
-
-  // ==================================================
   // DIBUJAR BRAZO
+  // ==================================================
+  //
+  // Esta función sigue siendo específica
+  // del press porque define
+  // cómo dibujamos cada brazo.
+  //
+  // Las operaciones básicas
+  // dibujarConexion y dibujarLandmark
+  // vienen ahora desde dibujo.ts.
   // ==================================================
 
   function dibujarBrazo(
@@ -775,6 +676,10 @@ function PressHombroVideoPreview(
           // --------------------------------------
           // VISIBILIDAD IZQUIERDA
           // --------------------------------------
+          //
+          // esLandmarkValido viene
+          // ahora desde dibujo.ts.
+          // --------------------------------------
 
           const brazoIzquierdoValido =
             esLandmarkValido(
@@ -812,6 +717,10 @@ function PressHombroVideoPreview(
           ) {
             // ====================================
             // IZQUIERDO A PÍXELES
+            // ====================================
+            //
+            // convertirAPixeles viene
+            // ahora desde dibujo.ts.
             // ====================================
 
             const hombroIzquierdo =
@@ -862,6 +771,10 @@ function PressHombroVideoPreview(
 
             // ====================================
             // ANALIZAR PRESS
+            // ====================================
+            //
+            // La lógica bilateral
+            // permanece exactamente igual.
             // ====================================
 
             const analisis =
@@ -1122,6 +1035,7 @@ function PressHombroVideoPreview(
         {/* No utilizamos camera-container
             porque el vídeo grabado
             NO debe verse como espejo. */}
+
         <div
           style={{
             position:

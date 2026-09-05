@@ -17,6 +17,22 @@ import {
 
 
 // --------------------------------------------------
+// UTILIDADES COMUNES DE MEDIAPIPE
+// --------------------------------------------------
+//
+// Estas funciones antes estaban definidas
+// directamente dentro de SentadillaPreview.
+//
+// Ahora las reutilizamos desde dibujo.ts.
+import {
+  convertirAPixeles,
+  dibujarConexion,
+  dibujarLandmark,
+  esLandmarkValido
+} from "../mediapipe/dibujo";
+
+
+// --------------------------------------------------
 // LÓGICA DE SENTADILLA
 // --------------------------------------------------
 
@@ -341,139 +357,16 @@ function SentadillaPreview() {
 
 
   // ==================================================
-  // CONVERTIR A PÍXELES
-  // ==================================================
-
-  function convertirAPixeles(
-    punto: PuntoSentadilla,
-    canvas: HTMLCanvasElement
-  ): PuntoSentadilla {
-    return {
-      x:
-        punto.x *
-        canvas.width,
-
-      y:
-        punto.y *
-        canvas.height,
-
-      visibility:
-        punto.visibility
-    };
-  }
-
-
-  // ==================================================
-  // COMPROBAR VISIBILIDAD
-  // ==================================================
-
-  function esLandmarkValido(
-    punto: PuntoSentadilla
-  ): boolean {
-    if (
-      punto.visibility ===
-      undefined
-    ) {
-      return true;
-    }
-
-
-    return (
-      punto.visibility >=
-      0.7
-    );
-  }
-
-
-  // ==================================================
-  // DIBUJAR LANDMARK
-  // ==================================================
-
-  function dibujarLandmark(
-    contexto:
-      CanvasRenderingContext2D,
-    punto:
-      PuntoSentadilla,
-    verde:
-      boolean
-  ) {
-    contexto.beginPath();
-
-
-    contexto.arc(
-      punto.x,
-      punto.y,
-      8,
-      0,
-      Math.PI * 2
-    );
-
-
-    // Normalmente los puntos
-    // aparecen en rojo.
-    //
-    // Cuando alcanzamos un rango válido
-    // los mostramos momentáneamente
-    // en verde.
-    contexto.fillStyle =
-      verde
-        ? "limegreen"
-        : "red";
-
-
-    contexto.fill();
-  }
-
-
-  // ==================================================
-  // DIBUJAR CONEXIÓN
-  // ==================================================
-
-  function dibujarConexion(
-    contexto:
-      CanvasRenderingContext2D,
-    inicio:
-      PuntoSentadilla,
-    fin:
-      PuntoSentadilla,
-    verde:
-      boolean
-  ) {
-    contexto.beginPath();
-
-
-    contexto.moveTo(
-      inicio.x,
-      inicio.y
-    );
-
-
-    contexto.lineTo(
-      fin.x,
-      fin.y
-    );
-
-
-    contexto.lineWidth =
-      4;
-
-
-    // Igual que en el curl:
-    //
-    // azul normalmente;
-    // verde al alcanzar el rango.
-    contexto.strokeStyle =
-      verde
-        ? "limegreen"
-        : "blue";
-
-
-    contexto.stroke();
-  }
-
-
-  // ==================================================
   // DIBUJAR CUERPO
+  // ==================================================
+  //
+  // Esta función sigue siendo propia
+  // de la sentadilla porque define
+  // qué conexiones queremos dibujar.
+  //
+  // Las operaciones básicas
+  // dibujarConexion y dibujarLandmark
+  // vienen ahora de dibujo.ts.
   // ==================================================
 
   function dibujarCuerpo(
@@ -667,6 +560,13 @@ function SentadillaPreview() {
         // ----------------------------------------
         // LANDMARKS DERECHOS
         // ----------------------------------------
+        //
+        // Mantenemos exactamente
+        // la configuración estable actual.
+        //
+        // Todavía NO añadimos
+        // selección izquierda/derecha.
+        // ----------------------------------------
 
         // 12 = hombro.
         const hombroNormalizado =
@@ -697,6 +597,8 @@ function SentadillaPreview() {
           rodillaNormalizada &&
           tobilloNormalizado
         ) {
+          // esLandmarkValido
+          // viene ahora de dibujo.ts.
           if (
             esLandmarkValido(
               caderaNormalizada
@@ -711,6 +613,9 @@ function SentadillaPreview() {
             // ------------------------------------
             // CONVERTIR PIERNA
             // ------------------------------------
+            //
+            // convertirAPixeles
+            // viene ahora de dibujo.ts.
 
             const cadera =
               convertirAPixeles(
@@ -788,6 +693,8 @@ function SentadillaPreview() {
             // ANALIZAR SENTADILLA
             // ------------------------------------
 
+            // La lógica biomecánica
+            // permanece exactamente igual.
             const analisis =
               analizarSentadilla(
                 estadoSentadillaRef.current,

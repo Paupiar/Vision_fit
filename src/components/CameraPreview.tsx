@@ -15,10 +15,31 @@ import {
   crearPoseLandmarker
 } from "../mediapipe/pose";
 
+
+// --------------------------------------------------
+// UTILIDADES COMUNES DE MEDIAPIPE
+// --------------------------------------------------
+//
+// Estas funciones antes estaban definidas
+// directamente dentro de CameraPreview.
+//
+// Ahora las reutilizamos desde dibujo.ts.
+import {
+  convertirAPixeles,
+  dibujarConexion,
+  dibujarLandmark,
+  esLandmarkValido
+} from "../mediapipe/dibujo";
+
+
+// --------------------------------------------------
+// LÓGICA DEL CURL
+// --------------------------------------------------
+
 // Importamos toda la lógica específica
 // del ejercicio curl.
 //
-// CameraPreview ya no necesita saber
+// CameraPreview no necesita saber
 // cómo se evalúa biomecánicamente el ejercicio.
 import {
   analizarFrameCurl,
@@ -44,20 +65,28 @@ function CameraPreview() {
 
   // Elemento <video>.
   const videoRef =
-    useRef<HTMLVideoElement | null>(null);
+    useRef<HTMLVideoElement | null>(
+      null
+    );
 
   // Canvas situado encima del vídeo.
   const canvasRef =
-    useRef<HTMLCanvasElement | null>(null);
+    useRef<HTMLCanvasElement | null>(
+      null
+    );
 
   // Detector de MediaPipe.
   const poseLandmarkerRef =
-    useRef<PoseLandmarker | null>(null);
+    useRef<PoseLandmarker | null>(
+      null
+    );
 
   // Identificador del bucle
   // requestAnimationFrame.
   const animationFrameRef =
-    useRef<number | null>(null);
+    useRef<number | null>(
+      null
+    );
 
 
   // --------------------------------------------------
@@ -86,13 +115,17 @@ function CameraPreview() {
   // Guarda hasta qué instante
   // los puntos deben aparecer verdes.
   const verdeHastaRef =
-    useRef<number>(0);
+    useRef<number>(
+      0
+    );
 
 
   // Último instante en que actualizamos
   // la interfaz de React.
   const ultimaActualizacionUIRef =
-    useRef<number>(0);
+    useRef<number>(
+      0
+    );
 
 
   // --------------------------------------------------
@@ -103,14 +136,18 @@ function CameraPreview() {
     repeticiones,
     setRepeticiones
   ] =
-    useState<number>(0);
+    useState<number>(
+      0
+    );
 
 
   const [
     anguloActual,
     setAnguloActual
   ] =
-    useState<number>(0);
+    useState<number>(
+      0
+    );
 
 
   const [
@@ -175,7 +212,9 @@ function CameraPreview() {
   ] =
     useState<
       ResultadoRepeticion[]
-    >([]);
+    >(
+      []
+    );
 
 
   // --------------------------------------------------
@@ -226,7 +265,9 @@ function CameraPreview() {
         // Si CameraPreview desapareció
         // mientras esperábamos el permiso,
         // apagamos inmediatamente la cámara.
-        if (!componenteActivo) {
+        if (
+          !componenteActivo
+        ) {
           nuevoStream
             .getTracks()
             .forEach(
@@ -245,7 +286,9 @@ function CameraPreview() {
 
         // Conectamos la cámara
         // al elemento <video>.
-        if (videoRef.current) {
+        if (
+          videoRef.current
+        ) {
           videoRef.current.srcObject =
             stream;
         }
@@ -264,7 +307,9 @@ function CameraPreview() {
           await crearPoseLandmarker();
 
 
-        if (!componenteActivo) {
+        if (
+          !componenteActivo
+        ) {
           return;
         }
 
@@ -282,7 +327,8 @@ function CameraPreview() {
         // podemos empezar directamente.
         if (
           videoRef.current &&
-          videoRef.current.readyState >= 2
+          videoRef.current.readyState >=
+            2
         ) {
           iniciarAnalisis();
         }
@@ -325,7 +371,9 @@ function CameraPreview() {
 
       // Apagamos físicamente
       // las pistas de la webcam.
-      if (stream) {
+      if (
+        stream
+      ) {
         stream
           .getTracks()
           .forEach(
@@ -337,7 +385,9 @@ function CameraPreview() {
 
 
       // Desconectamos el vídeo.
-      if (videoRef.current) {
+      if (
+        videoRef.current
+      ) {
         videoRef.current.srcObject =
           null;
       }
@@ -348,59 +398,6 @@ function CameraPreview() {
       );
     };
   }, []);
-
-
-  // --------------------------------------------------
-  // CONVERTIR COORDENADAS
-  // --------------------------------------------------
-
-  // MediaPipe devuelve coordenadas
-  // aproximadamente entre 0 y 1.
-  //
-  // Canvas trabaja con píxeles.
-  function convertirAPixeles(
-    punto: Punto,
-    canvas: HTMLCanvasElement
-  ): Punto {
-    return {
-      x:
-        punto.x *
-        canvas.width,
-
-      y:
-        punto.y *
-        canvas.height,
-
-      visibility:
-        punto.visibility
-    };
-  }
-
-
-  // --------------------------------------------------
-  // VALIDAR LANDMARK
-  // --------------------------------------------------
-
-  function esLandmarkValido(
-    punto: Punto
-  ): boolean {
-    // Si MediaPipe no proporciona
-    // visibility, aceptamos el punto.
-    if (
-      punto.visibility ===
-      undefined
-    ) {
-      return true;
-    }
-
-
-    // Mantenemos el umbral
-    // que ya habíamos establecido.
-    return (
-      punto.visibility >=
-      0.7
-    );
-  }
 
 
   // --------------------------------------------------
@@ -417,92 +414,16 @@ function CameraPreview() {
 
 
   // --------------------------------------------------
-  // DIBUJAR LANDMARK
-  // --------------------------------------------------
-
-  function dibujarLandmark(
-    contexto:
-      CanvasRenderingContext2D,
-    punto:
-      Punto,
-    verdeActivo:
-      boolean
-  ) {
-    contexto.beginPath();
-
-
-    contexto.arc(
-      punto.x,
-      punto.y,
-      8,
-      0,
-      Math.PI * 2
-    );
-
-
-    if (verdeActivo) {
-      contexto.fillStyle =
-        "limegreen";
-    } else {
-      contexto.fillStyle =
-        "red";
-    }
-
-
-    contexto.fill();
-  }
-
-
-  // --------------------------------------------------
-  // DIBUJAR CONEXIÓN
-  // --------------------------------------------------
-
-  function dibujarConexion(
-    contexto:
-      CanvasRenderingContext2D,
-    inicio:
-      Punto,
-    fin:
-      Punto,
-    verdeActivo:
-      boolean
-  ) {
-    contexto.beginPath();
-
-
-    contexto.moveTo(
-      inicio.x,
-      inicio.y
-    );
-
-
-    contexto.lineTo(
-      fin.x,
-      fin.y
-    );
-
-
-    contexto.lineWidth =
-      4;
-
-
-    if (verdeActivo) {
-      contexto.strokeStyle =
-        "limegreen";
-    } else {
-      contexto.strokeStyle =
-        "blue";
-    }
-
-
-    contexto.stroke();
-  }
-
-
-  // --------------------------------------------------
   // DIBUJAR BRAZO
   // --------------------------------------------------
 
+  // Esta función sigue siendo propia
+  // del curl porque describe
+  // qué conexiones queremos dibujar.
+  //
+  // Las operaciones básicas
+  // dibujarConexion y dibujarLandmark
+  // vienen ahora de dibujo.ts.
   function dibujarBrazo(
     contexto:
       CanvasRenderingContext2D,
@@ -598,7 +519,10 @@ function CameraPreview() {
 
     // Esperamos a que exista
     // una imagen válida en el vídeo.
-    if (video.readyState < 2) {
+    if (
+      video.readyState <
+      2
+    ) {
       animationFrameRef.current =
         requestAnimationFrame(
           analizarFrame
@@ -631,7 +555,9 @@ function CameraPreview() {
       );
 
 
-    if (!contexto) {
+    if (
+      !contexto
+    ) {
       return;
     }
 
@@ -670,6 +596,9 @@ function CameraPreview() {
         // LANDMARKS NECESARIOS PARA CURL
         // ----------------------------------------
 
+        // Por ahora mantenemos exactamente
+        // los landmarks del último commit estable.
+        //
         // 12 = hombro derecho.
         const hombroNormalizado =
           landmarks[12];
@@ -699,6 +628,8 @@ function CameraPreview() {
           codoNormalizado &&
           munecaNormalizada
         ) {
+          // esLandmarkValido ahora
+          // viene de dibujo.ts.
           if (
             esLandmarkValido(
               hombroNormalizado
@@ -713,6 +644,9 @@ function CameraPreview() {
             // ------------------------------------
             // PASAMOS A PÍXELES
             // ------------------------------------
+            //
+            // convertirAPixeles ahora
+            // viene también de dibujo.ts.
 
             const hombro =
               convertirAPixeles(
@@ -766,11 +700,9 @@ function CameraPreview() {
             // ANALIZADOR DEL CURL
             // ------------------------------------
 
-            // Este es el cambio clave
-            // de toda la refactorización.
-            //
             // CameraPreview entrega los landmarks
-            // y curl.ts hace TODO el análisis.
+            // y curl.ts hace todo
+            // el análisis biomecánico.
             const analisis =
               analizarFrameCurl(
                 estadoCurlRef.current,
@@ -824,9 +756,19 @@ function CameraPreview() {
             // ------------------------------------
             // REPETICIÓN TERMINADA
             // ------------------------------------
+            //
+            // IMPORTANTE:
+            //
+            // Este es exactamente el campo
+            // que utiliza tu ResultadoFrameCurl
+            // actual.
+            //
+            // NO usamos resultadoRepeticion.
+            // ------------------------------------
 
             const repeticionFinalizada =
-              analisis.repeticionFinalizada;
+              analisis
+                .repeticionFinalizada;
 
 
             if (
@@ -1025,7 +967,9 @@ function CameraPreview() {
   // --------------------------------------------------
 
   function videoPreparado() {
-    if (videoRef.current) {
+    if (
+      videoRef.current
+    ) {
       console.log(
         "Resolución:",
         videoRef.current.videoWidth,
@@ -1048,23 +992,33 @@ function CameraPreview() {
       {/* ----------------------------------------------
           IZQUIERDA: CÁMARA
           ---------------------------------------------- */}
+
       <div className="vision-fit-camera-column">
 
         <div className="camera-container">
 
           <video
-            ref={videoRef}
+            ref={
+              videoRef
+            }
+
             autoPlay
+
             playsInline
+
             onLoadedData={
               videoPreparado
             }
+
             className="camera-video"
           />
 
 
           <canvas
-            ref={canvasRef}
+            ref={
+              canvasRef
+            }
+
             className="camera-canvas"
           />
 
@@ -1076,11 +1030,13 @@ function CameraPreview() {
       {/* ----------------------------------------------
           DERECHA: ANÁLISIS
           ---------------------------------------------- */}
+
       <div className="vision-fit-data-column">
 
         {/* ------------------------------------------
             MOVIMIENTO
             ------------------------------------------ */}
+
         <section className="analysis-section">
 
           <h2>
@@ -1117,6 +1073,7 @@ function CameraPreview() {
         {/* ------------------------------------------
             TÉCNICA
             ------------------------------------------ */}
+
         <section className="analysis-section">
 
           <h3>
@@ -1152,7 +1109,7 @@ function CameraPreview() {
 
             {Math.round(
               DESPLAZAMIENTO_MAXIMO_CODO *
-              100
+                100
             )} %
           </p>
 
@@ -1185,7 +1142,7 @@ function CameraPreview() {
 
             {Math.round(
               DESPLAZAMIENTO_MAXIMO_HOMBRO *
-              100
+                100
             )} %
           </p>
 
@@ -1195,6 +1152,7 @@ function CameraPreview() {
         {/* ------------------------------------------
             RESUMEN DE SESIÓN
             ------------------------------------------ */}
+
         <section className="analysis-section">
 
           <h3>
@@ -1264,6 +1222,7 @@ function CameraPreview() {
         {/* ------------------------------------------
             HISTORIAL
             ------------------------------------------ */}
+
         <section className="analysis-section">
 
           <h3>
@@ -1271,12 +1230,16 @@ function CameraPreview() {
           </h3>
 
 
-          {historial.length === 0 ? (
+          {historial.length ===
+          0 ? (
+
             <p>
               Completa una repetición
               para ver su análisis.
             </p>
+
           ) : (
+
             <ol className="repetition-history">
 
               {historial.map(
@@ -1303,6 +1266,7 @@ function CameraPreview() {
               )}
 
             </ol>
+
           )}
 
         </section>

@@ -16,6 +16,23 @@ import {
   crearPoseLandmarker
 } from "../mediapipe/pose";
 
+
+// --------------------------------------------------
+// UTILIDADES COMUNES DE MEDIAPIPE
+// --------------------------------------------------
+//
+// Estas funciones antes estaban definidas
+// directamente dentro de VideoPreview.
+//
+// Ahora las reutilizamos desde dibujo.ts.
+import {
+  convertirAPixeles,
+  dibujarConexion,
+  dibujarLandmark,
+  esLandmarkValido
+} from "../mediapipe/dibujo";
+
+
 // --------------------------------------------------
 // LÓGICA DEL CURL
 // --------------------------------------------------
@@ -236,7 +253,9 @@ function VideoPreview(
   ] =
     useState<
       ResultadoRepeticion[]
-    >([]);
+    >(
+      []
+    );
 
 
   // ==================================================
@@ -378,7 +397,9 @@ function VideoPreview(
           );
 
 
-        if (contexto) {
+        if (
+          contexto
+        ) {
           contexto.clearRect(
             0,
             0,
@@ -404,7 +425,9 @@ function VideoPreview(
   // y el análisis.
   useEffect(
     function () {
-      if (visible) {
+      if (
+        visible
+      ) {
         return;
       }
 
@@ -467,7 +490,9 @@ function VideoPreview(
       );
 
 
-    if (contexto) {
+    if (
+      contexto
+    ) {
       contexto.clearRect(
         0,
         0,
@@ -475,58 +500,6 @@ function VideoPreview(
         canvas.height
       );
     }
-  }
-
-
-  // ==================================================
-  // COORDENADAS
-  // ==================================================
-
-  // Convertimos las coordenadas
-  // normalizadas de MediaPipe
-  // a coordenadas reales del canvas.
-  function convertirAPixeles(
-    punto: Punto,
-    canvas: HTMLCanvasElement
-  ): Punto {
-    return {
-      x:
-        punto.x *
-        canvas.width,
-
-      y:
-        punto.y *
-        canvas.height,
-
-      visibility:
-        punto.visibility
-    };
-  }
-
-
-  // ==================================================
-  // VISIBILIDAD
-  // ==================================================
-
-  function esLandmarkValido(
-    punto: Punto
-  ): boolean {
-    // Si MediaPipe no proporciona
-    // visibility, aceptamos el punto.
-    if (
-      punto.visibility ===
-      undefined
-    ) {
-      return true;
-    }
-
-
-    // Mantenemos el mismo umbral
-    // utilizado en cámara.
-    return (
-      punto.visibility >=
-      0.7
-    );
   }
 
 
@@ -543,90 +516,14 @@ function VideoPreview(
 
 
   // ==================================================
-  // DIBUJAR LANDMARK
-  // ==================================================
-
-  function dibujarLandmark(
-    contexto:
-      CanvasRenderingContext2D,
-    punto:
-      Punto,
-    verdeActivo:
-      boolean
-  ) {
-    contexto.beginPath();
-
-
-    contexto.arc(
-      punto.x,
-      punto.y,
-      8,
-      0,
-      Math.PI * 2
-    );
-
-
-    if (verdeActivo) {
-      contexto.fillStyle =
-        "limegreen";
-    } else {
-      contexto.fillStyle =
-        "red";
-    }
-
-
-    contexto.fill();
-  }
-
-
-  // ==================================================
-  // DIBUJAR CONEXIÓN
-  // ==================================================
-
-  function dibujarConexion(
-    contexto:
-      CanvasRenderingContext2D,
-    inicio:
-      Punto,
-    fin:
-      Punto,
-    verdeActivo:
-      boolean
-  ) {
-    contexto.beginPath();
-
-
-    contexto.moveTo(
-      inicio.x,
-      inicio.y
-    );
-
-
-    contexto.lineTo(
-      fin.x,
-      fin.y
-    );
-
-
-    contexto.lineWidth =
-      4;
-
-
-    if (verdeActivo) {
-      contexto.strokeStyle =
-        "limegreen";
-    } else {
-      contexto.strokeStyle =
-        "blue";
-    }
-
-
-    contexto.stroke();
-  }
-
-
-  // ==================================================
   // DIBUJAR BRAZO
+  // ==================================================
+  //
+  // Esta función sigue siendo específica
+  // del curl.
+  //
+  // Las funciones básicas de dibujo
+  // vienen ahora desde dibujo.ts.
   // ==================================================
 
   function dibujarBrazo(
@@ -983,7 +880,9 @@ function VideoPreview(
       );
 
 
-    if (!contexto) {
+    if (
+      !contexto
+    ) {
       return;
     }
 
@@ -1057,6 +956,9 @@ function VideoPreview(
 
 
       // Comprobamos visibilidad.
+      //
+      // esLandmarkValido viene ahora
+      // desde dibujo.ts.
       if (
         !esLandmarkValido(
           hombroNormalizado
@@ -1074,6 +976,10 @@ function VideoPreview(
 
       // ------------------------------------------------
       // CONVERTIR A PÍXELES
+      // ------------------------------------------------
+      //
+      // convertirAPixeles viene ahora
+      // desde dibujo.ts.
       // ------------------------------------------------
 
       const hombro =
@@ -1127,7 +1033,9 @@ function VideoPreview(
       // ANALIZAR EJERCICIO
       // ------------------------------------------------
 
-      if (analizarEjercicio) {
+      if (
+        analizarEjercicio
+      ) {
         procesarCurlVideo(
           timestamp,
           hombro,
@@ -1185,7 +1093,9 @@ function VideoPreview(
     // SEEK
     // ------------------------------------------------
 
-    if (video.seeking) {
+    if (
+      video.seeking
+    ) {
       animationFrameVideoRef.current =
         requestAnimationFrame(
           analizarFrameVideo
@@ -1199,7 +1109,9 @@ function VideoPreview(
     // FINAL
     // ------------------------------------------------
 
-    if (video.ended) {
+    if (
+      video.ended
+    ) {
       animationFrameVideoRef.current =
         null;
 
@@ -1211,7 +1123,9 @@ function VideoPreview(
     // PAUSA
     // ------------------------------------------------
 
-    if (video.paused) {
+    if (
+      video.paused
+    ) {
       animationFrameVideoRef.current =
         null;
 
@@ -1497,6 +1411,7 @@ function VideoPreview(
         {/* =============================================
             IZQUIERDA: VÍDEO
             ============================================= */}
+
         <div className="vision-fit-camera-column">
 
           <p>
@@ -1510,6 +1425,7 @@ function VideoPreview(
           {/* ------------------------------------------
               VÍDEO + CANVAS
               ------------------------------------------ */}
+
           <div
             style={{
               position: "relative",
@@ -1521,6 +1437,7 @@ function VideoPreview(
             {/* ----------------------------------------
                 VÍDEO
                 ---------------------------------------- */}
+
             <video
               ref={
                 videoSubidoRef
@@ -1578,6 +1495,7 @@ function VideoPreview(
             {/* ----------------------------------------
                 CANVAS
                 ---------------------------------------- */}
+
             <canvas
               ref={
                 canvasVideoRef
@@ -1605,11 +1523,13 @@ function VideoPreview(
         {/* =============================================
             DERECHA: INFORMACIÓN
             ============================================= */}
+
         <div className="vision-fit-data-column">
 
           {/* ------------------------------------------
               MOVIMIENTO
               ------------------------------------------ */}
+
           <section className="analysis-section">
 
             <h2>
@@ -1646,6 +1566,7 @@ function VideoPreview(
           {/* ------------------------------------------
               TÉCNICA
               ------------------------------------------ */}
+
           <section className="analysis-section">
 
             <h3>
@@ -1726,6 +1647,7 @@ function VideoPreview(
           {/* ------------------------------------------
               RESUMEN
               ------------------------------------------ */}
+
           <section className="analysis-section">
 
             <h3>
@@ -1792,6 +1714,7 @@ function VideoPreview(
           {/* ------------------------------------------
               HISTORIAL
               ------------------------------------------ */}
+
           <section className="analysis-section">
 
             <h3>
@@ -1801,11 +1724,14 @@ function VideoPreview(
 
             {historialVideo.length ===
             0 ? (
+
               <p>
                 Reproduce el vídeo para
                 comenzar el análisis.
               </p>
+
             ) : (
+
               <ol className="repetition-history">
 
                 {historialVideo.map(
@@ -1834,6 +1760,7 @@ function VideoPreview(
                 )}
 
               </ol>
+
             )}
 
           </section>

@@ -18,6 +18,22 @@ import {
 
 
 // --------------------------------------------------
+// UTILIDADES COMUNES DE MEDIAPIPE
+// --------------------------------------------------
+//
+// Estas funciones antes estaban definidas
+// directamente dentro de PressHombroPreview.
+//
+// Ahora las reutilizamos desde dibujo.ts.
+import {
+  convertirAPixeles,
+  dibujarConexion,
+  dibujarLandmark,
+  esLandmarkValido
+} from "../mediapipe/dibujo";
+
+
+// --------------------------------------------------
 // PRESS DE HOMBRO
 // --------------------------------------------------
 
@@ -190,6 +206,10 @@ function PressHombroPreview() {
 
     async function iniciarSistema() {
       try {
+        // ------------------------------------------
+        // CÁMARA
+        // ------------------------------------------
+
         const nuevoStream =
           await navigator.mediaDevices.getUserMedia({
             video:
@@ -227,6 +247,10 @@ function PressHombroPreview() {
             stream;
         }
 
+
+        // ------------------------------------------
+        // MEDIAPIPE
+        // ------------------------------------------
 
         console.log(
           "Cargando MediaPipe para press de hombro..."
@@ -320,129 +344,17 @@ function PressHombroPreview() {
 
 
   // ==================================================
-  // CONVERTIR A PÍXELES
-  // ==================================================
-
-  function convertirAPixeles(
-    punto: PuntoPressHombro,
-    canvas: HTMLCanvasElement
-  ): PuntoPressHombro {
-    return {
-      x:
-        punto.x *
-        canvas.width,
-
-      y:
-        punto.y *
-        canvas.height,
-
-      visibility:
-        punto.visibility
-    };
-  }
-
-
-  // ==================================================
-  // VISIBILIDAD
-  // ==================================================
-
-  function esLandmarkValido(
-    punto: PuntoPressHombro
-  ): boolean {
-    if (
-      punto.visibility ===
-      undefined
-    ) {
-      return true;
-    }
-
-
-    return (
-      punto.visibility >=
-      0.7
-    );
-  }
-
-
-  // ==================================================
-  // DIBUJAR PUNTO
-  // ==================================================
-
-  function dibujarLandmark(
-    contexto:
-      CanvasRenderingContext2D,
-    punto:
-      PuntoPressHombro,
-    verde:
-      boolean
-  ) {
-    contexto.beginPath();
-
-
-    contexto.arc(
-      punto.x,
-      punto.y,
-      8,
-      0,
-      Math.PI * 2
-    );
-
-
-    contexto.fillStyle =
-      verde
-        ? "limegreen"
-        : "red";
-
-
-    contexto.fill();
-  }
-
-
-  // ==================================================
-  // DIBUJAR CONEXIÓN
-  // ==================================================
-
-  function dibujarConexion(
-    contexto:
-      CanvasRenderingContext2D,
-    inicio:
-      PuntoPressHombro,
-    fin:
-      PuntoPressHombro,
-    verde:
-      boolean
-  ) {
-    contexto.beginPath();
-
-
-    contexto.moveTo(
-      inicio.x,
-      inicio.y
-    );
-
-
-    contexto.lineTo(
-      fin.x,
-      fin.y
-    );
-
-
-    contexto.lineWidth =
-      4;
-
-
-    contexto.strokeStyle =
-      verde
-        ? "limegreen"
-        : "blue";
-
-
-    contexto.stroke();
-  }
-
-
-  // ==================================================
   // DIBUJAR BRAZO
+  // ==================================================
+  //
+  // Esta función continúa dentro
+  // del componente porque define
+  // cómo dibujamos específicamente
+  // un brazo en el press.
+  //
+  // Las operaciones básicas
+  // dibujarConexion y dibujarLandmark
+  // vienen ahora de dibujo.ts.
   // ==================================================
 
   function dibujarBrazo(
@@ -457,6 +369,10 @@ function PressHombroPreview() {
     verde:
       boolean
   ) {
+    // ----------------------------------------------
+    // CONEXIONES
+    // ----------------------------------------------
+
     dibujarConexion(
       contexto,
       hombro,
@@ -472,6 +388,10 @@ function PressHombroPreview() {
       verde
     );
 
+
+    // ----------------------------------------------
+    // LANDMARKS
+    // ----------------------------------------------
 
     dibujarLandmark(
       contexto,
@@ -543,6 +463,8 @@ function PressHombroPreview() {
     }
 
 
+    // Igualamos la resolución
+    // del canvas a la cámara.
     if (
       canvas.width !==
         video.videoWidth ||
@@ -571,6 +493,8 @@ function PressHombroPreview() {
     }
 
 
+    // Limpiamos los landmarks
+    // del frame anterior.
     contexto.clearRect(
       0,
       0,
@@ -580,6 +504,10 @@ function PressHombroPreview() {
 
 
     try {
+      // ------------------------------------------
+      // MEDIAPIPE
+      // ------------------------------------------
+
       const resultado =
         poseLandmarker.detectForVideo(
           video,
@@ -599,14 +527,17 @@ function PressHombroPreview() {
         // BRAZO IZQUIERDO
         // ========================================
 
+        // 11 = hombro izquierdo.
         const hombroIzquierdoNormalizado =
           landmarks[11];
 
 
+        // 13 = codo izquierdo.
         const codoIzquierdoNormalizado =
           landmarks[13];
 
 
+        // 15 = muñeca izquierda.
         const munecaIzquierdaNormalizada =
           landmarks[15];
 
@@ -615,14 +546,17 @@ function PressHombroPreview() {
         // BRAZO DERECHO
         // ========================================
 
+        // 12 = hombro derecho.
         const hombroDerechoNormalizado =
           landmarks[12];
 
 
+        // 14 = codo derecho.
         const codoDerechoNormalizado =
           landmarks[14];
 
 
+        // 16 = muñeca derecha.
         const munecaDerechaNormalizada =
           landmarks[16];
 
@@ -639,6 +573,13 @@ function PressHombroPreview() {
           codoDerechoNormalizado &&
           munecaDerechaNormalizada
         ) {
+          // --------------------------------------
+          // VISIBILIDAD IZQUIERDA
+          // --------------------------------------
+          //
+          // esLandmarkValido viene
+          // ahora de dibujo.ts.
+
           const brazoIzquierdoValido =
             esLandmarkValido(
               hombroIzquierdoNormalizado
@@ -650,6 +591,10 @@ function PressHombroPreview() {
               munecaIzquierdaNormalizada
             );
 
+
+          // --------------------------------------
+          // VISIBILIDAD DERECHA
+          // --------------------------------------
 
           const brazoDerechoValido =
             esLandmarkValido(
@@ -663,6 +608,8 @@ function PressHombroPreview() {
             );
 
 
+          // Para analizar press
+          // necesitamos ambos brazos.
           if (
             brazoIzquierdoValido &&
             brazoDerechoValido
@@ -670,6 +617,9 @@ function PressHombroPreview() {
             // ====================================
             // CONVERTIR IZQUIERDO
             // ====================================
+            //
+            // convertirAPixeles viene
+            // ahora de dibujo.ts.
 
             const hombroIzquierdo =
               convertirAPixeles(
@@ -718,7 +668,11 @@ function PressHombroPreview() {
 
 
             // ====================================
-            // ANALIZAR
+            // ANALIZAR PRESS
+            // ====================================
+            //
+            // La lógica bilateral
+            // permanece exactamente igual.
             // ====================================
 
             const analisis =
@@ -736,9 +690,12 @@ function PressHombroPreview() {
 
 
             // ====================================
-            // VERDE
+            // FEEDBACK VERDE
             // ====================================
 
+            // Cuando ambos brazos alcanzan
+            // la posición baja o alta
+            // activamos verde durante 300 ms.
             if (
               analisis.posicionBajaAlcanzada ||
               analisis.posicionAltaAlcanzada
@@ -820,7 +777,7 @@ function PressHombroPreview() {
 
 
             // ====================================
-            // DIBUJAR
+            // DIBUJAR AMBOS BRAZOS
             // ====================================
 
             dibujarBrazo(
@@ -875,6 +832,8 @@ function PressHombroPreview() {
     }
 
 
+    // Evitamos tener
+    // dos bucles simultáneos.
     if (
       animationFrameRef.current !==
       null

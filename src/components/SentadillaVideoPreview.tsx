@@ -15,6 +15,23 @@ import {
   crearPoseLandmarker
 } from "../mediapipe/pose";
 
+
+// --------------------------------------------------
+// UTILIDADES COMUNES DE MEDIAPIPE
+// --------------------------------------------------
+//
+// Estas funciones antes estaban definidas
+// directamente dentro de SentadillaVideoPreview.
+//
+// Ahora las reutilizamos desde dibujo.ts.
+import {
+  convertirAPixeles,
+  dibujarConexion,
+  dibujarLandmark,
+  esLandmarkValido
+} from "../mediapipe/dibujo";
+
+
 // --------------------------------------------------
 // LÓGICA DE SENTADILLA
 // --------------------------------------------------
@@ -397,129 +414,16 @@ function SentadillaVideoPreview(
 
 
   // ==================================================
-  // CONVERTIR A PÍXELES
-  // ==================================================
-
-  function convertirAPixeles(
-    punto: PuntoSentadilla,
-    canvas: HTMLCanvasElement
-  ): PuntoSentadilla {
-    return {
-      x:
-        punto.x *
-        canvas.width,
-
-      y:
-        punto.y *
-        canvas.height,
-
-      visibility:
-        punto.visibility
-    };
-  }
-
-
-  // ==================================================
-  // VISIBILIDAD
-  // ==================================================
-
-  function esLandmarkValido(
-    punto: PuntoSentadilla
-  ): boolean {
-    if (
-      punto.visibility ===
-      undefined
-    ) {
-      return true;
-    }
-
-
-    return (
-      punto.visibility >=
-      0.7
-    );
-  }
-
-
-  // ==================================================
-  // DIBUJAR LANDMARK
-  // ==================================================
-
-  function dibujarLandmark(
-    contexto:
-      CanvasRenderingContext2D,
-    punto:
-      PuntoSentadilla,
-    verde:
-      boolean
-  ) {
-    contexto.beginPath();
-
-
-    contexto.arc(
-      punto.x,
-      punto.y,
-      8,
-      0,
-      Math.PI * 2
-    );
-
-
-    contexto.fillStyle =
-      verde
-        ? "limegreen"
-        : "red";
-
-
-    contexto.fill();
-  }
-
-
-  // ==================================================
-  // DIBUJAR CONEXIÓN
-  // ==================================================
-
-  function dibujarConexion(
-    contexto:
-      CanvasRenderingContext2D,
-    inicio:
-      PuntoSentadilla,
-    fin:
-      PuntoSentadilla,
-    verde:
-      boolean
-  ) {
-    contexto.beginPath();
-
-
-    contexto.moveTo(
-      inicio.x,
-      inicio.y
-    );
-
-
-    contexto.lineTo(
-      fin.x,
-      fin.y
-    );
-
-
-    contexto.lineWidth =
-      4;
-
-
-    contexto.strokeStyle =
-      verde
-        ? "limegreen"
-        : "blue";
-
-
-    contexto.stroke();
-  }
-
-
-  // ==================================================
   // DIBUJAR CUERPO
+  // ==================================================
+  //
+  // Esta función sigue siendo propia
+  // de la sentadilla porque define
+  // cómo dibujamos el tronco y la pierna.
+  //
+  // Las operaciones básicas
+  // dibujarConexion y dibujarLandmark
+  // vienen ahora desde dibujo.ts.
   // ==================================================
 
   function dibujarCuerpo(
@@ -712,6 +616,10 @@ function SentadillaVideoPreview(
           resultado.landmarks[0];
 
 
+        // ----------------------------------------
+        // LANDMARKS DERECHOS
+        // ----------------------------------------
+
         // 12 = hombro derecho.
         const hombroNormalizado =
           landmarks[12];
@@ -750,6 +658,14 @@ function SentadillaVideoPreview(
             tobilloNormalizado
           )
         ) {
+          // --------------------------------------
+          // CONVERTIR PIERNA A PÍXELES
+          // --------------------------------------
+          //
+          // convertirAPixeles ahora viene
+          // desde dibujo.ts.
+          // --------------------------------------
+
           const cadera =
             convertirAPixeles(
               caderaNormalizada,
@@ -1064,6 +980,7 @@ function SentadillaVideoPreview(
         {/* Usamos estilos propios aquí
             para NO aplicar el espejo
             que utilizamos en la webcam. */}
+
         <div
           style={{
             position:
