@@ -1,28 +1,45 @@
+// Importamos los hooks necesarios de React.
 import {
   useEffect,
   useRef,
   useState
 } from "react";
 
+// Tipo utilizado por el evento
+// del selector de archivos.
 import type {
   ChangeEvent
 } from "react";
 
+// Importamos los estilos generales.
 import "./App.css";
 
 
 // --------------------------------------------------
-// COMPONENTES
+// COMPONENTES DE CÁMARA
 // --------------------------------------------------
 
+// Curl mediante webcam.
 import CameraPreview from "./components/CameraPreview";
 
-import VideoPreview from "./components/VideoPreview";
-
+// Sentadilla mediante webcam.
 import SentadillaPreview from "./components/SentadillaPreview";
 
-// Nuevo componente para vídeos
-// de sentadilla.
+// Press de hombro mediante webcam.
+//
+// En este ejercicio analizaremos
+// los dos brazos simultáneamente.
+import PressHombroPreview from "./components/PressHombroPreview";
+
+
+// --------------------------------------------------
+// COMPONENTES DE VÍDEO
+// --------------------------------------------------
+
+// Curl mediante vídeo grabado.
+import VideoPreview from "./components/VideoPreview";
+
+// Sentadilla mediante vídeo grabado.
 import SentadillaVideoPreview from "./components/SentadillaVideoPreview";
 
 
@@ -41,9 +58,14 @@ import type {
 
 function App() {
   // ==================================================
-  // EJERCICIO
+  // EJERCICIO SELECCIONADO
   // ==================================================
 
+  // Al entrar en Visión Fit
+  // no hay ningún ejercicio seleccionado.
+  //
+  // Por eso inicialmente solamente
+  // aparece el selector de ejercicios.
   const [
     ejercicioSeleccionado,
     setEjercicioSeleccionado
@@ -57,6 +79,11 @@ function App() {
   // CÁMARA
   // ==================================================
 
+  // La cámara comienza apagada.
+  //
+  // Cuando sea true,
+  // mostraremos el componente correspondiente
+  // al ejercicio seleccionado.
   const [
     mostrarCamara,
     setMostrarCamara
@@ -70,18 +97,26 @@ function App() {
   // VÍDEO
   // ==================================================
 
+  // Referencia al input oculto
+  // utilizado para seleccionar archivos.
   const inputVideoRef =
     useRef<HTMLInputElement | null>(
       null
     );
 
 
+  // Guarda internamente la URL temporal
+  // del vídeo seleccionado.
+  //
+  // Nos permite liberarla posteriormente
+  // mediante URL.revokeObjectURL().
   const urlVideoRef =
     useRef<string | null>(
       null
     );
 
 
+  // Nombre original del vídeo.
   const [
     nombreVideo,
     setNombreVideo
@@ -91,6 +126,8 @@ function App() {
     );
 
 
+  // URL temporal utilizada
+  // por los componentes de vídeo.
   const [
     urlVideo,
     setUrlVideo
@@ -101,10 +138,12 @@ function App() {
 
 
   // ==================================================
-  // LIMPIAR VÍDEO ACTUAL
+  // LIMPIAR VÍDEO SELECCIONADO
   // ==================================================
 
   function limpiarVideoSeleccionado() {
+    // Si existe una URL temporal anterior,
+    // la liberamos de memoria.
     if (
       urlVideoRef.current !==
       null
@@ -119,6 +158,8 @@ function App() {
     }
 
 
+    // Eliminamos los datos
+    // visibles del vídeo.
     setUrlVideo(
       null
     );
@@ -129,6 +170,10 @@ function App() {
     );
 
 
+    // Reiniciamos también el input.
+    //
+    // Esto permite seleccionar
+    // posteriormente el mismo archivo.
     if (
       inputVideoRef.current
     ) {
@@ -145,6 +190,8 @@ function App() {
   function seleccionarEjercicio(
     ejercicio: EjercicioId
   ) {
+    // Buscamos el ejercicio
+    // dentro de la lista principal.
     const ejercicioEncontrado =
       EJERCICIOS.find(
         function (elemento) {
@@ -156,6 +203,9 @@ function App() {
       );
 
 
+    // Si no existe o todavía
+    // no está disponible,
+    // no hacemos nada.
     if (
       !ejercicioEncontrado ||
       !ejercicioEncontrado.disponible
@@ -164,15 +214,31 @@ function App() {
     }
 
 
-    // Apagamos la cámara
-    // antes de cambiar de ejercicio.
+    // ------------------------------------------------
+    // APAGAR CÁMARA
+    // ------------------------------------------------
+
+    // Antes de cambiar de ejercicio
+    // desmontamos cualquier componente
+    // de cámara activo.
+    //
+    // De esta forma la webcam
+    // también se libera correctamente.
     setMostrarCamara(
       false
     );
 
 
-    // Si cambiamos realmente de ejercicio,
+    // ------------------------------------------------
+    // LIMPIAR VÍDEO
+    // ------------------------------------------------
+
+    // Si realmente estamos cambiando
+    // a otro ejercicio,
     // eliminamos el vídeo anterior.
+    //
+    // Así evitamos que un vídeo de curl
+    // aparezca después en sentadilla, etc.
     if (
       ejercicioSeleccionado !==
       ejercicio
@@ -181,17 +247,30 @@ function App() {
     }
 
 
+    // ------------------------------------------------
+    // GUARDAR EJERCICIO
+    // ------------------------------------------------
+
     setEjercicioSeleccionado(
+      ejercicio
+    );
+
+
+    console.log(
+      "Ejercicio seleccionado:",
       ejercicio
     );
   }
 
 
   // ==================================================
-  // CÁMARA
+  // ENCENDER / APAGAR CÁMARA
   // ==================================================
 
   function cambiarCamara() {
+    // Si vamos a encender la cámara,
+    // el vídeo quedará oculto mientras
+    // la cámara esté activa.
     setMostrarCamara(
       !mostrarCamara
     );
@@ -203,8 +282,14 @@ function App() {
   // ==================================================
 
   function abrirSelectorVideo() {
-    // Actualmente tenemos vídeo
-    // para curl y sentadilla.
+    // Actualmente solamente tenemos
+    // análisis de vídeo para:
+    //
+    // - curl;
+    // - sentadilla.
+    //
+    // Press de hombro todavía
+    // no tiene componente de vídeo.
     if (
       ejercicioSeleccionado !==
         "curl" &&
@@ -218,12 +303,16 @@ function App() {
     if (
       inputVideoRef.current
     ) {
-      // Permite volver a seleccionar
-      // incluso el mismo archivo.
+      // Reiniciamos el valor
+      // para permitir seleccionar
+      // dos veces seguidas
+      // el mismo archivo.
       inputVideoRef.current.value =
         "";
 
 
+      // Abrimos el selector
+      // de archivos del dispositivo.
       inputVideoRef.current.click();
     }
   }
@@ -237,16 +326,24 @@ function App() {
     evento:
       ChangeEvent<HTMLInputElement>
   ) {
+    // Recuperamos el primer archivo
+    // seleccionado.
     const archivo =
       evento.target.files?.[0];
 
 
+    // Si el usuario cancela,
+    // no hacemos nada.
     if (
       !archivo
     ) {
       return;
     }
 
+
+    // ------------------------------------------------
+    // COMPROBAR QUE SEA UN VÍDEO
+    // ------------------------------------------------
 
     if (
       !archivo.type.startsWith(
@@ -262,7 +359,10 @@ function App() {
     }
 
 
-    // Eliminamos la URL anterior.
+    // ------------------------------------------------
+    // LIBERAR URL ANTERIOR
+    // ------------------------------------------------
+
     if (
       urlVideoRef.current !==
       null
@@ -273,31 +373,53 @@ function App() {
     }
 
 
-    // Creamos la nueva URL local.
+    // ------------------------------------------------
+    // CREAR URL LOCAL
+    // ------------------------------------------------
+
+    // Creamos una URL temporal
+    // que permite reproducir el archivo
+    // directamente desde el dispositivo.
+    //
+    // El vídeo no se sube
+    // a ningún servidor.
     const nuevaUrl =
       URL.createObjectURL(
         archivo
       );
 
 
+    // Guardamos la URL internamente.
     urlVideoRef.current =
       nuevaUrl;
 
 
+    // La guardamos también
+    // en el estado de React.
     setUrlVideo(
       nuevaUrl
     );
 
 
+    // Guardamos el nombre original.
     setNombreVideo(
       archivo.name
     );
 
 
-    // Si estaba activa la cámara,
+    // Si la cámara estaba activa,
     // la apagamos.
+    //
+    // De esta forma usamos
+    // una única fuente cada vez.
     setMostrarCamara(
       false
+    );
+
+
+    console.log(
+      "Vídeo seleccionado:",
+      archivo.name
     );
   }
 
@@ -307,7 +429,11 @@ function App() {
   // ==================================================
 
   useEffect(function () {
+    // Esta función se ejecutará
+    // cuando App desaparezca.
     return function limpiarAplicacion() {
+      // Liberamos cualquier URL
+      // temporal pendiente.
       if (
         urlVideoRef.current !==
         null
@@ -332,10 +458,14 @@ function App() {
     <main>
 
       {/* ==============================================
-          CABECERA
+          CABECERA DE VISIÓN FIT
           ============================================== */}
 
       <div className="vision-fit-header">
+
+        {/* --------------------------------------------
+            TÍTULO
+            -------------------------------------------- */}
 
         <h1>
           Visión Fit
@@ -343,7 +473,7 @@ function App() {
 
 
         {/* ============================================
-            EJERCICIOS
+            SELECCIÓN DE EJERCICIO
             ============================================ */}
 
         <section className="exercise-selector">
@@ -357,6 +487,8 @@ function App() {
 
             {EJERCICIOS.map(
               function (ejercicio) {
+                // Comprobamos si este botón
+                // corresponde al ejercicio actual.
                 const seleccionado =
                   ejercicio.id ===
                   ejercicioSeleccionado;
@@ -370,6 +502,8 @@ function App() {
 
                     type="button"
 
+                    // Los ejercicios no disponibles
+                    // aparecen desactivados.
                     disabled={
                       !ejercicio.disponible
                     }
@@ -388,9 +522,14 @@ function App() {
                         : "exercise-button"
                     }
                   >
+                    {/* Nombre visible. */}
                     {ejercicio.nombre}
 
 
+                    {/* Si algún ejercicio vuelve
+                        a estar marcado como no disponible,
+                        añadimos automáticamente
+                        "(próximamente)". */}
                     {!ejercicio.disponible ? (
                       <>
                         {" "}
@@ -409,9 +548,12 @@ function App() {
 
 
         {/* ============================================
-            FUENTE
+            FUENTE DE ANÁLISIS
             ============================================ */}
 
+        {/* La fuente solamente aparece
+            cuando ya hemos seleccionado
+            un ejercicio. */}
         {ejercicioSeleccionado !==
         null ? (
 
@@ -423,6 +565,10 @@ function App() {
 
 
             <div className="analysis-source-buttons">
+
+              {/* --------------------------------------
+                  CÁMARA
+                  -------------------------------------- */}
 
               <button
                 type="button"
@@ -437,14 +583,28 @@ function App() {
               </button>
 
 
+              {/* --------------------------------------
+                  VÍDEO
+                  -------------------------------------- */}
+
               <button
                 type="button"
 
                 onClick={
                   abrirSelectorVideo
                 }
+
+                // El press todavía
+                // no tiene análisis de vídeo.
+                disabled={
+                  ejercicioSeleccionado ===
+                  "press-hombro"
+                }
               >
-                Cargar vídeo
+                {ejercicioSeleccionado ===
+                "press-hombro"
+                  ? "Vídeo próximamente"
+                  : "Cargar vídeo"}
               </button>
 
             </div>
@@ -457,7 +617,7 @@ function App() {
 
 
       {/* ==============================================
-          INPUT OCULTO
+          INPUT OCULTO PARA VÍDEOS
           ============================================== */}
 
       <input
@@ -467,12 +627,15 @@ function App() {
 
         type="file"
 
+        // Aceptamos archivos de vídeo.
         accept="video/*"
 
         onChange={
           seleccionarVideo
         }
 
+        // El usuario no necesita
+        // ver este input.
         style={{
           display:
             "none"
@@ -507,6 +670,28 @@ function App() {
 
 
       {/* ==============================================
+          PRESS DE HOMBRO - CÁMARA
+          ============================================== */}
+
+      {/* El press utiliza su propio componente
+          porque analiza simultáneamente:
+
+          brazo izquierdo:
+          11 - 13 - 15
+
+          brazo derecho:
+          12 - 14 - 16
+      */}
+      {mostrarCamara &&
+      ejercicioSeleccionado ===
+        "press-hombro" ? (
+
+        <PressHombroPreview />
+
+      ) : null}
+
+
+      {/* ==============================================
           CURL - VÍDEO
           ============================================== */}
 
@@ -524,6 +709,9 @@ function App() {
             nombreVideo
           }
 
+          // El vídeo solamente
+          // está visible si la cámara
+          // está apagada.
           visible={
             !mostrarCamara
           }
@@ -557,9 +745,24 @@ function App() {
 
       ) : null}
 
+
+      {/* ==============================================
+          PRESS DE HOMBRO - VÍDEO
+          ============================================== */}
+
+      {/*
+        Todavía no existe un componente
+        de vídeo para press de hombro.
+
+        Lo añadiremos cuando primero
+        tengamos calibrado y estable
+        el análisis bilateral mediante cámara.
+      */}
+
     </main>
   );
 }
 
 
+// Exportamos el componente principal.
 export default App;

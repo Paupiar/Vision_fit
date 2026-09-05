@@ -1,13 +1,27 @@
 // --------------------------------------------------
 // EJERCICIOS DE VISIÓN FIT
 // --------------------------------------------------
-
-// Identificadores internos
-// de los ejercicios.
 //
-// Estos valores nos permiten saber
-// qué ejercicio ha seleccionado
-// el usuario en App.tsx.
+// En este archivo definimos:
+//
+// - los identificadores de ejercicios;
+// - la información que necesita cada ejercicio;
+// - qué ejercicios están disponibles.
+//
+// App.tsx utilizará esta lista para generar
+// automáticamente los botones.
+// --------------------------------------------------
+
+
+// --------------------------------------------------
+// IDENTIFICADORES
+// --------------------------------------------------
+
+// Identificadores internos de los ejercicios.
+//
+// Utilizamos valores cortos porque después
+// los emplearemos para decidir qué componente
+// y qué analizador debemos utilizar.
 export type EjercicioId =
   "curl" |
   "sentadilla" |
@@ -15,12 +29,11 @@ export type EjercicioId =
 
 
 // --------------------------------------------------
-// INFORMACIÓN DE UN EJERCICIO
+// INTERFAZ DE EJERCICIO
 // --------------------------------------------------
 
-// Define la información básica
-// que necesita cada ejercicio
-// para aparecer en la interfaz.
+// Define la información mínima
+// que necesitamos de cada ejercicio.
 export interface Ejercicio {
   // Identificador interno.
   id: EjercicioId;
@@ -29,7 +42,7 @@ export interface Ejercicio {
   nombre: string;
 
   // Indica si el ejercicio
-  // ya puede seleccionarse.
+  // puede utilizarse actualmente.
   disponible: boolean;
 }
 
@@ -38,17 +51,6 @@ export interface Ejercicio {
 // LISTA DE EJERCICIOS
 // --------------------------------------------------
 
-// Esta lista genera automáticamente
-// los botones de ejercicios.
-//
-// Cuando implementemos un ejercicio nuevo,
-// podremos simplemente cambiar:
-//
-// disponible: false
-//
-// por:
-//
-// disponible: true
 export const EJERCICIOS:
   Ejercicio[] = [
 
@@ -72,8 +74,6 @@ export const EJERCICIOS:
     // SENTADILLA
     // ------------------------------------------------
 
-    // Ya empezamos a implementar
-    // el análisis de sentadilla.
     {
       id:
         "sentadilla",
@@ -90,8 +90,11 @@ export const EJERCICIOS:
     // PRESS DE HOMBRO
     // ------------------------------------------------
 
-    // Todavía no hemos creado
-    // su analizador.
+    // Ya está disponible para comenzar
+    // las pruebas con cámara.
+    //
+    // El análisis se realizará de frente
+    // utilizando los dos brazos.
     {
       id:
         "press-hombro",
@@ -100,7 +103,7 @@ export const EJERCICIOS:
         "Press de hombro",
 
       disponible:
-        false
+        true
     }
 
   ];
