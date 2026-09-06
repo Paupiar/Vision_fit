@@ -38,6 +38,10 @@ import {
   LANDMARKS_PRESS_HOMBRO
 } from "../ejercicios/landmarks";
 
+import type {
+  Lado
+} from "../ejercicios/landmarks";
+
 
 // --------------------------------------------------
 // CURL
@@ -102,10 +106,29 @@ import type {
 
 
 // ==================================================
+// PROPS CURL
+// ==================================================
+
+interface CurlCameraPreviewProps {
+  lado: Lado;
+}
+
+
+// ==================================================
 // CÁMARA DEL CURL
 // ==================================================
 
-function CurlCameraPreview() {
+function CurlCameraPreview(
+  props: CurlCameraPreviewProps
+) {
+  // Elegimos los landmarks
+  // correspondientes al lado seleccionado.
+  const landmarksCurl =
+    LANDMARKS_CURL[
+      props.lado
+    ];
+
+
   // ==================================================
   // REFERENCIAS
   // ==================================================
@@ -563,27 +586,31 @@ function CurlCameraPreview() {
           resultado.landmarks[0];
 
 
+        // ----------------------------------------
+        // LANDMARKS DEL LADO SELECCIONADO
+        // ----------------------------------------
+
         const hombroNormalizado =
           landmarks[
-            LANDMARKS_CURL.hombro
+            landmarksCurl.hombro
           ];
 
 
         const codoNormalizado =
           landmarks[
-            LANDMARKS_CURL.codo
+            landmarksCurl.codo
           ];
 
 
         const munecaNormalizada =
           landmarks[
-            LANDMARKS_CURL.muneca
+            landmarksCurl.muneca
           ];
 
 
         const caderaNormalizada =
           landmarks[
-            LANDMARKS_CURL.cadera
+            landmarksCurl.cadera
           ];
 
 
@@ -1109,10 +1136,29 @@ function CurlCameraPreview() {
 
 
 // ==================================================
+// PROPS SENTADILLA
+// ==================================================
+
+interface SentadillaCameraPreviewProps {
+  lado: Lado;
+}
+
+
+// ==================================================
 // CÁMARA DE SENTADILLA
 // ==================================================
 
-function SentadillaCameraPreview() {
+function SentadillaCameraPreview(
+  props: SentadillaCameraPreviewProps
+) {
+  // Elegimos los landmarks
+  // correspondientes al lado seleccionado.
+  const landmarksSentadilla =
+    LANDMARKS_SENTADILLA[
+      props.lado
+    ];
+
+
   // ==================================================
   // REFERENCIAS
   // ==================================================
@@ -1572,27 +1618,31 @@ function SentadillaCameraPreview() {
           resultado.landmarks[0];
 
 
+        // ----------------------------------------
+        // LANDMARKS DEL LADO SELECCIONADO
+        // ----------------------------------------
+
         const hombroNormalizado =
           landmarks[
-            LANDMARKS_SENTADILLA.hombro
+            landmarksSentadilla.hombro
           ];
 
 
         const caderaNormalizada =
           landmarks[
-            LANDMARKS_SENTADILLA.cadera
+            landmarksSentadilla.cadera
           ];
 
 
         const rodillaNormalizada =
           landmarks[
-            LANDMARKS_SENTADILLA.rodilla
+            landmarksSentadilla.rodilla
           ];
 
 
         const tobilloNormalizado =
           landmarks[
-            LANDMARKS_SENTADILLA.tobillo
+            landmarksSentadilla.tobillo
           ];
 
 
@@ -2095,12 +2145,10 @@ function SentadillaCameraPreview() {
 // CÁMARA DEL PRESS DE HOMBRO
 // ==================================================
 //
-// El Press queda ahora integrado
-// directamente en CameraPreview.tsx.
+// El Press no recibe lado.
 //
-// Sigue siendo bilateral:
-// analizamos los dos brazos
-// simultáneamente.
+// Continúa siendo bilateral
+// y analiza ambos brazos simultáneamente.
 // ==================================================
 
 function PressHombroCameraPreview() {
@@ -2637,14 +2685,12 @@ function PressHombroCameraPreview() {
             );
 
 
-          // El Press necesita
-          // ambos brazos visibles.
           if (
             brazoIzquierdoValido &&
             brazoDerechoValido
           ) {
             // ====================================
-            // IZQUIERDO A PÍXELES
+            // IZQUIERDO
             // ====================================
 
             const hombroIzquierdo =
@@ -2669,7 +2715,7 @@ function PressHombroCameraPreview() {
 
 
             // ====================================
-            // DERECHO A PÍXELES
+            // DERECHO
             // ====================================
 
             const hombroDerecho =
@@ -2774,10 +2820,6 @@ function PressHombroCameraPreview() {
               "Ambos brazos detectados correctamente"
             );
 
-
-            // ====================================
-            // REPETICIÓN COMPLETA
-            // ====================================
 
             if (
               analisis.repeticionSumada
@@ -3121,23 +3163,31 @@ function PressHombroCameraPreview() {
 
 interface CameraPreviewProps {
   ejercicio: EjercicioId;
+
+  // Temporalmente es opcional.
+  //
+  // Mientras App.tsx todavía
+  // no tenga selector visual,
+  // se utilizará el lado derecho.
+  lado?: Lado;
 }
 
 
 // ==================================================
 // CAMERA PREVIEW GENÉRICO
 // ==================================================
-//
-// Este es ahora el único punto
-// de entrada de cámara.
-//
-// Dependiendo del ejercicio seleccionado,
-// utiliza el análisis correspondiente.
-// ==================================================
 
 function CameraPreview(
   props: CameraPreviewProps
 ) {
+  // Mientras App todavía
+  // no tenga selector de lado,
+  // utilizamos derecho por defecto.
+  const lado =
+    props.lado ??
+    "derecho";
+
+
   // ------------------------------------------------
   // CURL
   // ------------------------------------------------
@@ -3147,7 +3197,11 @@ function CameraPreview(
     "curl"
   ) {
     return (
-      <CurlCameraPreview />
+      <CurlCameraPreview
+        lado={
+          lado
+        }
+      />
     );
   }
 
@@ -3161,13 +3215,21 @@ function CameraPreview(
     "sentadilla"
   ) {
     return (
-      <SentadillaCameraPreview />
+      <SentadillaCameraPreview
+        lado={
+          lado
+        }
+      />
     );
   }
 
 
   // ------------------------------------------------
   // PRESS DE HOMBRO
+  // ------------------------------------------------
+  //
+  // El Press no recibe lado
+  // porque continúa siendo bilateral.
   // ------------------------------------------------
 
   return (

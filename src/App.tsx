@@ -16,32 +16,11 @@ import "./App.css";
 
 
 // --------------------------------------------------
-// COMPONENTE DE CÁMARA
-// --------------------------------------------------
-//
-// CameraPreview gestiona internamente
-// qué análisis utilizar:
-//
-// - Curl
-// - Sentadilla
-// - Press de hombro
+// COMPONENTES
 // --------------------------------------------------
 
 import CameraPreview
   from "./components/CameraPreview";
-
-
-// --------------------------------------------------
-// COMPONENTE DE VÍDEO
-// --------------------------------------------------
-//
-// VideoPreview será también
-// el único punto de entrada
-// para el análisis de vídeos.
-//
-// Actualmente decide internamente
-// qué ejercicio analizar.
-// --------------------------------------------------
 
 import VideoPreview
   from "./components/VideoPreview";
@@ -60,6 +39,15 @@ import type {
 } from "./ejercicios/tipos";
 
 
+// --------------------------------------------------
+// LADO
+// --------------------------------------------------
+
+import type {
+  Lado
+} from "./ejercicios/landmarks";
+
+
 function App() {
   // ==================================================
   // EJERCICIO
@@ -71,6 +59,26 @@ function App() {
   ] =
     useState<EjercicioId | null>(
       null
+    );
+
+
+  // ==================================================
+  // LADO
+  // ==================================================
+  //
+  // Curl y Sentadilla utilizan
+  // el lado seleccionado.
+  //
+  // El Press ignora este valor
+  // porque continúa siendo bilateral.
+  // ==================================================
+
+  const [
+    ladoSeleccionado,
+    setLadoSeleccionado
+  ] =
+    useState<Lado>(
+      "derecho"
     );
 
 
@@ -91,17 +99,12 @@ function App() {
   // VÍDEO
   // ==================================================
 
-  // Input oculto utilizado
-  // para seleccionar vídeos.
   const inputVideoRef =
     useRef<HTMLInputElement | null>(
       null
     );
 
 
-  // Guardamos también la URL temporal
-  // en una referencia para poder
-  // liberarla correctamente.
   const urlVideoRef =
     useRef<string | null>(
       null
@@ -127,14 +130,29 @@ function App() {
 
 
   // ==================================================
+  // ¿EL EJERCICIO UTILIZA LADO?
+  // ==================================================
+  //
+  // Actualmente:
+  //
+  // Curl        -> sí
+  // Sentadilla  -> sí
+  // Press       -> no, es bilateral
+  // ==================================================
+
+  const mostrarSelectorLado =
+    ejercicioSeleccionado ===
+      "curl" ||
+    ejercicioSeleccionado ===
+      "sentadilla";
+
+
+  // ==================================================
   // LIMPIAR VÍDEO
   // ==================================================
 
   function limpiarVideoSeleccionado() {
-    // ----------------------------------------------
-    // LIBERAR URL TEMPORAL
-    // ----------------------------------------------
-
+    // Liberamos la URL temporal anterior.
     if (
       urlVideoRef.current !==
       null
@@ -149,10 +167,6 @@ function App() {
     }
 
 
-    // ----------------------------------------------
-    // LIMPIAR ESTADOS
-    // ----------------------------------------------
-
     setUrlVideo(
       null
     );
@@ -163,14 +177,9 @@ function App() {
     );
 
 
-    // ----------------------------------------------
-    // REINICIAR INPUT
-    // ----------------------------------------------
-    //
-    // Esto permite seleccionar posteriormente
-    // exactamente el mismo archivo.
-    // ----------------------------------------------
-
+    // Reiniciamos el input
+    // para poder seleccionar
+    // posteriormente el mismo archivo.
     if (
       inputVideoRef.current
     ) {
@@ -187,8 +196,6 @@ function App() {
   function seleccionarEjercicio(
     ejercicio: EjercicioId
   ) {
-    // Buscamos el ejercicio
-    // dentro de nuestra configuración.
     const ejercicioEncontrado =
       EJERCICIOS.find(
         function (elemento) {
@@ -200,10 +207,8 @@ function App() {
       );
 
 
-    // ----------------------------------------------
-    // COMPROBAR DISPONIBILIDAD
-    // ----------------------------------------------
-
+    // Evitamos seleccionar
+    // ejercicios no disponibles.
     if (
       !ejercicioEncontrado ||
       !ejercicioEncontrado.disponible
@@ -212,30 +217,15 @@ function App() {
     }
 
 
-    // ----------------------------------------------
-    // APAGAR CÁMARA
-    // ----------------------------------------------
-    //
-    // Cuando cambiamos de ejercicio
-    // desmontamos CameraPreview.
-    //
-    // De esta forma se detienen correctamente
-    // la webcam y MediaPipe.
-    // ----------------------------------------------
-
+    // Apagamos cualquier cámara activa.
     setMostrarCamara(
       false
     );
 
 
-    // ----------------------------------------------
-    // LIMPIAR VÍDEO
-    // ----------------------------------------------
-    //
-    // Solo eliminamos el vídeo
-    // si realmente cambiamos de ejercicio.
-    // ----------------------------------------------
-
+    // Si cambiamos realmente
+    // de ejercicio,
+    // eliminamos el vídeo anterior.
     if (
       ejercicioSeleccionado !==
       ejercicio
@@ -243,10 +233,6 @@ function App() {
       limpiarVideoSeleccionado();
     }
 
-
-    // ----------------------------------------------
-    // GUARDAR EJERCICIO
-    // ----------------------------------------------
 
     setEjercicioSeleccionado(
       ejercicio
@@ -256,6 +242,35 @@ function App() {
     console.log(
       "Ejercicio seleccionado:",
       ejercicio
+    );
+  }
+
+
+  // ==================================================
+  // SELECCIONAR LADO
+  // ==================================================
+
+  function seleccionarLado(
+    lado: Lado
+  ) {
+    // Si ya está seleccionado,
+    // no hacemos nada.
+    if (
+      ladoSeleccionado ===
+      lado
+    ) {
+      return;
+    }
+
+
+    setLadoSeleccionado(
+      lado
+    );
+
+
+    console.log(
+      "Lado seleccionado:",
+      lado
     );
   }
 
@@ -276,8 +291,6 @@ function App() {
   // ==================================================
 
   function abrirSelectorVideo() {
-    // No permitimos cargar vídeo
-    // hasta seleccionar un ejercicio.
     if (
       ejercicioSeleccionado ===
       null
@@ -312,10 +325,8 @@ function App() {
       evento.target.files?.[0];
 
 
-    // ----------------------------------------------
-    // USUARIO CANCELA
-    // ----------------------------------------------
-
+    // Si el usuario cancela,
+    // no hacemos nada.
     if (
       !archivo
     ) {
@@ -323,10 +334,8 @@ function App() {
     }
 
 
-    // ----------------------------------------------
-    // COMPROBAR TIPO
-    // ----------------------------------------------
-
+    // Comprobamos que sea
+    // realmente un vídeo.
     if (
       !archivo.type.startsWith(
         "video/"
@@ -341,10 +350,7 @@ function App() {
     }
 
 
-    // ----------------------------------------------
-    // LIBERAR VÍDEO ANTERIOR
-    // ----------------------------------------------
-
+    // Liberamos una URL anterior.
     if (
       urlVideoRef.current !==
       null
@@ -355,10 +361,7 @@ function App() {
     }
 
 
-    // ----------------------------------------------
-    // CREAR URL TEMPORAL
-    // ----------------------------------------------
-
+    // Creamos una URL local.
     const nuevaUrl =
       URL.createObjectURL(
         archivo
@@ -379,15 +382,8 @@ function App() {
     );
 
 
-    // ----------------------------------------------
-    // APAGAR CÁMARA
-    // ----------------------------------------------
-    //
-    // El usuario utiliza una fuente
-    // u otra, pero no ambas
-    // simultáneamente.
-    // ----------------------------------------------
-
+    // Cuando seleccionamos vídeo,
+    // apagamos la cámara.
     setMostrarCamara(
       false
     );
@@ -406,9 +402,6 @@ function App() {
 
   useEffect(function () {
     return function limpiarAplicacion() {
-      // Si la aplicación se desmonta,
-      // liberamos la URL temporal
-      // del vídeo.
       if (
         urlVideoRef.current !==
         null
@@ -512,6 +505,87 @@ function App() {
 
 
         {/* ============================================
+            SELECTOR DE LADO
+            ============================================
+        
+            Solo aparece para:
+        
+            - Curl
+            - Sentadilla
+        
+            El Press sigue siendo bilateral.
+            ============================================ */}
+
+        {mostrarSelectorLado ? (
+
+          <section className="exercise-selector">
+
+            <h2>
+              Lado a analizar
+            </h2>
+
+
+            <div className="exercise-buttons">
+
+              {/* -------------------------------------
+                  IZQUIERDO
+                  ------------------------------------- */}
+
+              <button
+                type="button"
+
+                onClick={
+                  function () {
+                    seleccionarLado(
+                      "izquierdo"
+                    );
+                  }
+                }
+
+                className={
+                  ladoSeleccionado ===
+                  "izquierdo"
+                    ? "exercise-button exercise-button-active"
+                    : "exercise-button"
+                }
+              >
+                Izquierdo
+              </button>
+
+
+              {/* -------------------------------------
+                  DERECHO
+                  ------------------------------------- */}
+
+              <button
+                type="button"
+
+                onClick={
+                  function () {
+                    seleccionarLado(
+                      "derecho"
+                    );
+                  }
+                }
+
+                className={
+                  ladoSeleccionado ===
+                  "derecho"
+                    ? "exercise-button exercise-button-active"
+                    : "exercise-button"
+                }
+              >
+                Derecho
+              </button>
+
+            </div>
+
+          </section>
+
+        ) : null}
+
+
+        {/* ============================================
             FUENTE DE ANÁLISIS
             ============================================ */}
 
@@ -595,11 +669,13 @@ function App() {
           CÁMARA
           ==============================================
       
-          App ya no necesita saber
-          cómo funciona cada ejercicio.
+          Pasamos ahora:
       
-          Simplemente pasa el identificador
-          a CameraPreview.
+          - ejercicio;
+          - lado.
+      
+          La key hace que al cambiar de lado
+          se cree una sesión de análisis nueva.
           ============================================== */}
 
       {mostrarCamara &&
@@ -607,8 +683,18 @@ function App() {
         null ? (
 
         <CameraPreview
+          key={
+            ejercicioSeleccionado +
+            "-" +
+            ladoSeleccionado
+          }
+
           ejercicio={
             ejercicioSeleccionado
+          }
+
+          lado={
+            ladoSeleccionado
           }
         />
 
@@ -619,16 +705,12 @@ function App() {
           VÍDEO
           ==============================================
       
-          Igual que ocurre con la cámara,
-          App solamente pasa:
+          También pasamos el lado seleccionado
+          al análisis de vídeo.
       
-          - ejercicio;
-          - URL;
-          - nombre;
-          - visibilidad.
-      
-          VideoPreview decide internamente
-          qué análisis debe ejecutar.
+          Al cambiar de lado se reinicia
+          la sesión de análisis,
+          pero se mantiene el vídeo cargado.
           ============================================== */}
 
       {urlVideo !==
@@ -637,8 +719,20 @@ function App() {
         null ? (
 
         <VideoPreview
+          key={
+            ejercicioSeleccionado +
+            "-" +
+            ladoSeleccionado +
+            "-" +
+            urlVideo
+          }
+
           ejercicio={
             ejercicioSeleccionado
+          }
+
+          lado={
+            ladoSeleccionado
           }
 
           urlVideo={

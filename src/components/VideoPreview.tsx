@@ -38,6 +38,10 @@ import {
   LANDMARKS_PRESS_HOMBRO
 } from "../ejercicios/landmarks";
 
+import type {
+  Lado
+} from "../ejercicios/landmarks";
+
 
 // --------------------------------------------------
 // CURL
@@ -114,11 +118,21 @@ interface VideoComunProps {
 
 
 // ==================================================
+// PROPS DEL VÍDEO DEL CURL
+// ==================================================
+
+interface CurlVideoPreviewProps
+  extends VideoComunProps {
+  lado: Lado;
+}
+
+
+// ==================================================
 // VÍDEO DEL CURL
 // ==================================================
 
 function CurlVideoPreview(
-  props: VideoComunProps
+  props: CurlVideoPreviewProps
 ) {
   // Extraemos las propiedades
   // recibidas desde App.
@@ -128,6 +142,14 @@ function CurlVideoPreview(
     visible
   } =
     props;
+
+
+  // Elegimos los landmarks
+  // correspondientes al lado seleccionado.
+  const landmarksCurl =
+    LANDMARKS_CURL[
+      props.lado
+    ];
 
 
   // ==================================================
@@ -968,27 +990,31 @@ function CurlVideoPreview(
 
 
       // ------------------------------------------------
-      // LANDMARKS DEL CURL
+      // LANDMARKS DEL LADO SELECCIONADO
       // ------------------------------------------------
 
-      // 12 = hombro derecho.
       const hombroNormalizado =
-        landmarks[LANDMARKS_CURL.hombro];
+        landmarks[
+          landmarksCurl.hombro
+        ];
 
 
-      // 14 = codo derecho.
       const codoNormalizado =
-        landmarks[LANDMARKS_CURL.codo];
+        landmarks[
+          landmarksCurl.codo
+        ];
 
 
-      // 16 = muñeca derecha.
       const munecaNormalizada =
-        landmarks[LANDMARKS_CURL.muneca];
+        landmarks[
+          landmarksCurl.muneca
+        ];
 
 
-      // 24 = cadera derecha.
       const caderaNormalizada =
-        landmarks[LANDMARKS_CURL.cadera];
+        landmarks[
+          landmarksCurl.cadera
+        ];
 
 
       // Necesitamos hombro, codo y muñeca.
@@ -1824,12 +1850,30 @@ function CurlVideoPreview(
 
 
 // ==================================================
+// PROPS DEL VÍDEO DE SENTADILLA
+// ==================================================
+
+interface SentadillaVideoPreviewProps
+  extends VideoComunProps {
+  lado: Lado;
+}
+
+
+// ==================================================
 // VÍDEO DE SENTADILLA
 // ==================================================
 
 function SentadillaVideoPreviewIntegrado(
-  props: VideoComunProps
+  props: SentadillaVideoPreviewProps
 ) {
+  // Elegimos los landmarks
+  // correspondientes al lado seleccionado.
+  const landmarksSentadilla =
+    LANDMARKS_SENTADILLA[
+      props.lado
+    ];
+
+
   // ==================================================
   // REFERENCIAS
   // ==================================================
@@ -2378,27 +2422,31 @@ function SentadillaVideoPreviewIntegrado(
 
 
         // ----------------------------------------
-        // LANDMARKS DERECHOS
+        // LANDMARKS DEL LADO SELECCIONADO
         // ----------------------------------------
 
-        // 12 = hombro derecho.
         const hombroNormalizado =
-          landmarks[LANDMARKS_SENTADILLA.hombro];
+          landmarks[
+            landmarksSentadilla.hombro
+          ];
 
 
-        // 24 = cadera derecha.
         const caderaNormalizada =
-          landmarks[LANDMARKS_SENTADILLA.cadera];
+          landmarks[
+            landmarksSentadilla.cadera
+          ];
 
 
-        // 26 = rodilla derecha.
         const rodillaNormalizada =
-          landmarks[LANDMARKS_SENTADILLA.rodilla];
+          landmarks[
+            landmarksSentadilla.rodilla
+          ];
 
 
-        // 28 = tobillo derecho.
         const tobilloNormalizado =
-          landmarks[LANDMARKS_SENTADILLA.tobillo];
+          landmarks[
+            landmarksSentadilla.tobillo
+          ];
 
 
         // ----------------------------------------
@@ -4329,6 +4377,12 @@ function PressHombroVideoPreviewIntegrado(
 interface VideoPreviewProps
   extends VideoComunProps {
   ejercicio: EjercicioId;
+
+  // Temporalmente es opcional.
+  // Mientras App.tsx todavía no tenga
+  // selector visual, utilizamos
+  // el lado derecho por defecto.
+  lado?: Lado;
 }
 
 
@@ -4349,6 +4403,14 @@ interface VideoPreviewProps
 function VideoPreview(
   props: VideoPreviewProps
 ) {
+  // Mientras App todavía no tenga
+  // selector de lado, utilizamos
+  // el derecho por defecto.
+  const lado =
+    props.lado ??
+    "derecho";
+
+
   // ------------------------------------------------
   // CURL
   // ------------------------------------------------
@@ -4369,6 +4431,10 @@ function VideoPreview(
 
         visible={
           props.visible
+        }
+
+        lado={
+          lado
         }
       />
     );
@@ -4395,6 +4461,10 @@ function VideoPreview(
 
         visible={
           props.visible
+        }
+
+        lado={
+          lado
         }
       />
     );

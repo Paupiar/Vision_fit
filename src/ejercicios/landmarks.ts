@@ -7,34 +7,66 @@
 //
 // MediaPipe Pose devuelve 33 landmarks.
 //
-// Hasta ahora estos números estaban escritos
-// directamente dentro de los componentes.
-//
-// Centralizarlos nos permitirá:
+// Centralizar estos índices nos permite:
 //
 // - evitar números repetidos;
 // - reducir errores;
 // - cambiar fácilmente de lado;
-// - preparar el selector izquierda/derecha;
+// - utilizar el mismo análisis
+//   para izquierda y derecha;
 // - simplificar CameraPreview y VideoPreview.
 // --------------------------------------------------
+
+
+// ==================================================
+// TIPO DE LADO
+// ==================================================
+//
+// Curl y Sentadilla pueden analizarse
+// utilizando el lado izquierdo
+// o el lado derecho.
+//
+// El Press de hombro sigue siendo bilateral.
+// ==================================================
+
+export type Lado =
+  "izquierdo" |
+  "derecho";
 
 
 // ==================================================
 // CURL DE BÍCEPS
 // ==================================================
 //
-// Actualmente analizamos el lado derecho.
+// MediaPipe:
 //
-// Más adelante añadiremos también
-// la configuración del lado izquierdo.
+// IZQUIERDO
+// 11 -> hombro
+// 13 -> codo
+// 15 -> muñeca
+// 23 -> cadera
+//
+// DERECHO
+// 12 -> hombro
+// 14 -> codo
+// 16 -> muñeca
+// 24 -> cadera
 // ==================================================
 
 export const LANDMARKS_CURL = {
-  hombro: 12,
-  codo: 14,
-  muneca: 16,
-  cadera: 24
+  izquierdo: {
+    hombro: 11,
+    codo: 13,
+    muneca: 15,
+    cadera: 23
+  },
+
+  derecho: {
+    hombro: 12,
+    codo: 14,
+    muneca: 16,
+    cadera: 24
+  }
 };
 
 
@@ -42,20 +74,35 @@ export const LANDMARKS_CURL = {
 // SENTADILLA
 // ==================================================
 //
-// Actualmente analizamos
-// la pierna derecha.
+// MediaPipe:
 //
-// 12 -> hombro derecho
-// 24 -> cadera derecha
-// 26 -> rodilla derecha
-// 28 -> tobillo derecho
+// IZQUIERDO
+// 11 -> hombro
+// 23 -> cadera
+// 25 -> rodilla
+// 27 -> tobillo
+//
+// DERECHO
+// 12 -> hombro
+// 24 -> cadera
+// 26 -> rodilla
+// 28 -> tobillo
 // ==================================================
 
 export const LANDMARKS_SENTADILLA = {
-  hombro: 12,
-  cadera: 24,
-  rodilla: 26,
-  tobillo: 28
+  izquierdo: {
+    hombro: 11,
+    cadera: 23,
+    rodilla: 25,
+    tobillo: 27
+  },
+
+  derecho: {
+    hombro: 12,
+    cadera: 24,
+    rodilla: 26,
+    tobillo: 28
+  }
 };
 
 
@@ -63,7 +110,8 @@ export const LANDMARKS_SENTADILLA = {
 // PRESS DE HOMBRO
 // ==================================================
 //
-// El Press se analiza de forma bilateral.
+// El Press continúa analizándose
+// de forma bilateral.
 //
 // Por eso necesitamos simultáneamente
 // los landmarks de ambos brazos.
