@@ -21,16 +21,25 @@ import {
 // UTILIDADES COMUNES DE MEDIAPIPE
 // --------------------------------------------------
 //
-// Estas funciones antes estaban definidas
-// directamente dentro de PressHombroPreview.
-//
-// Ahora las reutilizamos desde dibujo.ts.
+// Estas funciones se reutilizan
+// desde dibujo.ts.
 import {
   convertirAPixeles,
   dibujarConexion,
   dibujarLandmark,
   esLandmarkValido
 } from "../mediapipe/dibujo";
+
+
+// --------------------------------------------------
+// CONFIGURACIÓN DE LANDMARKS
+// --------------------------------------------------
+//
+// Los índices de ambos brazos
+// se centralizan ahora en landmarks.ts.
+import {
+  LANDMARKS_PRESS_HOMBRO
+} from "../ejercicios/landmarks";
 
 
 // --------------------------------------------------
@@ -353,8 +362,7 @@ function PressHombroPreview() {
   // un brazo en el press.
   //
   // Las operaciones básicas
-  // dibujarConexion y dibujarLandmark
-  // vienen ahora de dibujo.ts.
+  // vienen desde dibujo.ts.
   // ==================================================
 
   function dibujarBrazo(
@@ -526,39 +534,61 @@ function PressHombroPreview() {
         // ========================================
         // BRAZO IZQUIERDO
         // ========================================
+        //
+        // Los índices vienen ahora
+        // desde LANDMARKS_PRESS_HOMBRO.
+        // ========================================
 
-        // 11 = hombro izquierdo.
         const hombroIzquierdoNormalizado =
-          landmarks[11];
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .izquierdo
+              .hombro
+          ];
 
 
-        // 13 = codo izquierdo.
         const codoIzquierdoNormalizado =
-          landmarks[13];
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .izquierdo
+              .codo
+          ];
 
 
-        // 15 = muñeca izquierda.
         const munecaIzquierdaNormalizada =
-          landmarks[15];
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .izquierdo
+              .muneca
+          ];
 
 
         // ========================================
         // BRAZO DERECHO
         // ========================================
 
-        // 12 = hombro derecho.
         const hombroDerechoNormalizado =
-          landmarks[12];
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .derecho
+              .hombro
+          ];
 
 
-        // 14 = codo derecho.
         const codoDerechoNormalizado =
-          landmarks[14];
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .derecho
+              .codo
+          ];
 
 
-        // 16 = muñeca derecha.
         const munecaDerechaNormalizada =
-          landmarks[16];
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .derecho
+              .muneca
+          ];
 
 
         // ----------------------------------------
@@ -576,9 +606,6 @@ function PressHombroPreview() {
           // --------------------------------------
           // VISIBILIDAD IZQUIERDA
           // --------------------------------------
-          //
-          // esLandmarkValido viene
-          // ahora de dibujo.ts.
 
           const brazoIzquierdoValido =
             esLandmarkValido(
@@ -617,9 +644,6 @@ function PressHombroPreview() {
             // ====================================
             // CONVERTIR IZQUIERDO
             // ====================================
-            //
-            // convertirAPixeles viene
-            // ahora de dibujo.ts.
 
             const hombroIzquierdo =
               convertirAPixeles(
@@ -670,10 +694,6 @@ function PressHombroPreview() {
             // ====================================
             // ANALIZAR PRESS
             // ====================================
-            //
-            // La lógica bilateral
-            // permanece exactamente igual.
-            // ====================================
 
             const analisis =
               analizarPressHombro(
@@ -693,9 +713,6 @@ function PressHombroPreview() {
             // FEEDBACK VERDE
             // ====================================
 
-            // Cuando ambos brazos alcanzan
-            // la posición baja o alta
-            // activamos verde durante 300 ms.
             if (
               analisis.posicionBajaAlcanzada ||
               analisis.posicionAltaAlcanzada

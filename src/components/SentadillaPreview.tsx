@@ -19,17 +19,24 @@ import {
 // --------------------------------------------------
 // UTILIDADES COMUNES DE MEDIAPIPE
 // --------------------------------------------------
-//
-// Estas funciones antes estaban definidas
-// directamente dentro de SentadillaPreview.
-//
-// Ahora las reutilizamos desde dibujo.ts.
+
 import {
   convertirAPixeles,
   dibujarConexion,
   dibujarLandmark,
   esLandmarkValido
 } from "../mediapipe/dibujo";
+
+
+// --------------------------------------------------
+// CONFIGURACIÓN DE LANDMARKS
+// --------------------------------------------------
+//
+// Los índices utilizados por la sentadilla
+// se centralizan ahora en landmarks.ts.
+import {
+  LANDMARKS_SENTADILLA
+} from "../ejercicios/landmarks";
 
 
 // --------------------------------------------------
@@ -89,12 +96,6 @@ function SentadillaPreview() {
   // EFECTO VERDE
   // --------------------------------------------------
 
-  // Guarda hasta qué instante
-  // queremos mantener los landmarks
-  // y conexiones en verde.
-  //
-  // Igual que en el curl,
-  // utilizaremos 300 ms.
   const verdeHastaRef =
     useRef<number>(
       0
@@ -359,15 +360,6 @@ function SentadillaPreview() {
   // ==================================================
   // DIBUJAR CUERPO
   // ==================================================
-  //
-  // Esta función sigue siendo propia
-  // de la sentadilla porque define
-  // qué conexiones queremos dibujar.
-  //
-  // Las operaciones básicas
-  // dibujarConexion y dibujarLandmark
-  // vienen ahora de dibujo.ts.
-  // ==================================================
 
   function dibujarCuerpo(
     contexto:
@@ -527,8 +519,6 @@ function SentadillaPreview() {
     }
 
 
-    // Limpiamos los landmarks
-    // del frame anterior.
     contexto.clearRect(
       0,
       0,
@@ -558,34 +548,39 @@ function SentadillaPreview() {
 
 
         // ----------------------------------------
-        // LANDMARKS DERECHOS
+        // LANDMARKS DE SENTADILLA
         // ----------------------------------------
         //
-        // Mantenemos exactamente
-        // la configuración estable actual.
+        // Ya no escribimos directamente:
         //
-        // Todavía NO añadimos
-        // selección izquierda/derecha.
+        // 12 / 24 / 26 / 28
+        //
+        // La configuración viene ahora
+        // desde landmarks.ts.
         // ----------------------------------------
 
-        // 12 = hombro.
         const hombroNormalizado =
-          landmarks[12];
+          landmarks[
+            LANDMARKS_SENTADILLA.hombro
+          ];
 
 
-        // 24 = cadera.
         const caderaNormalizada =
-          landmarks[24];
+          landmarks[
+            LANDMARKS_SENTADILLA.cadera
+          ];
 
 
-        // 26 = rodilla.
         const rodillaNormalizada =
-          landmarks[26];
+          landmarks[
+            LANDMARKS_SENTADILLA.rodilla
+          ];
 
 
-        // 28 = tobillo.
         const tobilloNormalizado =
-          landmarks[28];
+          landmarks[
+            LANDMARKS_SENTADILLA.tobillo
+          ];
 
 
         // ----------------------------------------
@@ -597,8 +592,6 @@ function SentadillaPreview() {
           rodillaNormalizada &&
           tobilloNormalizado
         ) {
-          // esLandmarkValido
-          // viene ahora de dibujo.ts.
           if (
             esLandmarkValido(
               caderaNormalizada
@@ -613,9 +606,6 @@ function SentadillaPreview() {
             // ------------------------------------
             // CONVERTIR PIERNA
             // ------------------------------------
-            //
-            // convertirAPixeles
-            // viene ahora de dibujo.ts.
 
             const cadera =
               convertirAPixeles(
@@ -674,15 +664,6 @@ function SentadillaPreview() {
             // PROFUNDIDAD ANTES DEL ANÁLISIS
             // ====================================
 
-            // Guardamos si ya habíamos
-            // alcanzado profundidad antes
-            // de analizar este frame.
-            //
-            // Nos permitirá detectar
-            // exactamente el instante
-            // en que pasamos de:
-            //
-            // no alcanzada -> alcanzada.
             const profundidadAntes =
               estadoSentadillaRef
                 .current
@@ -693,8 +674,6 @@ function SentadillaPreview() {
             // ANALIZAR SENTADILLA
             // ------------------------------------
 
-            // La lógica biomecánica
-            // permanece exactamente igual.
             const analisis =
               analizarSentadilla(
                 estadoSentadillaRef.current,
@@ -709,9 +688,6 @@ function SentadillaPreview() {
             // EFECTO VERDE
             // ====================================
 
-            // Después del análisis comprobamos
-            // si acabamos de alcanzar
-            // suficiente profundidad.
             const profundidadDespues =
               estadoSentadillaRef
                 .current
@@ -722,10 +698,6 @@ function SentadillaPreview() {
             // LLEGAR ABAJO
             // ------------------------------------
 
-            // Si antes no teníamos profundidad
-            // y ahora sí:
-            //
-            // acabamos de llegar a <= 100°.
             if (
               !profundidadAntes &&
               profundidadDespues
@@ -740,9 +712,6 @@ function SentadillaPreview() {
             // VOLVER ARRIBA
             // ------------------------------------
 
-            // Cuando se completa la repetición
-            // significa que hemos vuelto
-            // a >= 160°.
             if (
               analisis.repeticionSumada
             ) {
@@ -752,9 +721,6 @@ function SentadillaPreview() {
             }
 
 
-            // Mientras no hayan pasado
-            // esos 300 ms mostramos
-            // todo el esqueleto en verde.
             const mostrarVerde =
               timestamp <
               verdeHastaRef.current;

@@ -20,16 +20,25 @@ import {
 // UTILIDADES COMUNES DE MEDIAPIPE
 // --------------------------------------------------
 //
-// Estas funciones antes estaban definidas
-// directamente dentro de PressHombroVideoPreview.
-//
-// Ahora las reutilizamos desde dibujo.ts.
+// Estas funciones se reutilizan
+// desde dibujo.ts.
 import {
   convertirAPixeles,
   dibujarConexion,
   dibujarLandmark,
   esLandmarkValido
 } from "../mediapipe/dibujo";
+
+
+// --------------------------------------------------
+// CONFIGURACIÓN DE LANDMARKS
+// --------------------------------------------------
+//
+// Los índices de ambos brazos
+// se centralizan ahora en landmarks.ts.
+import {
+  LANDMARKS_PRESS_HOMBRO
+} from "../ejercicios/landmarks";
 
 
 // --------------------------------------------------
@@ -626,39 +635,61 @@ function PressHombroVideoPreview(
         // ========================================
         // BRAZO IZQUIERDO
         // ========================================
+        //
+        // Los índices vienen ahora
+        // desde landmarks.ts.
+        // ========================================
 
-        // 11 = hombro izquierdo.
         const hombroIzquierdoNormalizado =
-          landmarks[11];
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .izquierdo
+              .hombro
+          ];
 
 
-        // 13 = codo izquierdo.
         const codoIzquierdoNormalizado =
-          landmarks[13];
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .izquierdo
+              .codo
+          ];
 
 
-        // 15 = muñeca izquierda.
         const munecaIzquierdaNormalizada =
-          landmarks[15];
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .izquierdo
+              .muneca
+          ];
 
 
         // ========================================
         // BRAZO DERECHO
         // ========================================
 
-        // 12 = hombro derecho.
         const hombroDerechoNormalizado =
-          landmarks[12];
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .derecho
+              .hombro
+          ];
 
 
-        // 14 = codo derecho.
         const codoDerechoNormalizado =
-          landmarks[14];
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .derecho
+              .codo
+          ];
 
 
-        // 16 = muñeca derecha.
         const munecaDerechaNormalizada =
-          landmarks[16];
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .derecho
+              .muneca
+          ];
 
 
         // ----------------------------------------
@@ -675,10 +706,6 @@ function PressHombroVideoPreview(
         ) {
           // --------------------------------------
           // VISIBILIDAD IZQUIERDA
-          // --------------------------------------
-          //
-          // esLandmarkValido viene
-          // ahora desde dibujo.ts.
           // --------------------------------------
 
           const brazoIzquierdoValido =
@@ -717,10 +744,6 @@ function PressHombroVideoPreview(
           ) {
             // ====================================
             // IZQUIERDO A PÍXELES
-            // ====================================
-            //
-            // convertirAPixeles viene
-            // ahora desde dibujo.ts.
             // ====================================
 
             const hombroIzquierdo =

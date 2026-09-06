@@ -20,10 +20,8 @@ import {
 // UTILIDADES COMUNES DE MEDIAPIPE
 // --------------------------------------------------
 //
-// Estas funciones antes estaban definidas
-// directamente dentro de CameraPreview.
-//
-// Ahora las reutilizamos desde dibujo.ts.
+// Estas funciones viven ahora en dibujo.ts
+// y pueden reutilizarse en todos los ejercicios.
 import {
   convertirAPixeles,
   dibujarConexion,
@@ -33,14 +31,22 @@ import {
 
 
 // --------------------------------------------------
+// CONFIGURACIÓN DE LANDMARKS
+// --------------------------------------------------
+//
+// Los índices de MediaPipe ya no
+// se escriben directamente en este componente.
+//
+// Ahora se centralizan en landmarks.ts.
+import {
+  LANDMARKS_CURL
+} from "../ejercicios/landmarks";
+
+
+// --------------------------------------------------
 // LÓGICA DEL CURL
 // --------------------------------------------------
 
-// Importamos toda la lógica específica
-// del ejercicio curl.
-//
-// CameraPreview no necesita saber
-// cómo se evalúa biomecánicamente el ejercicio.
 import {
   analizarFrameCurl,
   calcularResumenSesion,
@@ -69,17 +75,20 @@ function CameraPreview() {
       null
     );
 
+
   // Canvas situado encima del vídeo.
   const canvasRef =
     useRef<HTMLCanvasElement | null>(
       null
     );
 
+
   // Detector de MediaPipe.
   const poseLandmarkerRef =
     useRef<PoseLandmarker | null>(
       null
     );
+
 
   // Identificador del bucle
   // requestAnimationFrame.
@@ -101,7 +110,7 @@ function CameraPreview() {
   // - errores;
   // - repeticiones;
   //
-  // vive ahora dentro de este objeto.
+  // vive dentro de este objeto.
   const estadoCurlRef =
     useRef(
       crearEstadoCurl()
@@ -221,8 +230,6 @@ function CameraPreview() {
   // RESUMEN DE LA SESIÓN
   // --------------------------------------------------
 
-  // El cálculo también está ahora
-  // dentro del módulo del curl.
   const resumenSesion =
     calcularResumenSesion(
       historial
@@ -275,6 +282,7 @@ function CameraPreview() {
                 track.stop();
               }
             );
+
 
           return;
         }
@@ -420,10 +428,6 @@ function CameraPreview() {
   // Esta función sigue siendo propia
   // del curl porque describe
   // qué conexiones queremos dibujar.
-  //
-  // Las operaciones básicas
-  // dibujarConexion y dibujarLandmark
-  // vienen ahora de dibujo.ts.
   function dibujarBrazo(
     contexto:
       CanvasRenderingContext2D,
@@ -501,6 +505,7 @@ function CameraPreview() {
           analizarFrame
         );
 
+
       return;
     }
 
@@ -527,6 +532,7 @@ function CameraPreview() {
         requestAnimationFrame(
           analizarFrame
         );
+
 
       return;
     }
@@ -595,28 +601,39 @@ function CameraPreview() {
         // ----------------------------------------
         // LANDMARKS NECESARIOS PARA CURL
         // ----------------------------------------
-
-        // Por ahora mantenemos exactamente
-        // los landmarks del último commit estable.
         //
-        // 12 = hombro derecho.
+        // Los índices vienen ahora de:
+        //
+        // src/ejercicios/landmarks.ts
+        //
+        // CameraPreview ya no necesita
+        // conocer directamente:
+        //
+        // 12 / 14 / 16 / 24
+        // ----------------------------------------
+
         const hombroNormalizado =
-          landmarks[12];
+          landmarks[
+            LANDMARKS_CURL.hombro
+          ];
 
 
-        // 14 = codo derecho.
         const codoNormalizado =
-          landmarks[14];
+          landmarks[
+            LANDMARKS_CURL.codo
+          ];
 
 
-        // 16 = muñeca derecha.
         const munecaNormalizada =
-          landmarks[16];
+          landmarks[
+            LANDMARKS_CURL.muneca
+          ];
 
 
-        // 24 = cadera derecha.
         const caderaNormalizada =
-          landmarks[24];
+          landmarks[
+            LANDMARKS_CURL.cadera
+          ];
 
 
         // ----------------------------------------
@@ -628,8 +645,6 @@ function CameraPreview() {
           codoNormalizado &&
           munecaNormalizada
         ) {
-          // esLandmarkValido ahora
-          // viene de dibujo.ts.
           if (
             esLandmarkValido(
               hombroNormalizado
@@ -644,9 +659,6 @@ function CameraPreview() {
             // ------------------------------------
             // PASAMOS A PÍXELES
             // ------------------------------------
-            //
-            // convertirAPixeles ahora
-            // viene también de dibujo.ts.
 
             const hombro =
               convertirAPixeles(
@@ -700,9 +712,6 @@ function CameraPreview() {
             // ANALIZADOR DEL CURL
             // ------------------------------------
 
-            // CameraPreview entrega los landmarks
-            // y curl.ts hace todo
-            // el análisis biomecánico.
             const analisis =
               analizarFrameCurl(
                 estadoCurlRef.current,
@@ -755,15 +764,6 @@ function CameraPreview() {
 
             // ------------------------------------
             // REPETICIÓN TERMINADA
-            // ------------------------------------
-            //
-            // IMPORTANTE:
-            //
-            // Este es exactamente el campo
-            // que utiliza tu ResultadoFrameCurl
-            // actual.
-            //
-            // NO usamos resultadoRepeticion.
             // ------------------------------------
 
             const repeticionFinalizada =

@@ -33,6 +33,17 @@ import {
 
 
 // --------------------------------------------------
+// CONFIGURACIÓN DE LANDMARKS
+// --------------------------------------------------
+//
+// Los índices utilizados por la sentadilla
+// se centralizan ahora en landmarks.ts.
+import {
+  LANDMARKS_SENTADILLA
+} from "../ejercicios/landmarks";
+
+
+// --------------------------------------------------
 // LÓGICA DE SENTADILLA
 // --------------------------------------------------
 
@@ -617,27 +628,39 @@ function SentadillaVideoPreview(
 
 
         // ----------------------------------------
-        // LANDMARKS DERECHOS
+        // LANDMARKS DE SENTADILLA
+        // ----------------------------------------
+        //
+        // Ya no utilizamos directamente:
+        //
+        // 12 / 24 / 26 / 28
+        //
+        // La configuración viene ahora
+        // desde landmarks.ts.
         // ----------------------------------------
 
-        // 12 = hombro derecho.
         const hombroNormalizado =
-          landmarks[12];
+          landmarks[
+            LANDMARKS_SENTADILLA.hombro
+          ];
 
 
-        // 24 = cadera derecha.
         const caderaNormalizada =
-          landmarks[24];
+          landmarks[
+            LANDMARKS_SENTADILLA.cadera
+          ];
 
 
-        // 26 = rodilla derecha.
         const rodillaNormalizada =
-          landmarks[26];
+          landmarks[
+            LANDMARKS_SENTADILLA.rodilla
+          ];
 
 
-        // 28 = tobillo derecho.
         const tobilloNormalizado =
-          landmarks[28];
+          landmarks[
+            LANDMARKS_SENTADILLA.tobillo
+          ];
 
 
         // ----------------------------------------
@@ -660,10 +683,6 @@ function SentadillaVideoPreview(
         ) {
           // --------------------------------------
           // CONVERTIR PIERNA A PÍXELES
-          // --------------------------------------
-          //
-          // convertirAPixeles ahora viene
-          // desde dibujo.ts.
           // --------------------------------------
 
           const cadera =

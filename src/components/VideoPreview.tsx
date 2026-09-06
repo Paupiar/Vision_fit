@@ -21,16 +21,25 @@ import {
 // UTILIDADES COMUNES DE MEDIAPIPE
 // --------------------------------------------------
 //
-// Estas funciones antes estaban definidas
-// directamente dentro de VideoPreview.
-//
-// Ahora las reutilizamos desde dibujo.ts.
+// Estas funciones se reutilizan
+// desde dibujo.ts.
 import {
   convertirAPixeles,
   dibujarConexion,
   dibujarLandmark,
   esLandmarkValido
 } from "../mediapipe/dibujo";
+
+
+// --------------------------------------------------
+// CONFIGURACIÓN DE LANDMARKS
+// --------------------------------------------------
+//
+// Los índices utilizados por el Curl
+// se centralizan ahora en landmarks.ts.
+import {
+  LANDMARKS_CURL
+} from "../ejercicios/landmarks";
 
 
 // --------------------------------------------------
@@ -518,13 +527,6 @@ function VideoPreview(
   // ==================================================
   // DIBUJAR BRAZO
   // ==================================================
-  //
-  // Esta función sigue siendo específica
-  // del curl.
-  //
-  // Las funciones básicas de dibujo
-  // vienen ahora desde dibujo.ts.
-  // ==================================================
 
   function dibujarBrazo(
     contexto:
@@ -643,10 +645,6 @@ function VideoPreview(
     muneca: Punto,
     cadera: Punto | null
   ) {
-    // ------------------------------------------------
-    // ANALIZADOR COMÚN
-    // ------------------------------------------------
-
     // Utilizamos el mismo analizarFrameCurl()
     // que utiliza la cámara.
     //
@@ -744,7 +742,6 @@ function VideoPreview(
           .current >=
       100
     ) {
-      // Ángulo.
       setAnguloVideo(
         Math.round(
           analisis.anguloCodo
@@ -752,25 +749,21 @@ function VideoPreview(
       );
 
 
-      // Fase.
       setFaseVideo(
         analisis.fase
       );
 
 
-      // Feedback del movimiento.
       setFeedbackVideo(
         analisis.feedbackMovimiento
       );
 
 
-      // Feedback técnico del codo.
       setFeedbackCodoVideo(
         analisis.feedbackCodo
       );
 
 
-      // Feedback técnico del tronco.
       setFeedbackTroncoVideo(
         analisis.feedbackHombro
       );
@@ -908,7 +901,6 @@ function VideoPreview(
         );
 
 
-      // No detectamos ninguna persona.
       if (
         resultado.landmarks.length ===
         0
@@ -924,25 +916,36 @@ function VideoPreview(
       // ------------------------------------------------
       // LANDMARKS DEL CURL
       // ------------------------------------------------
+      //
+      // Ya no escribimos aquí:
+      //
+      // 12 / 14 / 16 / 24
+      //
+      // La configuración viene de landmarks.ts.
+      // ------------------------------------------------
 
-      // 12 = hombro derecho.
       const hombroNormalizado =
-        landmarks[12];
+        landmarks[
+          LANDMARKS_CURL.hombro
+        ];
 
 
-      // 14 = codo derecho.
       const codoNormalizado =
-        landmarks[14];
+        landmarks[
+          LANDMARKS_CURL.codo
+        ];
 
 
-      // 16 = muñeca derecha.
       const munecaNormalizada =
-        landmarks[16];
+        landmarks[
+          LANDMARKS_CURL.muneca
+        ];
 
 
-      // 24 = cadera derecha.
       const caderaNormalizada =
-        landmarks[24];
+        landmarks[
+          LANDMARKS_CURL.cadera
+        ];
 
 
       // Necesitamos hombro, codo y muñeca.
@@ -956,9 +959,6 @@ function VideoPreview(
 
 
       // Comprobamos visibilidad.
-      //
-      // esLandmarkValido viene ahora
-      // desde dibujo.ts.
       if (
         !esLandmarkValido(
           hombroNormalizado
@@ -976,10 +976,6 @@ function VideoPreview(
 
       // ------------------------------------------------
       // CONVERTIR A PÍXELES
-      // ------------------------------------------------
-      //
-      // convertirAPixeles viene ahora
-      // desde dibujo.ts.
       // ------------------------------------------------
 
       const hombro =
@@ -1133,14 +1129,12 @@ function VideoPreview(
     }
 
 
-    // Procesamos el frame actual.
     procesarFrameVideo(
       timestamp,
       true
     );
 
 
-    // Solicitamos el siguiente.
     animationFrameVideoRef.current =
       requestAnimationFrame(
         analizarFrameVideo
@@ -1392,12 +1386,6 @@ function VideoPreview(
 
   return (
     <div
-      // Cuando se enciende la cámara
-      // mantenemos VideoPreview montado,
-      // pero lo ocultamos.
-      //
-      // Así no perdemos su estado
-      // innecesariamente.
       style={{
         display:
           visible
@@ -1422,10 +1410,6 @@ function VideoPreview(
           </p>
 
 
-          {/* ------------------------------------------
-              VÍDEO + CANVAS
-              ------------------------------------------ */}
-
           <div
             style={{
               position: "relative",
@@ -1433,10 +1417,6 @@ function VideoPreview(
               maxWidth: "640px"
             }}
           >
-
-            {/* ----------------------------------------
-                VÍDEO
-                ---------------------------------------- */}
 
             <video
               ref={
@@ -1451,33 +1431,22 @@ function VideoPreview(
 
               playsInline
 
-              // Cuando conocemos las dimensiones
-              // reales del vídeo preparamos
-              // el canvas.
               onLoadedMetadata={
                 prepararCanvasVideo
               }
 
-              // Cuando realmente empieza
-              // a reproducirse iniciamos MediaPipe.
               onPlaying={
                 iniciarAnalisisVideo
               }
 
-              // Una pausa normal conserva
-              // todos los resultados.
               onPause={
                 detenerAnalisisVideo
               }
 
-              // Al terminar conservamos
-              // el resumen.
               onEnded={
                 videoTerminado
               }
 
-              // Si el usuario mueve la barra,
-              // reiniciamos la sesión.
               onSeeked={
                 manejarSeekVideo
               }
@@ -1492,10 +1461,6 @@ function VideoPreview(
             />
 
 
-            {/* ----------------------------------------
-                CANVAS
-                ---------------------------------------- */}
-
             <canvas
               ref={
                 canvasVideoRef
@@ -1508,9 +1473,6 @@ function VideoPreview(
                 width: "100%",
                 height: "100%",
                 zIndex: 2,
-
-                // Los controles del vídeo
-                // siguen funcionando.
                 pointerEvents: "none"
               }}
             />
