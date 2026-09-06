@@ -5,10 +5,11 @@ import {
   useState
 } from "react";
 
-// Tipo utilizado por el selector
-// de archivos.
+// Tipos utilizados por React
+// y por el selector de archivos.
 import type {
-  ChangeEvent
+  ChangeEvent,
+  ComponentType
 } from "react";
 
 // Estilos generales.
@@ -16,31 +17,36 @@ import "./App.css";
 
 
 // --------------------------------------------------
-// COMPONENTES DE CÁMARA
+// CÁMARA
 // --------------------------------------------------
-
-// Curl.
-import CameraPreview from "./components/CameraPreview";
-
-// Sentadilla.
-import SentadillaPreview from "./components/SentadillaPreview";
-
-// Press bilateral.
-import PressHombroPreview from "./components/PressHombroPreview";
+//
+// Ahora App solamente conoce
+// un componente de cámara.
+import CameraPreview
+  from "./components/CameraPreview";
 
 
 // --------------------------------------------------
 // COMPONENTES DE VÍDEO
 // --------------------------------------------------
+//
+// Los vídeos todavía mantienen
+// sus tres componentes independientes.
+//
+// Los unificaremos después
+// de terminar con la cámara.
 
 // Curl.
-import VideoPreview from "./components/VideoPreview";
+import VideoPreview
+  from "./components/VideoPreview";
 
 // Sentadilla.
-import SentadillaVideoPreview from "./components/SentadillaVideoPreview";
+import SentadillaVideoPreview
+  from "./components/SentadillaVideoPreview";
 
 // Press de hombro bilateral.
-import PressHombroVideoPreview from "./components/PressHombroVideoPreview";
+import PressHombroVideoPreview
+  from "./components/PressHombroVideoPreview";
 
 
 // --------------------------------------------------
@@ -54,6 +60,44 @@ import {
 import type {
   EjercicioId
 } from "./ejercicios/tipos";
+
+
+// ==================================================
+// PROPS COMUNES DE LOS VÍDEOS
+// ==================================================
+
+interface VideoPreviewComunProps {
+  urlVideo: string;
+
+  nombreVideo: string;
+
+  visible: boolean;
+}
+
+
+// ==================================================
+// COMPONENTES DE VÍDEO POR EJERCICIO
+// ==================================================
+//
+// Este sistema sigue siendo necesario
+// mientras no hayamos unificado
+// VideoPreview.
+// ==================================================
+
+const COMPONENTES_VIDEO:
+  Record<
+    EjercicioId,
+    ComponentType<VideoPreviewComunProps>
+  > = {
+    curl:
+      VideoPreview,
+
+    sentadilla:
+      SentadillaVideoPreview,
+
+    "press-hombro":
+      PressHombroVideoPreview
+  };
 
 
 function App() {
@@ -115,6 +159,19 @@ function App() {
     useState<string | null>(
       null
     );
+
+
+  // ==================================================
+  // COMPONENTE DE VÍDEO ACTUAL
+  // ==================================================
+
+  const ComponenteVideo =
+    ejercicioSeleccionado !==
+    null
+      ? COMPONENTES_VIDEO[
+          ejercicioSeleccionado
+        ]
+      : null;
 
 
   // ==================================================
@@ -232,8 +289,6 @@ function App() {
   // ==================================================
 
   function abrirSelectorVideo() {
-    // Los tres ejercicios actuales
-    // ya disponen de análisis de vídeo.
     if (
       ejercicioSeleccionado ===
       null
@@ -474,8 +529,6 @@ function App() {
               </button>
 
 
-              {/* Los tres ejercicios
-                  actuales ya permiten vídeo. */}
               <button
                 type="button"
 
@@ -520,64 +573,20 @@ function App() {
 
 
       {/* ==============================================
-          CURL - CÁMARA
+          CÁMARA
+          ==============================================
+      
+          Ya existe un único punto de entrada
+          para cualquier ejercicio.
           ============================================== */}
 
       {mostrarCamara &&
-      ejercicioSeleccionado ===
-        "curl" ? (
+      ejercicioSeleccionado !==
+        null ? (
 
-        <CameraPreview />
-
-      ) : null}
-
-
-      {/* ==============================================
-          SENTADILLA - CÁMARA
-          ============================================== */}
-
-      {mostrarCamara &&
-      ejercicioSeleccionado ===
-        "sentadilla" ? (
-
-        <SentadillaPreview />
-
-      ) : null}
-
-
-      {/* ==============================================
-          PRESS - CÁMARA
-          ============================================== */}
-
-      {mostrarCamara &&
-      ejercicioSeleccionado ===
-        "press-hombro" ? (
-
-        <PressHombroPreview />
-
-      ) : null}
-
-
-      {/* ==============================================
-          CURL - VÍDEO
-          ============================================== */}
-
-      {urlVideo !==
-        null &&
-      ejercicioSeleccionado ===
-        "curl" ? (
-
-        <VideoPreview
-          urlVideo={
-            urlVideo
-          }
-
-          nombreVideo={
-            nombreVideo
-          }
-
-          visible={
-            !mostrarCamara
+        <CameraPreview
+          ejercicio={
+            ejercicioSeleccionado
           }
         />
 
@@ -585,41 +594,15 @@ function App() {
 
 
       {/* ==============================================
-          SENTADILLA - VÍDEO
+          VÍDEO
           ============================================== */}
 
       {urlVideo !==
         null &&
-      ejercicioSeleccionado ===
-        "sentadilla" ? (
+      ComponenteVideo !==
+        null ? (
 
-        <SentadillaVideoPreview
-          urlVideo={
-            urlVideo
-          }
-
-          nombreVideo={
-            nombreVideo
-          }
-
-          visible={
-            !mostrarCamara
-          }
-        />
-
-      ) : null}
-
-
-      {/* ==============================================
-          PRESS - VÍDEO
-          ============================================== */}
-
-      {urlVideo !==
-        null &&
-      ejercicioSeleccionado ===
-        "press-hombro" ? (
-
-        <PressHombroVideoPreview
+        <ComponenteVideo
           urlVideo={
             urlVideo
           }

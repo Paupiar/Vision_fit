@@ -1,16 +1,16 @@
-// Importamos los hooks de React necesarios.
+// Importamos los hooks necesarios de React.
 import {
   useEffect,
   useRef,
   useState
 } from "react";
 
-// Tipo de MediaPipe.
+// Tipo del detector de MediaPipe.
 import type {
   PoseLandmarker
 } from "@mediapipe/tasks-vision";
 
-// Configuración del detector.
+// Función común para crear MediaPipe.
 import {
   crearPoseLandmarker
 } from "../mediapipe/pose";
@@ -19,9 +19,7 @@ import {
 // --------------------------------------------------
 // UTILIDADES COMUNES DE MEDIAPIPE
 // --------------------------------------------------
-//
-// Estas funciones viven ahora en dibujo.ts
-// y pueden reutilizarse en todos los ejercicios.
+
 import {
   convertirAPixeles,
   dibujarConexion,
@@ -31,20 +29,18 @@ import {
 
 
 // --------------------------------------------------
-// CONFIGURACIÓN DE LANDMARKS
+// LANDMARKS
 // --------------------------------------------------
-//
-// Los índices de MediaPipe ya no
-// se escriben directamente en este componente.
-//
-// Ahora se centralizan en landmarks.ts.
+
 import {
-  LANDMARKS_CURL
+  LANDMARKS_CURL,
+  LANDMARKS_SENTADILLA,
+  LANDMARKS_PRESS_HOMBRO
 } from "../ejercicios/landmarks";
 
 
 // --------------------------------------------------
-// LÓGICA DEL CURL
+// CURL
 // --------------------------------------------------
 
 import {
@@ -55,8 +51,6 @@ import {
   DESPLAZAMIENTO_MAXIMO_HOMBRO
 } from "../ejercicios/curl";
 
-// Importamos únicamente los tipos
-// que necesita este componente.
 import type {
   FaseCurl,
   Punto,
@@ -64,82 +58,103 @@ import type {
 } from "../ejercicios/curl";
 
 
-function CameraPreview() {
-  // --------------------------------------------------
-  // ELEMENTOS DE LA PÁGINA
-  // --------------------------------------------------
+// --------------------------------------------------
+// SENTADILLA
+// --------------------------------------------------
 
-  // Elemento <video>.
+import {
+  analizarSentadilla,
+  calcularResumenSesionSentadilla,
+  crearEstadoSentadilla
+} from "../ejercicios/sentadilla";
+
+import type {
+  FaseSentadilla,
+  PuntoSentadilla,
+  ResultadoRepeticionSentadilla
+} from "../ejercicios/sentadilla";
+
+
+// --------------------------------------------------
+// PRESS DE HOMBRO
+// --------------------------------------------------
+
+import {
+  analizarPressHombro,
+  calcularResumenSesionPress,
+  crearEstadoPressHombro
+} from "../ejercicios/pressHombro";
+
+import type {
+  FasePressHombro,
+  PuntoPressHombro,
+  ResultadoRepeticionPress
+} from "../ejercicios/pressHombro";
+
+
+// --------------------------------------------------
+// EJERCICIOS
+// --------------------------------------------------
+
+import type {
+  EjercicioId
+} from "../ejercicios/tipos";
+
+
+// ==================================================
+// CÁMARA DEL CURL
+// ==================================================
+
+function CurlCameraPreview() {
+  // ==================================================
+  // REFERENCIAS
+  // ==================================================
+
   const videoRef =
     useRef<HTMLVideoElement | null>(
       null
     );
 
 
-  // Canvas situado encima del vídeo.
   const canvasRef =
     useRef<HTMLCanvasElement | null>(
       null
     );
 
 
-  // Detector de MediaPipe.
   const poseLandmarkerRef =
     useRef<PoseLandmarker | null>(
       null
     );
 
 
-  // Identificador del bucle
-  // requestAnimationFrame.
   const animationFrameRef =
     useRef<number | null>(
       null
     );
 
 
-  // --------------------------------------------------
-  // ANALIZADOR DEL CURL
-  // --------------------------------------------------
-
-  // Creamos un único estado interno del ejercicio.
-  //
-  // Todo lo relacionado con:
-  // - fases;
-  // - referencias;
-  // - errores;
-  // - repeticiones;
-  //
-  // vive dentro de este objeto.
   const estadoCurlRef =
     useRef(
       crearEstadoCurl()
     );
 
 
-  // --------------------------------------------------
-  // FEEDBACK VISUAL
-  // --------------------------------------------------
-
-  // Guarda hasta qué instante
-  // los puntos deben aparecer verdes.
   const verdeHastaRef =
     useRef<number>(
       0
     );
 
 
-  // Último instante en que actualizamos
-  // la interfaz de React.
   const ultimaActualizacionUIRef =
     useRef<number>(
       0
     );
 
 
-  // --------------------------------------------------
-  // ESTADOS VISIBLES
-  // --------------------------------------------------
+  // ==================================================
+  // ESTADOS
+  // ==================================================
 
   const [
     repeticiones,
@@ -213,8 +228,6 @@ function CameraPreview() {
     );
 
 
-  // Historial de repeticiones
-  // completamente terminadas.
   const [
     historial,
     setHistorial
@@ -226,9 +239,9 @@ function CameraPreview() {
     );
 
 
-  // --------------------------------------------------
-  // RESUMEN DE LA SESIÓN
-  // --------------------------------------------------
+  // ==================================================
+  // RESUMEN
+  // ==================================================
 
   const resumenSesion =
     calcularResumenSesion(
@@ -236,29 +249,22 @@ function CameraPreview() {
     );
 
 
-  // --------------------------------------------------
-  // INICIAR CÁMARA Y MEDIAPIPE
-  // --------------------------------------------------
+  // ==================================================
+  // CÁMARA Y MEDIAPIPE
+  // ==================================================
 
   useEffect(function () {
-    // Stream real de la webcam.
     let stream:
       MediaStream | null =
       null;
 
 
-    // Permite saber si el componente
-    // continúa montado.
     let componenteActivo =
       true;
 
 
     async function iniciarSistema() {
       try {
-        // ------------------------------------------
-        // CÁMARA
-        // ------------------------------------------
-
         const nuevoStream =
           await navigator.mediaDevices.getUserMedia({
             video:
@@ -269,9 +275,6 @@ function CameraPreview() {
           });
 
 
-        // Si CameraPreview desapareció
-        // mientras esperábamos el permiso,
-        // apagamos inmediatamente la cámara.
         if (
           !componenteActivo
         ) {
@@ -292,8 +295,6 @@ function CameraPreview() {
           nuevoStream;
 
 
-        // Conectamos la cámara
-        // al elemento <video>.
         if (
           videoRef.current
         ) {
@@ -301,10 +302,6 @@ function CameraPreview() {
             stream;
         }
 
-
-        // ------------------------------------------
-        // MEDIAPIPE
-        // ------------------------------------------
 
         console.log(
           "Cargando MediaPipe..."
@@ -331,8 +328,6 @@ function CameraPreview() {
         );
 
 
-        // Si el vídeo ya está preparado,
-        // podemos empezar directamente.
         if (
           videoRef.current &&
           videoRef.current.readyState >=
@@ -353,16 +348,11 @@ function CameraPreview() {
     iniciarSistema();
 
 
-    // --------------------------------------------------
-    // LIMPIEZA
-    // --------------------------------------------------
-
     return function detenerSistema() {
       componenteActivo =
         false;
 
 
-      // Detenemos el análisis.
       if (
         animationFrameRef.current !==
         null
@@ -377,8 +367,6 @@ function CameraPreview() {
       }
 
 
-      // Apagamos físicamente
-      // las pistas de la webcam.
       if (
         stream
       ) {
@@ -392,7 +380,6 @@ function CameraPreview() {
       }
 
 
-      // Desconectamos el vídeo.
       if (
         videoRef.current
       ) {
@@ -402,18 +389,16 @@ function CameraPreview() {
 
 
       console.log(
-        "Cámara y análisis detenidos"
+        "Cámara y análisis de curl detenidos"
       );
     };
   }, []);
 
 
-  // --------------------------------------------------
-  // ACTIVAR VERDE
-  // --------------------------------------------------
+  // ==================================================
+  // FEEDBACK VERDE
+  // ==================================================
 
-  // Activa los puntos y conexiones
-  // verdes durante 0,3 segundos.
   function activarFeedbackVerde() {
     verdeHastaRef.current =
       performance.now() +
@@ -421,13 +406,10 @@ function CameraPreview() {
   }
 
 
-  // --------------------------------------------------
+  // ==================================================
   // DIBUJAR BRAZO
-  // --------------------------------------------------
+  // ==================================================
 
-  // Esta función sigue siendo propia
-  // del curl porque describe
-  // qué conexiones queremos dibujar.
   function dibujarBrazo(
     contexto:
       CanvasRenderingContext2D,
@@ -438,14 +420,11 @@ function CameraPreview() {
     muneca:
       Punto
   ) {
-    // Comprobamos si todavía estamos
-    // dentro de los 300 ms de verde.
     const verdeActivo =
       performance.now() <
       verdeHastaRef.current;
 
 
-    // Hombro -> codo.
     dibujarConexion(
       contexto,
       hombro,
@@ -454,7 +433,6 @@ function CameraPreview() {
     );
 
 
-    // Codo -> muñeca.
     dibujarConexion(
       contexto,
       codo,
@@ -463,7 +441,6 @@ function CameraPreview() {
     );
 
 
-    // Puntos.
     dibujarLandmark(
       contexto,
       hombro,
@@ -486,15 +463,13 @@ function CameraPreview() {
   }
 
 
-  // --------------------------------------------------
+  // ==================================================
   // ANALIZAR FRAME
-  // --------------------------------------------------
+  // ==================================================
 
   function analizarFrame(
     timestamp: number
   ) {
-    // Necesitamos los tres elementos
-    // principales preparados.
     if (
       !videoRef.current ||
       !canvasRef.current ||
@@ -522,8 +497,6 @@ function CameraPreview() {
       poseLandmarkerRef.current;
 
 
-    // Esperamos a que exista
-    // una imagen válida en el vídeo.
     if (
       video.readyState <
       2
@@ -538,8 +511,6 @@ function CameraPreview() {
     }
 
 
-    // Igualamos la resolución
-    // del canvas a la cámara.
     if (
       canvas.width !==
         video.videoWidth ||
@@ -568,7 +539,6 @@ function CameraPreview() {
     }
 
 
-    // Limpiamos el dibujo anterior.
     contexto.clearRect(
       0,
       0,
@@ -578,10 +548,6 @@ function CameraPreview() {
 
 
     try {
-      // ------------------------------------------
-      // MEDIAPIPE
-      // ------------------------------------------
-
       const resultado =
         poseLandmarker.detectForVideo(
           video,
@@ -589,7 +555,6 @@ function CameraPreview() {
         );
 
 
-      // Necesitamos una persona detectada.
       if (
         resultado.landmarks.length >
         0
@@ -597,20 +562,6 @@ function CameraPreview() {
         const landmarks =
           resultado.landmarks[0];
 
-
-        // ----------------------------------------
-        // LANDMARKS NECESARIOS PARA CURL
-        // ----------------------------------------
-        //
-        // Los índices vienen ahora de:
-        //
-        // src/ejercicios/landmarks.ts
-        //
-        // CameraPreview ya no necesita
-        // conocer directamente:
-        //
-        // 12 / 14 / 16 / 24
-        // ----------------------------------------
 
         const hombroNormalizado =
           landmarks[
@@ -636,10 +587,6 @@ function CameraPreview() {
           ];
 
 
-        // ----------------------------------------
-        // VALIDAMOS EL BRAZO
-        // ----------------------------------------
-
         if (
           hombroNormalizado &&
           codoNormalizado &&
@@ -656,10 +603,6 @@ function CameraPreview() {
               munecaNormalizada
             )
           ) {
-            // ------------------------------------
-            // PASAMOS A PÍXELES
-            // ------------------------------------
-
             const hombro =
               convertirAPixeles(
                 hombroNormalizado,
@@ -681,19 +624,11 @@ function CameraPreview() {
               );
 
 
-            // ------------------------------------
-            // CADERA
-            // ------------------------------------
-
-            // Por defecto suponemos
-            // que la cadera no es válida.
             let cadera:
               Punto | null =
               null;
 
 
-            // Solamente la utilizamos
-            // si MediaPipe la ve correctamente.
             if (
               caderaNormalizada &&
               esLandmarkValido(
@@ -708,10 +643,6 @@ function CameraPreview() {
             }
 
 
-            // ------------------------------------
-            // ANALIZADOR DEL CURL
-            // ------------------------------------
-
             const analisis =
               analizarFrameCurl(
                 estadoCurlRef.current,
@@ -722,28 +653,17 @@ function CameraPreview() {
               );
 
 
-            // ------------------------------------
-            // CAMBIO DE FASE
-            // ------------------------------------
-
             if (
               analisis.cambioFase
             ) {
-              // Feedback visual verde.
               activarFeedbackVerde();
 
 
-              // Actualizamos inmediatamente
-              // la fase visible.
               setFaseActual(
                 analisis.fase
               );
             }
 
-
-            // ------------------------------------
-            // NUEVA REPETICIÓN
-            // ------------------------------------
 
             if (
               analisis.repeticionSumada
@@ -752,19 +672,8 @@ function CameraPreview() {
                 estadoCurlRef.current
                   .repeticiones
               );
-
-
-              console.log(
-                "Repetición detectada:",
-                estadoCurlRef.current
-                  .repeticiones
-              );
             }
 
-
-            // ------------------------------------
-            // REPETICIÓN TERMINADA
-            // ------------------------------------
 
             const repeticionFinalizada =
               analisis
@@ -775,8 +684,6 @@ function CameraPreview() {
               repeticionFinalizada !==
               null
             ) {
-              // Añadimos el resultado
-              // al historial.
               setHistorial(
                 function (
                   historialAnterior
@@ -787,27 +694,15 @@ function CameraPreview() {
                   ];
                 }
               );
-
-
-              console.log(
-                "Resultado repetición:",
-                repeticionFinalizada
-              );
             }
 
 
-            // ------------------------------------
-            // ACTUALIZAR INTERFAZ
-            // ------------------------------------
-
-            // Aproximadamente cada 100 ms.
             if (
               timestamp -
                 ultimaActualizacionUIRef
                   .current >=
               100
             ) {
-              // Ángulo.
               setAnguloActual(
                 Math.round(
                   analisis.anguloCodo
@@ -815,36 +710,28 @@ function CameraPreview() {
               );
 
 
-              // Fase.
               setFaseActual(
                 analisis.fase
               );
 
 
-              // Feedback de movimiento.
               setFeedback(
                 analisis
                   .feedbackMovimiento
               );
 
 
-              // Feedback del codo.
               setFeedbackCodo(
                 analisis
                   .feedbackCodo
               );
 
 
-              // Feedback del tronco.
               setFeedbackHombro(
                 analisis
                   .feedbackHombro
               );
 
-
-              // ----------------------------------
-              // DESPLAZAMIENTO CODO
-              // ----------------------------------
 
               if (
                 analisis
@@ -865,10 +752,6 @@ function CameraPreview() {
               }
 
 
-              // ----------------------------------
-              // DESPLAZAMIENTO TRONCO
-              // ----------------------------------
-
               if (
                 analisis
                   .desplazamientoHombro !==
@@ -888,17 +771,11 @@ function CameraPreview() {
               }
 
 
-              // Guardamos cuándo
-              // hemos actualizado la interfaz.
               ultimaActualizacionUIRef
                 .current =
                 timestamp;
             }
 
-
-            // ------------------------------------
-            // DIBUJAR
-            // ------------------------------------
 
             dibujarBrazo(
               contexto,
@@ -912,13 +789,12 @@ function CameraPreview() {
 
     } catch (error) {
       console.error(
-        "Error analizando el frame:",
+        "Error analizando el curl:",
         error
       );
     }
 
 
-    // Analizamos el siguiente frame.
     animationFrameRef.current =
       requestAnimationFrame(
         analizarFrame
@@ -926,9 +802,9 @@ function CameraPreview() {
   }
 
 
-  // --------------------------------------------------
-  // INICIAR ANÁLISIS
-  // --------------------------------------------------
+  // ==================================================
+  // INICIAR
+  // ==================================================
 
   function iniciarAnalisis() {
     if (
@@ -938,8 +814,6 @@ function CameraPreview() {
     }
 
 
-    // Evitamos crear dos bucles
-    // simultáneamente.
     if (
       animationFrameRef.current !==
       null
@@ -954,44 +828,20 @@ function CameraPreview() {
       requestAnimationFrame(
         analizarFrame
       );
-
-
-    console.log(
-      "Análisis de pose iniciado"
-    );
   }
 
 
-  // --------------------------------------------------
-  // VÍDEO PREPARADO
-  // --------------------------------------------------
-
   function videoPreparado() {
-    if (
-      videoRef.current
-    ) {
-      console.log(
-        "Resolución:",
-        videoRef.current.videoWidth,
-        videoRef.current.videoHeight
-      );
-    }
-
-
     iniciarAnalisis();
   }
 
 
-  // --------------------------------------------------
-  // INTERFAZ
-  // --------------------------------------------------
+  // ==================================================
+  // INTERFAZ CURL
+  // ==================================================
 
   return (
     <div className="vision-fit-layout">
-
-      {/* ----------------------------------------------
-          IZQUIERDA: CÁMARA
-          ---------------------------------------------- */}
 
       <div className="vision-fit-camera-column">
 
@@ -1027,15 +877,7 @@ function CameraPreview() {
       </div>
 
 
-      {/* ----------------------------------------------
-          DERECHA: ANÁLISIS
-          ---------------------------------------------- */}
-
       <div className="vision-fit-data-column">
-
-        {/* ------------------------------------------
-            MOVIMIENTO
-            ------------------------------------------ */}
 
         <section className="analysis-section">
 
@@ -1069,10 +911,6 @@ function CameraPreview() {
 
         </section>
 
-
-        {/* ------------------------------------------
-            TÉCNICA
-            ------------------------------------------ */}
 
         <section className="analysis-section">
 
@@ -1149,10 +987,6 @@ function CameraPreview() {
         </section>
 
 
-        {/* ------------------------------------------
-            RESUMEN DE SESIÓN
-            ------------------------------------------ */}
-
         <section className="analysis-section">
 
           <h3>
@@ -1219,10 +1053,6 @@ function CameraPreview() {
         </section>
 
 
-        {/* ------------------------------------------
-            HISTORIAL
-            ------------------------------------------ */}
-
         <section className="analysis-section">
 
           <h3>
@@ -1278,5 +1108,2074 @@ function CameraPreview() {
 }
 
 
-// Exportamos el componente.
+// ==================================================
+// CÁMARA DE SENTADILLA
+// ==================================================
+
+function SentadillaCameraPreview() {
+  // ==================================================
+  // REFERENCIAS
+  // ==================================================
+
+  const videoRef =
+    useRef<HTMLVideoElement | null>(
+      null
+    );
+
+
+  const canvasRef =
+    useRef<HTMLCanvasElement | null>(
+      null
+    );
+
+
+  const poseLandmarkerRef =
+    useRef<PoseLandmarker | null>(
+      null
+    );
+
+
+  const animationFrameRef =
+    useRef<number | null>(
+      null
+    );
+
+
+  const estadoSentadillaRef =
+    useRef(
+      crearEstadoSentadilla()
+    );
+
+
+  const verdeHastaRef =
+    useRef<number>(
+      0
+    );
+
+
+  // ==================================================
+  // ESTADOS
+  // ==================================================
+
+  const [
+    repeticiones,
+    setRepeticiones
+  ] =
+    useState<number>(
+      0
+    );
+
+
+  const [
+    anguloRodilla,
+    setAnguloRodilla
+  ] =
+    useState<number>(
+      0
+    );
+
+
+  const [
+    inclinacionTronco,
+    setInclinacionTronco
+  ] =
+    useState<number | null>(
+      null
+    );
+
+
+  const [
+    fase,
+    setFase
+  ] =
+    useState<FaseSentadilla>(
+      "arriba"
+    );
+
+
+  const [
+    feedback,
+    setFeedback
+  ] =
+    useState<string>(
+      "Colócate de forma que se vea la pierna completa"
+    );
+
+
+  const [
+    feedbackTronco,
+    setFeedbackTronco
+  ] =
+    useState<string>(
+      "Esperando detección"
+    );
+
+
+  const [
+    mensaje,
+    setMensaje
+  ] =
+    useState<string>(
+      "Esperando detección"
+    );
+
+
+  const [
+    mensajeTronco,
+    setMensajeTronco
+  ] =
+    useState<string>(
+      "Esperando detección"
+    );
+
+
+  const [
+    historial,
+    setHistorial
+  ] =
+    useState<
+      ResultadoRepeticionSentadilla[]
+    >(
+      []
+    );
+
+
+  // ==================================================
+  // RESUMEN
+  // ==================================================
+
+  const resumen =
+    calcularResumenSesionSentadilla(
+      historial
+    );
+
+
+  // ==================================================
+  // CÁMARA Y MEDIAPIPE
+  // ==================================================
+
+  useEffect(function () {
+    let stream:
+      MediaStream | null =
+      null;
+
+
+    let componenteActivo =
+      true;
+
+
+    async function iniciarSistema() {
+      try {
+        const nuevoStream =
+          await navigator.mediaDevices.getUserMedia({
+            video:
+              true,
+
+            audio:
+              false
+          });
+
+
+        if (
+          !componenteActivo
+        ) {
+          nuevoStream
+            .getTracks()
+            .forEach(
+              function (track) {
+                track.stop();
+              }
+            );
+
+
+          return;
+        }
+
+
+        stream =
+          nuevoStream;
+
+
+        if (
+          videoRef.current
+        ) {
+          videoRef.current.srcObject =
+            stream;
+        }
+
+
+        console.log(
+          "Cargando MediaPipe para sentadilla..."
+        );
+
+
+        const poseLandmarker =
+          await crearPoseLandmarker();
+
+
+        if (
+          !componenteActivo
+        ) {
+          return;
+        }
+
+
+        poseLandmarkerRef.current =
+          poseLandmarker;
+
+
+        console.log(
+          "MediaPipe preparado para sentadilla"
+        );
+
+
+        if (
+          videoRef.current &&
+          videoRef.current.readyState >=
+            2
+        ) {
+          iniciarAnalisis();
+        }
+
+      } catch (error) {
+        console.error(
+          "Error iniciando sentadilla:",
+          error
+        );
+      }
+    }
+
+
+    iniciarSistema();
+
+
+    return function detenerSistema() {
+      componenteActivo =
+        false;
+
+
+      if (
+        animationFrameRef.current !==
+        null
+      ) {
+        cancelAnimationFrame(
+          animationFrameRef.current
+        );
+
+
+        animationFrameRef.current =
+          null;
+      }
+
+
+      if (
+        stream
+      ) {
+        stream
+          .getTracks()
+          .forEach(
+            function (track) {
+              track.stop();
+            }
+          );
+      }
+
+
+      if (
+        videoRef.current
+      ) {
+        videoRef.current.srcObject =
+          null;
+      }
+
+
+      console.log(
+        "Análisis de sentadilla detenido"
+      );
+    };
+  }, []);
+
+
+  // ==================================================
+  // DIBUJAR CUERPO
+  // ==================================================
+
+  function dibujarCuerpo(
+    contexto:
+      CanvasRenderingContext2D,
+    hombro:
+      PuntoSentadilla | null,
+    cadera:
+      PuntoSentadilla,
+    rodilla:
+      PuntoSentadilla,
+    tobillo:
+      PuntoSentadilla,
+    verde:
+      boolean
+  ) {
+    if (
+      hombro !==
+      null
+    ) {
+      dibujarConexion(
+        contexto,
+        hombro,
+        cadera,
+        verde
+      );
+
+
+      dibujarLandmark(
+        contexto,
+        hombro,
+        verde
+      );
+    }
+
+
+    dibujarConexion(
+      contexto,
+      cadera,
+      rodilla,
+      verde
+    );
+
+
+    dibujarConexion(
+      contexto,
+      rodilla,
+      tobillo,
+      verde
+    );
+
+
+    dibujarLandmark(
+      contexto,
+      cadera,
+      verde
+    );
+
+
+    dibujarLandmark(
+      contexto,
+      rodilla,
+      verde
+    );
+
+
+    dibujarLandmark(
+      contexto,
+      tobillo,
+      verde
+    );
+  }
+
+
+  // ==================================================
+  // ANALIZAR FRAME
+  // ==================================================
+
+  function analizarFrame(
+    timestamp: number
+  ) {
+    if (
+      !videoRef.current ||
+      !canvasRef.current ||
+      !poseLandmarkerRef.current
+    ) {
+      animationFrameRef.current =
+        requestAnimationFrame(
+          analizarFrame
+        );
+
+
+      return;
+    }
+
+
+    const video =
+      videoRef.current;
+
+
+    const canvas =
+      canvasRef.current;
+
+
+    const poseLandmarker =
+      poseLandmarkerRef.current;
+
+
+    if (
+      video.readyState <
+      2
+    ) {
+      animationFrameRef.current =
+        requestAnimationFrame(
+          analizarFrame
+        );
+
+
+      return;
+    }
+
+
+    if (
+      canvas.width !==
+        video.videoWidth ||
+      canvas.height !==
+        video.videoHeight
+    ) {
+      canvas.width =
+        video.videoWidth;
+
+
+      canvas.height =
+        video.videoHeight;
+    }
+
+
+    const contexto =
+      canvas.getContext(
+        "2d"
+      );
+
+
+    if (
+      !contexto
+    ) {
+      return;
+    }
+
+
+    contexto.clearRect(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+
+    try {
+      const resultado =
+        poseLandmarker.detectForVideo(
+          video,
+          timestamp
+        );
+
+
+      if (
+        resultado.landmarks.length >
+        0
+      ) {
+        const landmarks =
+          resultado.landmarks[0];
+
+
+        const hombroNormalizado =
+          landmarks[
+            LANDMARKS_SENTADILLA.hombro
+          ];
+
+
+        const caderaNormalizada =
+          landmarks[
+            LANDMARKS_SENTADILLA.cadera
+          ];
+
+
+        const rodillaNormalizada =
+          landmarks[
+            LANDMARKS_SENTADILLA.rodilla
+          ];
+
+
+        const tobilloNormalizado =
+          landmarks[
+            LANDMARKS_SENTADILLA.tobillo
+          ];
+
+
+        if (
+          caderaNormalizada &&
+          rodillaNormalizada &&
+          tobilloNormalizado
+        ) {
+          if (
+            esLandmarkValido(
+              caderaNormalizada
+            ) &&
+            esLandmarkValido(
+              rodillaNormalizada
+            ) &&
+            esLandmarkValido(
+              tobilloNormalizado
+            )
+          ) {
+            const cadera =
+              convertirAPixeles(
+                caderaNormalizada,
+                canvas
+              );
+
+
+            const rodilla =
+              convertirAPixeles(
+                rodillaNormalizada,
+                canvas
+              );
+
+
+            const tobillo =
+              convertirAPixeles(
+                tobilloNormalizado,
+                canvas
+              );
+
+
+            let hombro:
+              PuntoSentadilla | null =
+              null;
+
+
+            if (
+              hombroNormalizado &&
+              esLandmarkValido(
+                hombroNormalizado
+              )
+            ) {
+              hombro =
+                convertirAPixeles(
+                  hombroNormalizado,
+                  canvas
+                );
+
+
+              setMensajeTronco(
+                "Tronco detectado correctamente"
+              );
+
+            } else {
+              setMensajeTronco(
+                "Asegúrate de que se vea el hombro"
+              );
+            }
+
+
+            const profundidadAntes =
+              estadoSentadillaRef
+                .current
+                .profundidadAlcanzada;
+
+
+            const analisis =
+              analizarSentadilla(
+                estadoSentadillaRef.current,
+                hombro,
+                cadera,
+                rodilla,
+                tobillo
+              );
+
+
+            const profundidadDespues =
+              estadoSentadillaRef
+                .current
+                .profundidadAlcanzada;
+
+
+            if (
+              !profundidadAntes &&
+              profundidadDespues
+            ) {
+              verdeHastaRef.current =
+                timestamp +
+                300;
+            }
+
+
+            if (
+              analisis.repeticionSumada
+            ) {
+              verdeHastaRef.current =
+                timestamp +
+                300;
+            }
+
+
+            const mostrarVerde =
+              timestamp <
+              verdeHastaRef.current;
+
+
+            setAnguloRodilla(
+              Math.round(
+                analisis.anguloRodilla
+              )
+            );
+
+
+            if (
+              analisis.inclinacionTronco !==
+              null
+            ) {
+              setInclinacionTronco(
+                Math.round(
+                  analisis.inclinacionTronco
+                )
+              );
+
+            } else {
+              setInclinacionTronco(
+                null
+              );
+            }
+
+
+            setFase(
+              analisis.fase
+            );
+
+
+            setFeedback(
+              analisis.feedbackMovimiento
+            );
+
+
+            setFeedbackTronco(
+              analisis.feedbackTronco
+            );
+
+
+            setMensaje(
+              "Pierna detectada correctamente"
+            );
+
+
+            if (
+              analisis.repeticionSumada
+            ) {
+              setRepeticiones(
+                analisis.repeticiones
+              );
+
+
+              setHistorial(
+                [
+                  ...analisis.historial
+                ]
+              );
+            }
+
+
+            dibujarCuerpo(
+              contexto,
+              hombro,
+              cadera,
+              rodilla,
+              tobillo,
+              mostrarVerde
+            );
+
+          } else {
+            setMensaje(
+              "Asegúrate de que se vea la pierna completa"
+            );
+          }
+        }
+      }
+
+    } catch (error) {
+      console.error(
+        "Error analizando sentadilla:",
+        error
+      );
+    }
+
+
+    animationFrameRef.current =
+      requestAnimationFrame(
+        analizarFrame
+      );
+  }
+
+
+  // ==================================================
+  // INICIAR
+  // ==================================================
+
+  function iniciarAnalisis() {
+    if (
+      !poseLandmarkerRef.current
+    ) {
+      return;
+    }
+
+
+    if (
+      animationFrameRef.current !==
+      null
+    ) {
+      cancelAnimationFrame(
+        animationFrameRef.current
+      );
+    }
+
+
+    animationFrameRef.current =
+      requestAnimationFrame(
+        analizarFrame
+      );
+  }
+
+
+  function videoPreparado() {
+    iniciarAnalisis();
+  }
+
+
+  // ==================================================
+  // INTERFAZ SENTADILLA
+  // ==================================================
+
+  return (
+    <div className="vision-fit-layout">
+
+      <div className="vision-fit-camera-column">
+
+        <div className="camera-container">
+
+          <video
+            ref={
+              videoRef
+            }
+
+            autoPlay
+
+            playsInline
+
+            onLoadedData={
+              videoPreparado
+            }
+
+            className="camera-video"
+          />
+
+
+          <canvas
+            ref={
+              canvasRef
+            }
+
+            className="camera-canvas"
+          />
+
+        </div>
+
+      </div>
+
+
+      <div className="vision-fit-data-column">
+
+        <section className="analysis-section">
+
+          <h2>
+            Sentadilla
+          </h2>
+
+
+          <p>
+            <strong>
+              Repeticiones:
+            </strong>{" "}
+            {repeticiones}
+          </p>
+
+
+          <p>
+            <strong>
+              Ángulo de rodilla:
+            </strong>{" "}
+            {anguloRodilla}°
+          </p>
+
+
+          <p>
+            <strong>
+              Inclinación del tronco:
+            </strong>{" "}
+
+            {inclinacionTronco !==
+            null
+              ? inclinacionTronco +
+                "°"
+              : "No disponible"}
+          </p>
+
+
+          <p>
+            <strong>
+              Fase:
+            </strong>{" "}
+            {fase}
+          </p>
+
+
+          <p>
+            <strong>
+              Movimiento:
+            </strong>{" "}
+            {feedback}
+          </p>
+
+
+          <p>
+            <strong>
+              Técnica del tronco:
+            </strong>{" "}
+            {feedbackTronco}
+          </p>
+
+
+          <p>
+            <strong>
+              Pierna:
+            </strong>{" "}
+            {mensaje}
+          </p>
+
+
+          <p>
+            <strong>
+              Tronco:
+            </strong>{" "}
+            {mensajeTronco}
+          </p>
+
+        </section>
+
+
+        {historial.length >
+        0 ? (
+
+          <section className="analysis-section">
+
+            <h2>
+              Resumen de sesión
+            </h2>
+
+
+            <p>
+              <strong>
+                Repeticiones:
+              </strong>{" "}
+              {resumen.total}
+            </p>
+
+
+            <p>
+              <strong>
+                Correctas:
+              </strong>{" "}
+              {resumen.correctas}
+            </p>
+
+
+            <p>
+              <strong>
+                Técnica correcta:
+              </strong>{" "}
+
+              {Math.round(
+                resumen.porcentajeCorrectas
+              )}
+              %
+            </p>
+
+
+            <p>
+              <strong>
+                Profundidad insuficiente:
+              </strong>{" "}
+
+              {
+                resumen.profundidadInsuficiente
+              }
+            </p>
+
+
+            <p>
+              <strong>
+                Exceso de inclinación:
+              </strong>{" "}
+
+              {
+                resumen.excesoInclinacionTronco
+              }
+            </p>
+
+          </section>
+
+        ) : null}
+
+
+        {historial.length >
+        0 ? (
+
+          <section className="analysis-section">
+
+            <h2>
+              Historial
+            </h2>
+
+
+            <ol className="repetition-history">
+
+              {historial.map(
+                function (repeticion) {
+                  return (
+                    <li
+                      key={
+                        repeticion.numero
+                      }
+                    >
+                      <strong>
+                        Rep{" "}
+                        {
+                          repeticion.numero
+                        }
+                        :
+                      </strong>{" "}
+
+                      {
+                        repeticion.resultado
+                      }
+
+                      {" — "}
+
+                      rodilla mín.:{" "}
+
+                      {Math.round(
+                        repeticion.anguloMinimo
+                      )}
+                      °
+
+                      {" — "}
+
+                      tronco máx.:{" "}
+
+                      {repeticion
+                        .inclinacionTroncoMaxima !==
+                      null
+                        ? Math.round(
+                            repeticion
+                              .inclinacionTroncoMaxima
+                          ) +
+                          "°"
+                        : "N/D"}
+                    </li>
+                  );
+                }
+              )}
+
+            </ol>
+
+          </section>
+
+        ) : null}
+
+      </div>
+
+    </div>
+  );
+}
+
+
+// ==================================================
+// CÁMARA DEL PRESS DE HOMBRO
+// ==================================================
+//
+// El Press queda ahora integrado
+// directamente en CameraPreview.tsx.
+//
+// Sigue siendo bilateral:
+// analizamos los dos brazos
+// simultáneamente.
+// ==================================================
+
+function PressHombroCameraPreview() {
+  // ==================================================
+  // REFERENCIAS
+  // ==================================================
+
+  const videoRef =
+    useRef<HTMLVideoElement | null>(
+      null
+    );
+
+
+  const canvasRef =
+    useRef<HTMLCanvasElement | null>(
+      null
+    );
+
+
+  const poseLandmarkerRef =
+    useRef<PoseLandmarker | null>(
+      null
+    );
+
+
+  const animationFrameRef =
+    useRef<number | null>(
+      null
+    );
+
+
+  const estadoPressRef =
+    useRef(
+      crearEstadoPressHombro()
+    );
+
+
+  const verdeHastaRef =
+    useRef<number>(
+      0
+    );
+
+
+  // ==================================================
+  // ESTADOS
+  // ==================================================
+
+  const [
+    repeticiones,
+    setRepeticiones
+  ] =
+    useState<number>(
+      0
+    );
+
+
+  const [
+    anguloIzquierdo,
+    setAnguloIzquierdo
+  ] =
+    useState<number>(
+      0
+    );
+
+
+  const [
+    anguloDerecho,
+    setAnguloDerecho
+  ] =
+    useState<number>(
+      0
+    );
+
+
+  const [
+    diferenciaAngular,
+    setDiferenciaAngular
+  ] =
+    useState<number>(
+      0
+    );
+
+
+  const [
+    fase,
+    setFase
+  ] =
+    useState<FasePressHombro>(
+      "esperando"
+    );
+
+
+  const [
+    feedbackMovimiento,
+    setFeedbackMovimiento
+  ] =
+    useState<string>(
+      "Coloca ambos brazos en posición baja"
+    );
+
+
+  const [
+    feedbackSimetria,
+    setFeedbackSimetria
+  ] =
+    useState<string>(
+      "Esperando detección"
+    );
+
+
+  const [
+    mensaje,
+    setMensaje
+  ] =
+    useState<string>(
+      "Colócate de frente y muestra los dos brazos"
+    );
+
+
+  const [
+    historial,
+    setHistorial
+  ] =
+    useState<
+      ResultadoRepeticionPress[]
+    >(
+      []
+    );
+
+
+  // ==================================================
+  // RESUMEN
+  // ==================================================
+
+  const resumen =
+    calcularResumenSesionPress(
+      historial
+    );
+
+
+  // ==================================================
+  // CÁMARA Y MEDIAPIPE
+  // ==================================================
+
+  useEffect(function () {
+    let stream:
+      MediaStream | null =
+      null;
+
+
+    let componenteActivo =
+      true;
+
+
+    async function iniciarSistema() {
+      try {
+        const nuevoStream =
+          await navigator.mediaDevices.getUserMedia({
+            video:
+              true,
+
+            audio:
+              false
+          });
+
+
+        if (
+          !componenteActivo
+        ) {
+          nuevoStream
+            .getTracks()
+            .forEach(
+              function (track) {
+                track.stop();
+              }
+            );
+
+
+          return;
+        }
+
+
+        stream =
+          nuevoStream;
+
+
+        if (
+          videoRef.current
+        ) {
+          videoRef.current.srcObject =
+            stream;
+        }
+
+
+        console.log(
+          "Cargando MediaPipe para press de hombro..."
+        );
+
+
+        const poseLandmarker =
+          await crearPoseLandmarker();
+
+
+        if (
+          !componenteActivo
+        ) {
+          return;
+        }
+
+
+        poseLandmarkerRef.current =
+          poseLandmarker;
+
+
+        console.log(
+          "MediaPipe preparado para press de hombro"
+        );
+
+
+        if (
+          videoRef.current &&
+          videoRef.current.readyState >=
+            2
+        ) {
+          iniciarAnalisis();
+        }
+
+      } catch (error) {
+        console.error(
+          "Error iniciando press de hombro:",
+          error
+        );
+      }
+    }
+
+
+    iniciarSistema();
+
+
+    return function detenerSistema() {
+      componenteActivo =
+        false;
+
+
+      if (
+        animationFrameRef.current !==
+        null
+      ) {
+        cancelAnimationFrame(
+          animationFrameRef.current
+        );
+
+
+        animationFrameRef.current =
+          null;
+      }
+
+
+      if (
+        stream
+      ) {
+        stream
+          .getTracks()
+          .forEach(
+            function (track) {
+              track.stop();
+            }
+          );
+      }
+
+
+      if (
+        videoRef.current
+      ) {
+        videoRef.current.srcObject =
+          null;
+      }
+
+
+      console.log(
+        "Análisis de press detenido"
+      );
+    };
+  }, []);
+
+
+  // ==================================================
+  // DIBUJAR BRAZO
+  // ==================================================
+
+  function dibujarBrazo(
+    contexto:
+      CanvasRenderingContext2D,
+    hombro:
+      PuntoPressHombro,
+    codo:
+      PuntoPressHombro,
+    muneca:
+      PuntoPressHombro,
+    verde:
+      boolean
+  ) {
+    dibujarConexion(
+      contexto,
+      hombro,
+      codo,
+      verde
+    );
+
+
+    dibujarConexion(
+      contexto,
+      codo,
+      muneca,
+      verde
+    );
+
+
+    dibujarLandmark(
+      contexto,
+      hombro,
+      verde
+    );
+
+
+    dibujarLandmark(
+      contexto,
+      codo,
+      verde
+    );
+
+
+    dibujarLandmark(
+      contexto,
+      muneca,
+      verde
+    );
+  }
+
+
+  // ==================================================
+  // ANALIZAR FRAME
+  // ==================================================
+
+  function analizarFrame(
+    timestamp: number
+  ) {
+    if (
+      !videoRef.current ||
+      !canvasRef.current ||
+      !poseLandmarkerRef.current
+    ) {
+      animationFrameRef.current =
+        requestAnimationFrame(
+          analizarFrame
+        );
+
+
+      return;
+    }
+
+
+    const video =
+      videoRef.current;
+
+
+    const canvas =
+      canvasRef.current;
+
+
+    const poseLandmarker =
+      poseLandmarkerRef.current;
+
+
+    if (
+      video.readyState <
+      2
+    ) {
+      animationFrameRef.current =
+        requestAnimationFrame(
+          analizarFrame
+        );
+
+
+      return;
+    }
+
+
+    if (
+      canvas.width !==
+        video.videoWidth ||
+      canvas.height !==
+        video.videoHeight
+    ) {
+      canvas.width =
+        video.videoWidth;
+
+
+      canvas.height =
+        video.videoHeight;
+    }
+
+
+    const contexto =
+      canvas.getContext(
+        "2d"
+      );
+
+
+    if (
+      !contexto
+    ) {
+      return;
+    }
+
+
+    contexto.clearRect(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+
+    try {
+      const resultado =
+        poseLandmarker.detectForVideo(
+          video,
+          timestamp
+        );
+
+
+      if (
+        resultado.landmarks.length >
+        0
+      ) {
+        const landmarks =
+          resultado.landmarks[0];
+
+
+        // ========================================
+        // BRAZO IZQUIERDO
+        // ========================================
+
+        const hombroIzquierdoNormalizado =
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .izquierdo
+              .hombro
+          ];
+
+
+        const codoIzquierdoNormalizado =
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .izquierdo
+              .codo
+          ];
+
+
+        const munecaIzquierdaNormalizada =
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .izquierdo
+              .muneca
+          ];
+
+
+        // ========================================
+        // BRAZO DERECHO
+        // ========================================
+
+        const hombroDerechoNormalizado =
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .derecho
+              .hombro
+          ];
+
+
+        const codoDerechoNormalizado =
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .derecho
+              .codo
+          ];
+
+
+        const munecaDerechaNormalizada =
+          landmarks[
+            LANDMARKS_PRESS_HOMBRO
+              .derecho
+              .muneca
+          ];
+
+
+        // ========================================
+        // COMPROBAR EXISTENCIA
+        // ========================================
+
+        if (
+          hombroIzquierdoNormalizado &&
+          codoIzquierdoNormalizado &&
+          munecaIzquierdaNormalizada &&
+          hombroDerechoNormalizado &&
+          codoDerechoNormalizado &&
+          munecaDerechaNormalizada
+        ) {
+          // ======================================
+          // VISIBILIDAD
+          // ======================================
+
+          const brazoIzquierdoValido =
+            esLandmarkValido(
+              hombroIzquierdoNormalizado
+            ) &&
+            esLandmarkValido(
+              codoIzquierdoNormalizado
+            ) &&
+            esLandmarkValido(
+              munecaIzquierdaNormalizada
+            );
+
+
+          const brazoDerechoValido =
+            esLandmarkValido(
+              hombroDerechoNormalizado
+            ) &&
+            esLandmarkValido(
+              codoDerechoNormalizado
+            ) &&
+            esLandmarkValido(
+              munecaDerechaNormalizada
+            );
+
+
+          // El Press necesita
+          // ambos brazos visibles.
+          if (
+            brazoIzquierdoValido &&
+            brazoDerechoValido
+          ) {
+            // ====================================
+            // IZQUIERDO A PÍXELES
+            // ====================================
+
+            const hombroIzquierdo =
+              convertirAPixeles(
+                hombroIzquierdoNormalizado,
+                canvas
+              );
+
+
+            const codoIzquierdo =
+              convertirAPixeles(
+                codoIzquierdoNormalizado,
+                canvas
+              );
+
+
+            const munecaIzquierda =
+              convertirAPixeles(
+                munecaIzquierdaNormalizada,
+                canvas
+              );
+
+
+            // ====================================
+            // DERECHO A PÍXELES
+            // ====================================
+
+            const hombroDerecho =
+              convertirAPixeles(
+                hombroDerechoNormalizado,
+                canvas
+              );
+
+
+            const codoDerecho =
+              convertirAPixeles(
+                codoDerechoNormalizado,
+                canvas
+              );
+
+
+            const munecaDerecha =
+              convertirAPixeles(
+                munecaDerechaNormalizada,
+                canvas
+              );
+
+
+            // ====================================
+            // ANALIZAR PRESS
+            // ====================================
+
+            const analisis =
+              analizarPressHombro(
+                estadoPressRef.current,
+
+                hombroIzquierdo,
+                codoIzquierdo,
+                munecaIzquierda,
+
+                hombroDerecho,
+                codoDerecho,
+                munecaDerecha
+              );
+
+
+            // ====================================
+            // FEEDBACK VERDE
+            // ====================================
+
+            if (
+              analisis.posicionBajaAlcanzada ||
+              analisis.posicionAltaAlcanzada
+            ) {
+              verdeHastaRef.current =
+                timestamp +
+                300;
+            }
+
+
+            const mostrarVerde =
+              timestamp <
+              verdeHastaRef.current;
+
+
+            // ====================================
+            // INTERFAZ
+            // ====================================
+
+            setAnguloIzquierdo(
+              Math.round(
+                analisis.anguloCodoIzquierdo
+              )
+            );
+
+
+            setAnguloDerecho(
+              Math.round(
+                analisis.anguloCodoDerecho
+              )
+            );
+
+
+            setDiferenciaAngular(
+              Math.round(
+                analisis.diferenciaAngular
+              )
+            );
+
+
+            setFase(
+              analisis.fase
+            );
+
+
+            setFeedbackMovimiento(
+              analisis.feedbackMovimiento
+            );
+
+
+            setFeedbackSimetria(
+              analisis.feedbackSimetria
+            );
+
+
+            setMensaje(
+              "Ambos brazos detectados correctamente"
+            );
+
+
+            // ====================================
+            // REPETICIÓN COMPLETA
+            // ====================================
+
+            if (
+              analisis.repeticionSumada
+            ) {
+              setRepeticiones(
+                analisis.repeticiones
+              );
+
+
+              setHistorial(
+                [
+                  ...analisis.historial
+                ]
+              );
+            }
+
+
+            // ====================================
+            // DIBUJAR
+            // ====================================
+
+            dibujarBrazo(
+              contexto,
+              hombroIzquierdo,
+              codoIzquierdo,
+              munecaIzquierda,
+              mostrarVerde
+            );
+
+
+            dibujarBrazo(
+              contexto,
+              hombroDerecho,
+              codoDerecho,
+              munecaDerecha,
+              mostrarVerde
+            );
+
+          } else {
+            setMensaje(
+              "Asegúrate de que se vean completamente los dos brazos"
+            );
+          }
+        }
+      }
+
+    } catch (error) {
+      console.error(
+        "Error analizando press de hombro:",
+        error
+      );
+    }
+
+
+    animationFrameRef.current =
+      requestAnimationFrame(
+        analizarFrame
+      );
+  }
+
+
+  // ==================================================
+  // INICIAR
+  // ==================================================
+
+  function iniciarAnalisis() {
+    if (
+      !poseLandmarkerRef.current
+    ) {
+      return;
+    }
+
+
+    if (
+      animationFrameRef.current !==
+      null
+    ) {
+      cancelAnimationFrame(
+        animationFrameRef.current
+      );
+    }
+
+
+    animationFrameRef.current =
+      requestAnimationFrame(
+        analizarFrame
+      );
+  }
+
+
+  function videoPreparado() {
+    iniciarAnalisis();
+  }
+
+
+  // ==================================================
+  // INTERFAZ PRESS
+  // ==================================================
+
+  return (
+    <div className="vision-fit-layout">
+
+      <div className="vision-fit-camera-column">
+
+        <div className="camera-container">
+
+          <video
+            ref={
+              videoRef
+            }
+
+            autoPlay
+
+            playsInline
+
+            onLoadedData={
+              videoPreparado
+            }
+
+            className="camera-video"
+          />
+
+
+          <canvas
+            ref={
+              canvasRef
+            }
+
+            className="camera-canvas"
+          />
+
+        </div>
+
+      </div>
+
+
+      <div className="vision-fit-data-column">
+
+        <section className="analysis-section">
+
+          <h2>
+            Press de hombro
+          </h2>
+
+
+          <p>
+            <strong>
+              Repeticiones:
+            </strong>{" "}
+            {repeticiones}
+          </p>
+
+
+          <p>
+            <strong>
+              Ángulo izquierdo:
+            </strong>{" "}
+            {anguloIzquierdo}°
+          </p>
+
+
+          <p>
+            <strong>
+              Ángulo derecho:
+            </strong>{" "}
+            {anguloDerecho}°
+          </p>
+
+
+          <p>
+            <strong>
+              Diferencia actual:
+            </strong>{" "}
+            {diferenciaAngular}°
+          </p>
+
+
+          <p>
+            <strong>
+              Fase:
+            </strong>{" "}
+            {fase}
+          </p>
+
+
+          <p>
+            <strong>
+              Movimiento:
+            </strong>{" "}
+            {feedbackMovimiento}
+          </p>
+
+
+          <p>
+            <strong>
+              Simetría:
+            </strong>{" "}
+            {feedbackSimetria}
+          </p>
+
+
+          <p>
+            <strong>
+              Detección:
+            </strong>{" "}
+            {mensaje}
+          </p>
+
+        </section>
+
+
+        {historial.length >
+        0 ? (
+
+          <section className="analysis-section">
+
+            <h2>
+              Resumen de sesión
+            </h2>
+
+
+            <p>
+              <strong>
+                Repeticiones:
+              </strong>{" "}
+              {resumen.total}
+            </p>
+
+
+            <p>
+              <strong>
+                Correctas:
+              </strong>{" "}
+              {resumen.correctas}
+            </p>
+
+
+            <p>
+              <strong>
+                Técnica correcta:
+              </strong>{" "}
+
+              {Math.round(
+                resumen.porcentajeCorrectas
+              )}
+              %
+            </p>
+
+
+            <p>
+              <strong>
+                Descompensación:
+              </strong>{" "}
+              {resumen.descompensadas}
+            </p>
+
+          </section>
+
+        ) : null}
+
+
+        {historial.length >
+        0 ? (
+
+          <section className="analysis-section">
+
+            <h2>
+              Historial
+            </h2>
+
+
+            <ol className="repetition-history">
+
+              {historial.map(
+                function (repeticion) {
+                  return (
+                    <li
+                      key={
+                        repeticion.numero
+                      }
+                    >
+                      <strong>
+                        Rep{" "}
+                        {
+                          repeticion.numero
+                        }
+                        :
+                      </strong>{" "}
+
+                      {
+                        repeticion.resultado
+                      }
+
+                      {" — "}
+
+                      diferencia media:{" "}
+
+                      {Math.round(
+                        repeticion.diferenciaMedia
+                      )}
+                      °
+
+                      {" — "}
+
+                      máxima:{" "}
+
+                      {Math.round(
+                        repeticion.diferenciaMaxima
+                      )}
+                      °
+
+                      {" — "}
+
+                      descompensado:{" "}
+
+                      {Math.round(
+                        repeticion.porcentajeDescompensado
+                      )}
+                      %
+                    </li>
+                  );
+                }
+              )}
+
+            </ol>
+
+          </section>
+
+        ) : null}
+
+      </div>
+
+    </div>
+  );
+}
+
+
+// ==================================================
+// PROPS DEL COMPONENTE GENÉRICO
+// ==================================================
+
+interface CameraPreviewProps {
+  ejercicio: EjercicioId;
+}
+
+
+// ==================================================
+// CAMERA PREVIEW GENÉRICO
+// ==================================================
+//
+// Este es ahora el único punto
+// de entrada de cámara.
+//
+// Dependiendo del ejercicio seleccionado,
+// utiliza el análisis correspondiente.
+// ==================================================
+
+function CameraPreview(
+  props: CameraPreviewProps
+) {
+  // ------------------------------------------------
+  // CURL
+  // ------------------------------------------------
+
+  if (
+    props.ejercicio ===
+    "curl"
+  ) {
+    return (
+      <CurlCameraPreview />
+    );
+  }
+
+
+  // ------------------------------------------------
+  // SENTADILLA
+  // ------------------------------------------------
+
+  if (
+    props.ejercicio ===
+    "sentadilla"
+  ) {
+    return (
+      <SentadillaCameraPreview />
+    );
+  }
+
+
+  // ------------------------------------------------
+  // PRESS DE HOMBRO
+  // ------------------------------------------------
+
+  return (
+    <PressHombroCameraPreview />
+  );
+}
+
+
+// Exportamos el único
+// componente de cámara.
 export default CameraPreview;
