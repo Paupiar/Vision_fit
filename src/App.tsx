@@ -5,11 +5,10 @@ import {
   useState
 } from "react";
 
-// Tipos utilizados por React
-// y por el selector de archivos.
+// Tipo utilizado por el selector
+// de archivos.
 import type {
-  ChangeEvent,
-  ComponentType
+  ChangeEvent
 } from "react";
 
 // Estilos generales.
@@ -17,36 +16,35 @@ import "./App.css";
 
 
 // --------------------------------------------------
-// CÁMARA
+// COMPONENTE DE CÁMARA
 // --------------------------------------------------
 //
-// Ahora App solamente conoce
-// un componente de cámara.
+// CameraPreview gestiona internamente
+// qué análisis utilizar:
+//
+// - Curl
+// - Sentadilla
+// - Press de hombro
+// --------------------------------------------------
+
 import CameraPreview
   from "./components/CameraPreview";
 
 
 // --------------------------------------------------
-// COMPONENTES DE VÍDEO
+// COMPONENTE DE VÍDEO
 // --------------------------------------------------
 //
-// Los vídeos todavía mantienen
-// sus tres componentes independientes.
+// VideoPreview será también
+// el único punto de entrada
+// para el análisis de vídeos.
 //
-// Los unificaremos después
-// de terminar con la cámara.
+// Actualmente decide internamente
+// qué ejercicio analizar.
+// --------------------------------------------------
 
-// Curl.
 import VideoPreview
   from "./components/VideoPreview";
-
-// Sentadilla.
-import SentadillaVideoPreview
-  from "./components/SentadillaVideoPreview";
-
-// Press de hombro bilateral.
-import PressHombroVideoPreview
-  from "./components/PressHombroVideoPreview";
 
 
 // --------------------------------------------------
@@ -60,44 +58,6 @@ import {
 import type {
   EjercicioId
 } from "./ejercicios/tipos";
-
-
-// ==================================================
-// PROPS COMUNES DE LOS VÍDEOS
-// ==================================================
-
-interface VideoPreviewComunProps {
-  urlVideo: string;
-
-  nombreVideo: string;
-
-  visible: boolean;
-}
-
-
-// ==================================================
-// COMPONENTES DE VÍDEO POR EJERCICIO
-// ==================================================
-//
-// Este sistema sigue siendo necesario
-// mientras no hayamos unificado
-// VideoPreview.
-// ==================================================
-
-const COMPONENTES_VIDEO:
-  Record<
-    EjercicioId,
-    ComponentType<VideoPreviewComunProps>
-  > = {
-    curl:
-      VideoPreview,
-
-    sentadilla:
-      SentadillaVideoPreview,
-
-    "press-hombro":
-      PressHombroVideoPreview
-  };
 
 
 function App() {
@@ -131,12 +91,17 @@ function App() {
   // VÍDEO
   // ==================================================
 
+  // Input oculto utilizado
+  // para seleccionar vídeos.
   const inputVideoRef =
     useRef<HTMLInputElement | null>(
       null
     );
 
 
+  // Guardamos también la URL temporal
+  // en una referencia para poder
+  // liberarla correctamente.
   const urlVideoRef =
     useRef<string | null>(
       null
@@ -162,24 +127,14 @@ function App() {
 
 
   // ==================================================
-  // COMPONENTE DE VÍDEO ACTUAL
-  // ==================================================
-
-  const ComponenteVideo =
-    ejercicioSeleccionado !==
-    null
-      ? COMPONENTES_VIDEO[
-          ejercicioSeleccionado
-        ]
-      : null;
-
-
-  // ==================================================
   // LIMPIAR VÍDEO
   // ==================================================
 
   function limpiarVideoSeleccionado() {
-    // Liberamos la URL temporal anterior.
+    // ----------------------------------------------
+    // LIBERAR URL TEMPORAL
+    // ----------------------------------------------
+
     if (
       urlVideoRef.current !==
       null
@@ -194,6 +149,10 @@ function App() {
     }
 
 
+    // ----------------------------------------------
+    // LIMPIAR ESTADOS
+    // ----------------------------------------------
+
     setUrlVideo(
       null
     );
@@ -204,9 +163,14 @@ function App() {
     );
 
 
-    // Reiniciamos el input
-    // para poder seleccionar
-    // posteriormente el mismo archivo.
+    // ----------------------------------------------
+    // REINICIAR INPUT
+    // ----------------------------------------------
+    //
+    // Esto permite seleccionar posteriormente
+    // exactamente el mismo archivo.
+    // ----------------------------------------------
+
     if (
       inputVideoRef.current
     ) {
@@ -223,6 +187,8 @@ function App() {
   function seleccionarEjercicio(
     ejercicio: EjercicioId
   ) {
+    // Buscamos el ejercicio
+    // dentro de nuestra configuración.
     const ejercicioEncontrado =
       EJERCICIOS.find(
         function (elemento) {
@@ -234,8 +200,10 @@ function App() {
       );
 
 
-    // Evitamos seleccionar
-    // ejercicios no disponibles.
+    // ----------------------------------------------
+    // COMPROBAR DISPONIBILIDAD
+    // ----------------------------------------------
+
     if (
       !ejercicioEncontrado ||
       !ejercicioEncontrado.disponible
@@ -244,15 +212,30 @@ function App() {
     }
 
 
-    // Apagamos cualquier cámara activa.
+    // ----------------------------------------------
+    // APAGAR CÁMARA
+    // ----------------------------------------------
+    //
+    // Cuando cambiamos de ejercicio
+    // desmontamos CameraPreview.
+    //
+    // De esta forma se detienen correctamente
+    // la webcam y MediaPipe.
+    // ----------------------------------------------
+
     setMostrarCamara(
       false
     );
 
 
-    // Si cambiamos realmente
-    // de ejercicio,
-    // eliminamos el vídeo anterior.
+    // ----------------------------------------------
+    // LIMPIAR VÍDEO
+    // ----------------------------------------------
+    //
+    // Solo eliminamos el vídeo
+    // si realmente cambiamos de ejercicio.
+    // ----------------------------------------------
+
     if (
       ejercicioSeleccionado !==
       ejercicio
@@ -260,6 +243,10 @@ function App() {
       limpiarVideoSeleccionado();
     }
 
+
+    // ----------------------------------------------
+    // GUARDAR EJERCICIO
+    // ----------------------------------------------
 
     setEjercicioSeleccionado(
       ejercicio
@@ -274,7 +261,7 @@ function App() {
 
 
   // ==================================================
-  // CÁMARA
+  // ENCENDER / APAGAR CÁMARA
   // ==================================================
 
   function cambiarCamara() {
@@ -289,6 +276,8 @@ function App() {
   // ==================================================
 
   function abrirSelectorVideo() {
+    // No permitimos cargar vídeo
+    // hasta seleccionar un ejercicio.
     if (
       ejercicioSeleccionado ===
       null
@@ -323,8 +312,10 @@ function App() {
       evento.target.files?.[0];
 
 
-    // Si el usuario cancela,
-    // no hacemos nada.
+    // ----------------------------------------------
+    // USUARIO CANCELA
+    // ----------------------------------------------
+
     if (
       !archivo
     ) {
@@ -332,8 +323,10 @@ function App() {
     }
 
 
-    // Comprobamos que sea
-    // realmente un vídeo.
+    // ----------------------------------------------
+    // COMPROBAR TIPO
+    // ----------------------------------------------
+
     if (
       !archivo.type.startsWith(
         "video/"
@@ -348,7 +341,10 @@ function App() {
     }
 
 
-    // Liberamos una URL anterior.
+    // ----------------------------------------------
+    // LIBERAR VÍDEO ANTERIOR
+    // ----------------------------------------------
+
     if (
       urlVideoRef.current !==
       null
@@ -359,7 +355,10 @@ function App() {
     }
 
 
-    // Creamos una URL local.
+    // ----------------------------------------------
+    // CREAR URL TEMPORAL
+    // ----------------------------------------------
+
     const nuevaUrl =
       URL.createObjectURL(
         archivo
@@ -380,8 +379,15 @@ function App() {
     );
 
 
-    // Cuando seleccionamos vídeo,
-    // apagamos la cámara.
+    // ----------------------------------------------
+    // APAGAR CÁMARA
+    // ----------------------------------------------
+    //
+    // El usuario utiliza una fuente
+    // u otra, pero no ambas
+    // simultáneamente.
+    // ----------------------------------------------
+
     setMostrarCamara(
       false
     );
@@ -395,11 +401,14 @@ function App() {
 
 
   // ==================================================
-  // LIMPIEZA
+  // LIMPIEZA DE LA APLICACIÓN
   // ==================================================
 
   useEffect(function () {
     return function limpiarAplicacion() {
+      // Si la aplicación se desmonta,
+      // liberamos la URL temporal
+      // del vídeo.
       if (
         urlVideoRef.current !==
         null
@@ -435,7 +444,7 @@ function App() {
 
 
         {/* ============================================
-            EJERCICIOS
+            SELECTOR DE EJERCICIO
             ============================================ */}
 
         <section className="exercise-selector">
@@ -480,7 +489,9 @@ function App() {
                         : "exercise-button"
                     }
                   >
-                    {ejercicio.nombre}
+                    {
+                      ejercicio.nombre
+                    }
 
 
                     {!ejercicio.disponible ? (
@@ -516,6 +527,10 @@ function App() {
 
             <div className="analysis-source-buttons">
 
+              {/* ======================================
+                  CÁMARA
+                  ====================================== */}
+
               <button
                 type="button"
 
@@ -528,6 +543,10 @@ function App() {
                   : "Encender cámara"}
               </button>
 
+
+              {/* ======================================
+                  VÍDEO
+                  ====================================== */}
 
               <button
                 type="button"
@@ -549,7 +568,7 @@ function App() {
 
 
       {/* ==============================================
-          INPUT DE VÍDEO
+          INPUT OCULTO DE VÍDEO
           ============================================== */}
 
       <input
@@ -576,8 +595,11 @@ function App() {
           CÁMARA
           ==============================================
       
-          Ya existe un único punto de entrada
-          para cualquier ejercicio.
+          App ya no necesita saber
+          cómo funciona cada ejercicio.
+      
+          Simplemente pasa el identificador
+          a CameraPreview.
           ============================================== */}
 
       {mostrarCamara &&
@@ -595,14 +617,30 @@ function App() {
 
       {/* ==============================================
           VÍDEO
+          ==============================================
+      
+          Igual que ocurre con la cámara,
+          App solamente pasa:
+      
+          - ejercicio;
+          - URL;
+          - nombre;
+          - visibilidad.
+      
+          VideoPreview decide internamente
+          qué análisis debe ejecutar.
           ============================================== */}
 
       {urlVideo !==
         null &&
-      ComponenteVideo !==
+      ejercicioSeleccionado !==
         null ? (
 
-        <ComponenteVideo
+        <VideoPreview
+          ejercicio={
+            ejercicioSeleccionado
+          }
+
           urlVideo={
             urlVideo
           }
