@@ -1468,8 +1468,8 @@ function CurlVideoPreview(
       // mantenemos VideoPreview montado,
       // pero lo ocultamos.
       //
-      // Así no perdemos su estado
-      // innecesariamente.
+      // Así conservamos su estado
+      // mientras cambia la fuente de análisis.
       style={{
         display:
           visible
@@ -1494,21 +1494,22 @@ function CurlVideoPreview(
           </p>
 
 
-          {/* ------------------------------------------
-              VÍDEO + CANVAS
-              ------------------------------------------ */}
+          {/* No utilizamos camera-container
+              porque el vídeo grabado
+              NO debe verse como espejo. */}
 
           <div
             style={{
-              position: "relative",
-              width: "100%",
-              maxWidth: "640px"
+              position:
+                "relative",
+
+              width:
+                "100%",
+
+              maxWidth:
+                "640px"
             }}
           >
-
-            {/* ----------------------------------------
-                VÍDEO
-                ---------------------------------------- */}
 
             <video
               ref={
@@ -1555,18 +1556,26 @@ function CurlVideoPreview(
               }
 
               style={{
-                width: "100%",
-                height: "auto",
-                display: "block",
-                position: "relative",
-                zIndex: 1
+                width:
+                  "100%",
+
+                height:
+                  "auto",
+
+                display:
+                  "block",
+
+                position:
+                  "relative",
+
+                zIndex:
+                  1,
+
+                borderRadius:
+                  "8px"
               }}
             />
 
-
-            {/* ----------------------------------------
-                CANVAS
-                ---------------------------------------- */}
 
             <canvas
               ref={
@@ -1574,16 +1583,28 @@ function CurlVideoPreview(
               }
 
               style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                zIndex: 2,
+                position:
+                  "absolute",
+
+                top:
+                  0,
+
+                left:
+                  0,
+
+                width:
+                  "100%",
+
+                height:
+                  "100%",
+
+                zIndex:
+                  2,
 
                 // Los controles del vídeo
                 // siguen funcionando.
-                pointerEvents: "none"
+                pointerEvents:
+                  "none"
               }}
             />
 
@@ -1598,240 +1619,356 @@ function CurlVideoPreview(
 
         <div className="vision-fit-data-column">
 
-          {/* ------------------------------------------
-              MOVIMIENTO
-              ------------------------------------------ */}
+          {/* ==========================================
+              FEEDBACK ACTUAL
+              ========================================== */}
+
+          <section className="analysis-section analysis-current">
+
+            <div className="analysis-section-header">
+
+              <div>
+
+                <span className="analysis-section-label">
+                  Análisis de vídeo
+                </span>
+
+
+                <h2>
+                  Feedback actual
+                </h2>
+
+              </div>
+
+
+              <div className="analysis-repetition-counter">
+
+                <span>
+                  Repeticiones
+                </span>
+
+
+                <strong>
+                  {repeticionesVideo}
+                </strong>
+
+              </div>
+
+            </div>
+
+
+            <div className="analysis-metrics-grid">
+
+              <div className="analysis-metric">
+
+                <span>
+                  Fase
+                </span>
+
+
+                <strong>
+                  {faseVideo}
+                </strong>
+
+              </div>
+
+
+              <div className="analysis-metric">
+
+                <span>
+                  Ángulo del codo
+                </span>
+
+
+                <strong>
+                  {anguloVideo}°
+                </strong>
+
+              </div>
+
+            </div>
+
+
+            <div className="analysis-feedback-main">
+
+              <span>
+                Movimiento
+              </span>
+
+
+              <strong>
+                {feedbackVideo}
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-technique">
+
+              <h3>
+                Técnica
+              </h3>
+
+
+              <div className="analysis-technique-item">
+
+                <div>
+
+                  <strong>
+                    Codo
+                  </strong>
+
+
+                  <p>
+                    {feedbackCodoVideo}
+                  </p>
+
+                </div>
+
+
+                <span>
+                  {desplazamientoCodoVideo ===
+                  null
+                    ? "--"
+                    : desplazamientoCodoVideo +
+                      " %"}
+                </span>
+
+              </div>
+
+
+              <div className="analysis-technique-item">
+
+                <div>
+
+                  <strong>
+                    Tronco
+                  </strong>
+
+
+                  <p>
+                    {feedbackTroncoVideo}
+                  </p>
+
+                </div>
+
+
+                <span>
+                  {desplazamientoTroncoVideo ===
+                  null
+                    ? "--"
+                    : desplazamientoTroncoVideo +
+                      " %"}
+                </span>
+
+              </div>
+
+
+              <div className="analysis-limits">
+
+                <small>
+                  Límite codo:{" "}
+                  {Math.round(
+                    CONFIGURACION_CURL_VIDEO
+                      .desplazamientoMaximoCodo *
+                    100
+                  )}
+                  %
+                </small>
+
+
+                <small>
+                  Límite tronco:{" "}
+                  {Math.round(
+                    CONFIGURACION_CURL_VIDEO
+                      .desplazamientoMaximoHombro *
+                    100
+                  )}
+                  %
+                </small>
+
+              </div>
+
+            </div>
+
+          </section>
+
+
+          {/* ==========================================
+              RESUMEN
+              ========================================== */}
 
           <section className="analysis-section">
 
+            <span className="analysis-section-label">
+              Sesión
+            </span>
+
+
             <h2>
-              Repeticiones: {repeticionesVideo}
+              Resumen
             </h2>
 
 
-            <p>
+            <div className="analysis-summary-grid">
+
+              <div className="analysis-summary-item">
+
+                <span>
+                  Analizadas
+                </span>
+
+
+                <strong>
+                  {resumenVideo.total}
+                </strong>
+
+              </div>
+
+
+              <div className="analysis-summary-item">
+
+                <span>
+                  Correctas
+                </span>
+
+
+                <strong>
+                  {resumenVideo.correctas}
+                </strong>
+
+              </div>
+
+
+              <div className="analysis-summary-item">
+
+                <span>
+                  Técnica correcta
+                </span>
+
+
+                <strong>
+                  {
+                    resumenVideo
+                      .porcentajeCorrectas
+                  }
+                  %
+                </strong>
+
+              </div>
+
+
+              <div className="analysis-summary-item">
+
+                <span>
+                  Errores de codo
+                </span>
+
+
+                <strong>
+                  {resumenVideo.erroresCodo}
+                </strong>
+
+              </div>
+
+
+              <div className="analysis-summary-item">
+
+                <span>
+                  Balanceo tronco
+                </span>
+
+
+                <strong>
+                  {resumenVideo.erroresTronco}
+                </strong>
+
+              </div>
+
+            </div>
+
+
+            <div className="analysis-most-common-error">
+
+              <span>
+                Error más frecuente
+              </span>
+
+
               <strong>
-                Ángulo del codo:
-              </strong>{" "}
-              {anguloVideo}°
-            </p>
+                {
+                  resumenVideo
+                    .errorMasFrecuente
+                }
+              </strong>
 
-
-            <p>
-              <strong>
-                Fase:
-              </strong>{" "}
-              {faseVideo}
-            </p>
-
-
-            <p>
-              <strong>
-                Movimiento:
-              </strong>{" "}
-              {feedbackVideo}
-            </p>
+            </div>
 
           </section>
 
 
-          {/* ------------------------------------------
-              TÉCNICA
-              ------------------------------------------ */}
-
-          <section className="analysis-section">
-
-            <h3>
-              Técnica del curl
-            </h3>
-
-
-            <p>
-              <strong>
-                Codo:
-              </strong>{" "}
-              {feedbackCodoVideo}
-            </p>
-
-
-            <p>
-              <strong>
-                Desplazamiento:
-              </strong>{" "}
-
-              {desplazamientoCodoVideo ===
-              null
-                ? "--"
-                : desplazamientoCodoVideo +
-                  " %"}
-            </p>
-
-
-            <p>
-              <strong>
-                Límite:
-              </strong>{" "}
-
-              {Math.round(
-                CONFIGURACION_CURL_VIDEO
-                  .desplazamientoMaximoCodo *
-                100
-              )} %
-            </p>
-
-
-            <p>
-              <strong>
-                Tronco:
-              </strong>{" "}
-              {feedbackTroncoVideo}
-            </p>
-
-
-            <p>
-              <strong>
-                Desplazamiento:
-              </strong>{" "}
-
-              {desplazamientoTroncoVideo ===
-              null
-                ? "--"
-                : desplazamientoTroncoVideo +
-                  " %"}
-            </p>
-
-
-            <p>
-              <strong>
-                Límite:
-              </strong>{" "}
-
-              {Math.round(
-                CONFIGURACION_CURL_VIDEO
-                  .desplazamientoMaximoHombro *
-                100
-              )} %
-            </p>
-
-          </section>
-
-
-          {/* ------------------------------------------
-              RESUMEN
-              ------------------------------------------ */}
-
-          <section className="analysis-section">
-
-            <h3>
-              Resumen de sesión
-            </h3>
-
-
-            <p>
-              <strong>
-                Repeticiones analizadas:
-              </strong>{" "}
-              {resumenVideo.total}
-            </p>
-
-
-            <p>
-              <strong>
-                Correctas:
-              </strong>{" "}
-              {resumenVideo.correctas}
-            </p>
-
-
-            <p>
-              <strong>
-                Técnica correcta:
-              </strong>{" "}
-              {
-                resumenVideo
-                  .porcentajeCorrectas
-              } %
-            </p>
-
-
-            <p>
-              <strong>
-                Errores de codo:
-              </strong>{" "}
-              {resumenVideo.erroresCodo}
-            </p>
-
-
-            <p>
-              <strong>
-                Balanceos de tronco:
-              </strong>{" "}
-              {resumenVideo.erroresTronco}
-            </p>
-
-
-            <p>
-              <strong>
-                Error más frecuente:
-              </strong>{" "}
-              {
-                resumenVideo
-                  .errorMasFrecuente
-              }
-            </p>
-
-          </section>
-
-
-          {/* ------------------------------------------
+          {/* ==========================================
               HISTORIAL
-              ------------------------------------------ */}
+              ========================================== */}
 
           <section className="analysis-section">
 
-            <h3>
+            <span className="analysis-section-label">
+              Detalle
+            </span>
+
+
+            <h2>
               Historial
-            </h3>
+            </h2>
 
 
             {historialVideo.length ===
             0 ? (
 
-              <p>
+              <p className="analysis-empty-message">
                 Reproduce el vídeo para
-                comenzar el análisis.
+                empezar a generar el historial.
               </p>
 
             ) : (
 
-              <ol className="repetition-history">
+              <div className="analysis-history">
 
                 {historialVideo.map(
                   function (
                     repeticion
                   ) {
                     return (
-                      <li
+                      <div
                         key={
                           repeticion.numero
                         }
-                      >
-                        <strong>
-                          Rep {
-                            repeticion.numero
-                          }:
-                        </strong>{" "}
 
-                        {
-                          repeticion
-                            .resultado
-                        }
-                      </li>
+                        className="analysis-history-item"
+                      >
+
+                        <span className="analysis-history-number">
+                          Rep{" "}
+                          {
+                            repeticion.numero
+                          }
+                        </span>
+
+
+                        <strong>
+                          {
+                            repeticion
+                              .resultado
+                          }
+                        </strong>
+
+                      </div>
                     );
                   }
                 )}
 
-              </ol>
+              </div>
 
             )}
 
@@ -1844,7 +1981,6 @@ function CurlVideoPreview(
     </div>
   );
 }
-
 
 // Exportamos el componente.
 
@@ -2781,14 +2917,17 @@ function SentadillaVideoPreviewIntegrado(
 
       <div className="vision-fit-camera-column">
 
-        <h3>
+        <p>
+          <strong>
+            Vídeo:
+          </strong>{" "}
           {props.nombreVideo}
-        </h3>
+        </p>
 
 
-        {/* Usamos estilos propios aquí
-            para NO aplicar el espejo
-            que utilizamos en la webcam. */}
+        {/* No utilizamos camera-container
+            porque el vídeo grabado
+            NO debe verse como espejo. */}
 
         <div
           style={{
@@ -2881,219 +3020,365 @@ function SentadillaVideoPreviewIntegrado(
 
       <div className="vision-fit-data-column">
 
-        <section className="analysis-section">
+        {/* ==========================================
+            FEEDBACK ACTUAL
+            ========================================== */}
 
-          <h2>
-            Sentadilla
-          </h2>
+        <section className="analysis-section analysis-current">
+
+          <div className="analysis-section-header">
+
+            <div>
+
+              <span className="analysis-section-label">
+                Análisis de vídeo
+              </span>
 
 
-          <p>
+              <h2>
+                Feedback actual
+              </h2>
+
+            </div>
+
+
+            <div className="analysis-repetition-counter">
+
+              <span>
+                Repeticiones
+              </span>
+
+
+              <strong>
+                {repeticiones}
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          <div className="analysis-metrics-grid">
+
+            <div className="analysis-metric">
+
+              <span>
+                Fase
+              </span>
+
+
+              <strong>
+                {fase}
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-metric">
+
+              <span>
+                Ángulo de rodilla
+              </span>
+
+
+              <strong>
+                {anguloRodilla}°
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-metric">
+
+              <span>
+                Inclinación del tronco
+              </span>
+
+
+              <strong>
+                {inclinacionTronco !==
+                null
+                  ? inclinacionTronco +
+                    "°"
+                  : "--"}
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          <div className="analysis-feedback-main">
+
+            <span>
+              Movimiento
+            </span>
+
+
             <strong>
-              Repeticiones:
-            </strong>{" "}
-            {repeticiones}
-          </p>
+              {feedback}
+            </strong>
+
+          </div>
 
 
-          <p>
-            <strong>
-              Ángulo de rodilla:
-            </strong>{" "}
-            {anguloRodilla}°
-          </p>
+          <div className="analysis-technique">
+
+            <h3>
+              Técnica
+            </h3>
 
 
-          <p>
-            <strong>
-              Inclinación del tronco:
-            </strong>{" "}
+            <div className="analysis-technique-item">
 
-            {inclinacionTronco !==
-            null
-              ? inclinacionTronco +
-                "°"
-              : "No disponible"}
-          </p>
+              <div>
+
+                <strong>
+                  Tronco
+                </strong>
 
 
-          <p>
-            <strong>
-              Fase:
-            </strong>{" "}
-            {fase}
-          </p>
+                <p>
+                  {feedbackTronco}
+                </p>
+
+              </div>
 
 
-          <p>
-            <strong>
-              Movimiento:
-            </strong>{" "}
-            {feedback}
-          </p>
+              <span>
+                {inclinacionTronco !==
+                null
+                  ? inclinacionTronco +
+                    "°"
+                  : "--"}
+              </span>
+
+            </div>
 
 
-          <p>
-            <strong>
-              Técnica del tronco:
-            </strong>{" "}
-            {feedbackTronco}
-          </p>
+            <div className="analysis-technique-item">
+
+              <div>
+
+                <strong>
+                  Estado
+                </strong>
 
 
-          <p>
-            <strong>
-              Estado:
-            </strong>{" "}
-            {mensaje}
-          </p>
+                <p>
+                  {mensaje}
+                </p>
+
+              </div>
+
+            </div>
+
+          </div>
 
         </section>
 
 
-        {/* ===========================================
+        {/* ==========================================
             RESUMEN
-            =========================================== */}
+            ========================================== */}
 
-        {historial.length >
-        0 ? (
+        <section className="analysis-section">
 
-          <section className="analysis-section">
-
-            <h2>
-              Resumen de sesión
-            </h2>
+          <span className="analysis-section-label">
+            Sesión
+          </span>
 
 
-            <p>
+          <h2>
+            Resumen
+          </h2>
+
+
+          <div className="analysis-summary-grid">
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Analizadas
+              </span>
+
+
               <strong>
-                Repeticiones:
-              </strong>{" "}
-              {resumen.total}
-            </p>
+                {resumen.total}
+              </strong>
+
+            </div>
 
 
-            <p>
+            <div className="analysis-summary-item">
+
+              <span>
+                Correctas
+              </span>
+
+
               <strong>
-                Correctas:
-              </strong>{" "}
-              {resumen.correctas}
-            </p>
+                {resumen.correctas}
+              </strong>
+
+            </div>
 
 
-            <p>
+            <div className="analysis-summary-item">
+
+              <span>
+                Técnica correcta
+              </span>
+
+
               <strong>
-                Técnica correcta:
-              </strong>{" "}
+                {Math.round(
+                  resumen
+                    .porcentajeCorrectas
+                )}
+                %
+              </strong>
 
-              {Math.round(
-                resumen.porcentajeCorrectas
-              )}
-              %
-            </p>
+            </div>
 
 
-            <p>
+            <div className="analysis-summary-item">
+
+              <span>
+                Profundidad insuficiente
+              </span>
+
+
               <strong>
-                Profundidad insuficiente:
-              </strong>{" "}
+                {
+                  resumen
+                    .profundidadInsuficiente
+                }
+              </strong>
 
-              {
-                resumen.profundidadInsuficiente
-              }
-            </p>
+            </div>
 
 
-            <p>
+            <div className="analysis-summary-item">
+
+              <span>
+                Exceso de inclinación
+              </span>
+
+
               <strong>
-                Exceso de inclinación:
-              </strong>{" "}
+                {
+                  resumen
+                    .excesoInclinacionTronco
+                }
+              </strong>
 
-              {
-                resumen.excesoInclinacionTronco
-              }
-            </p>
+            </div>
 
-          </section>
+          </div>
 
-        ) : null}
+        </section>
 
 
-        {/* ===========================================
+        {/* ==========================================
             HISTORIAL
-            =========================================== */}
+            ========================================== */}
 
-        {historial.length >
-        0 ? (
+        <section className="analysis-section">
 
-          <section className="analysis-section">
-
-            <h2>
-              Historial
-            </h2>
+          <span className="analysis-section-label">
+            Detalle
+          </span>
 
 
-            <ol className="repetition-history">
+          <h2>
+            Historial
+          </h2>
+
+
+          {historial.length ===
+          0 ? (
+
+            <p className="analysis-empty-message">
+              Reproduce el vídeo para
+              empezar a generar el historial.
+            </p>
+
+          ) : (
+
+            <div className="analysis-history">
 
               {historial.map(
-                function (repeticion) {
+                function (
+                  repeticion
+                ) {
                   return (
-                    <li
+                    <div
                       key={
                         repeticion.numero
                       }
+
+                      className="analysis-history-item"
                     >
-                      <strong>
+
+                      <span className="analysis-history-number">
                         Rep{" "}
                         {
                           repeticion.numero
                         }
-                        :
-                      </strong>{" "}
+                      </span>
 
-                      {
-                        repeticion.resultado
-                      }
 
-                      {" — "}
+                      <div>
 
-                      rodilla mín.:{" "}
+                        <strong>
+                          {
+                            repeticion.resultado
+                          }
+                        </strong>
 
-                      {Math.round(
-                        repeticion.anguloMinimo
-                      )}
-                      °
 
-                      {" — "}
-
-                      tronco máx.:{" "}
-
-                      {repeticion
-                        .inclinacionTroncoMaxima !==
-                      null
-                        ? Math.round(
+                        <p>
+                          Rodilla mín.:{" "}
+                          {Math.round(
                             repeticion
-                              .inclinacionTroncoMaxima
-                          ) +
-                          "°"
-                        : "N/D"}
-                    </li>
+                              .anguloMinimo
+                          )}
+                          °
+                        </p>
+
+
+                        <p>
+                          Tronco máx.:{" "}
+                          {repeticion
+                            .inclinacionTroncoMaxima !==
+                          null
+                            ? Math.round(
+                                repeticion
+                                  .inclinacionTroncoMaxima
+                              ) +
+                              "°"
+                            : "N/D"}
+                        </p>
+
+                      </div>
+
+                    </div>
                   );
                 }
               )}
 
-            </ol>
+            </div>
 
-          </section>
+          )}
 
-        ) : null}
+        </section>
 
       </div>
 
     </div>
   );
 }
-
 
 // ==================================================
 // VÍDEO DEL PRESS DE HOMBRO
@@ -4040,9 +4325,6 @@ function PressHombroVideoPreviewIntegrado(
   // INTERFAZ
   // ==================================================
 
-  // Si por algún motivo
-  // el componente debe ocultarse,
-  // no renderizamos nada.
   if (
     !props.visible
   ) {
@@ -4054,14 +4336,17 @@ function PressHombroVideoPreviewIntegrado(
     <div className="vision-fit-layout">
 
       {/* =============================================
-          VÍDEO
+          IZQUIERDA: VÍDEO
           ============================================= */}
 
       <div className="vision-fit-camera-column">
 
-        <h3>
+        <p>
+          <strong>
+            Vídeo:
+          </strong>{" "}
           {props.nombreVideo}
-        </h3>
+        </p>
 
 
         {/* No utilizamos camera-container
@@ -4154,221 +4439,365 @@ function PressHombroVideoPreviewIntegrado(
 
 
       {/* =============================================
-          DATOS
+          DERECHA: ANÁLISIS
           ============================================= */}
 
       <div className="vision-fit-data-column">
 
-        {/* ===========================================
-            MOVIMIENTO
-            =========================================== */}
+        {/* ==========================================
+            FEEDBACK ACTUAL
+            ========================================== */}
 
-        <section className="analysis-section">
+        <section className="analysis-section analysis-current">
 
-          <h2>
-            Press de hombro
-          </h2>
+          <div className="analysis-section-header">
+
+            <div>
+
+              <span className="analysis-section-label">
+                Análisis de vídeo
+              </span>
 
 
-          <p>
+              <h2>
+                Feedback actual
+              </h2>
+
+            </div>
+
+
+            <div className="analysis-repetition-counter">
+
+              <span>
+                Repeticiones
+              </span>
+
+
+              <strong>
+                {repeticiones}
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          <div className="analysis-metrics-grid">
+
+            <div className="analysis-metric">
+
+              <span>
+                Fase
+              </span>
+
+
+              <strong>
+                {fase}
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-metric">
+
+              <span>
+                Ángulo izquierdo
+              </span>
+
+
+              <strong>
+                {anguloIzquierdo}°
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-metric">
+
+              <span>
+                Ángulo derecho
+              </span>
+
+
+              <strong>
+                {anguloDerecho}°
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-metric">
+
+              <span>
+                Diferencia
+              </span>
+
+
+              <strong>
+                {diferenciaAngular}°
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          <div className="analysis-feedback-main">
+
+            <span>
+              Movimiento
+            </span>
+
+
             <strong>
-              Repeticiones:
-            </strong>{" "}
-            {repeticiones}
-          </p>
+              {feedbackMovimiento}
+            </strong>
+
+          </div>
 
 
-          <p>
-            <strong>
-              Ángulo izquierdo:
-            </strong>{" "}
-            {anguloIzquierdo}°
-          </p>
+          <div className="analysis-technique">
+
+            <h3>
+              Técnica
+            </h3>
 
 
-          <p>
-            <strong>
-              Ángulo derecho:
-            </strong>{" "}
-            {anguloDerecho}°
-          </p>
+            <div className="analysis-technique-item">
+
+              <div>
+
+                <strong>
+                  Simetría
+                </strong>
 
 
-          <p>
-            <strong>
-              Diferencia actual:
-            </strong>{" "}
-            {diferenciaAngular}°
-          </p>
+                <p>
+                  {feedbackSimetria}
+                </p>
+
+              </div>
 
 
-          <p>
-            <strong>
-              Fase:
-            </strong>{" "}
-            {fase}
-          </p>
+              <span>
+                {diferenciaAngular}°
+              </span>
+
+            </div>
 
 
-          <p>
-            <strong>
-              Movimiento:
-            </strong>{" "}
-            {feedbackMovimiento}
-          </p>
+            <div className="analysis-technique-item">
+
+              <div>
+
+                <strong>
+                  Estado
+                </strong>
 
 
-          <p>
-            <strong>
-              Simetría:
-            </strong>{" "}
-            {feedbackSimetria}
-          </p>
+                <p>
+                  {mensaje}
+                </p>
 
+              </div>
 
-          <p>
-            <strong>
-              Estado:
-            </strong>{" "}
-            {mensaje}
-          </p>
+            </div>
+
+          </div>
 
         </section>
 
 
-        {/* ===========================================
+        {/* ==========================================
             RESUMEN
-            =========================================== */}
+            ========================================== */}
 
-        {historial.length >
-        0 ? (
+        <section className="analysis-section">
 
-          <section className="analysis-section">
-
-            <h2>
-              Resumen de sesión
-            </h2>
+          <span className="analysis-section-label">
+            Sesión
+          </span>
 
 
-            <p>
+          <h2>
+            Resumen
+          </h2>
+
+
+          <div className="analysis-summary-grid">
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Analizadas
+              </span>
+
+
               <strong>
-                Repeticiones:
-              </strong>{" "}
-              {resumen.total}
-            </p>
+                {resumen.total}
+              </strong>
+
+            </div>
 
 
-            <p>
+            <div className="analysis-summary-item">
+
+              <span>
+                Correctas
+              </span>
+
+
               <strong>
-                Correctas:
-              </strong>{" "}
-              {resumen.correctas}
-            </p>
+                {resumen.correctas}
+              </strong>
+
+            </div>
 
 
-            <p>
+            <div className="analysis-summary-item">
+
+              <span>
+                Técnica correcta
+              </span>
+
+
               <strong>
-                Técnica correcta:
-              </strong>{" "}
+                {Math.round(
+                  resumen
+                    .porcentajeCorrectas
+                )}
+                %
+              </strong>
 
-              {Math.round(
-                resumen.porcentajeCorrectas
-              )}
-              %
-            </p>
+            </div>
 
 
-            <p>
+            <div className="analysis-summary-item">
+
+              <span>
+                Descompensadas
+              </span>
+
+
               <strong>
-                Descompensación:
-              </strong>{" "}
-              {resumen.descompensadas}
-            </p>
+                {
+                  resumen
+                    .descompensadas
+                }
+              </strong>
 
-          </section>
+            </div>
 
-        ) : null}
+          </div>
+
+        </section>
 
 
-        {/* ===========================================
+        {/* ==========================================
             HISTORIAL
-            =========================================== */}
+            ========================================== */}
 
-        {historial.length >
-        0 ? (
+        <section className="analysis-section">
 
-          <section className="analysis-section">
-
-            <h2>
-              Historial
-            </h2>
+          <span className="analysis-section-label">
+            Detalle
+          </span>
 
 
-            <ol className="repetition-history">
+          <h2>
+            Historial
+          </h2>
+
+
+          {historial.length ===
+          0 ? (
+
+            <p className="analysis-empty-message">
+              Reproduce el vídeo para
+              empezar a generar el historial.
+            </p>
+
+          ) : (
+
+            <div className="analysis-history">
 
               {historial.map(
-                function (repeticion) {
+                function (
+                  repeticion
+                ) {
                   return (
-                    <li
+                    <div
                       key={
                         repeticion.numero
                       }
+
+                      className="analysis-history-item"
                     >
-                      <strong>
+
+                      <span className="analysis-history-number">
                         Rep{" "}
                         {
                           repeticion.numero
                         }
-                        :
-                      </strong>{" "}
+                      </span>
 
-                      {
-                        repeticion.resultado
-                      }
 
-                      {" — "}
+                      <div>
 
-                      diferencia media:{" "}
+                        <strong>
+                          {
+                            repeticion.resultado
+                          }
+                        </strong>
 
-                      {Math.round(
-                        repeticion.diferenciaMedia
-                      )}
-                      °
 
-                      {" — "}
+                        <p>
+                          Diferencia media:{" "}
+                          {Math.round(
+                            repeticion
+                              .diferenciaMedia
+                          )}
+                          °
+                        </p>
 
-                      máxima:{" "}
 
-                      {Math.round(
-                        repeticion.diferenciaMaxima
-                      )}
-                      °
+                        <p>
+                          Diferencia máxima:{" "}
+                          {Math.round(
+                            repeticion
+                              .diferenciaMaxima
+                          )}
+                          °
+                        </p>
 
-                      {" — "}
 
-                      descompensado:{" "}
+                        <p>
+                          Descompensado:{" "}
+                          {Math.round(
+                            repeticion
+                              .porcentajeDescompensado
+                          )}
+                          %
+                        </p>
 
-                      {Math.round(
-                        repeticion.porcentajeDescompensado
-                      )}
-                      %
-                    </li>
+                      </div>
+
+                    </div>
                   );
                 }
               )}
 
-            </ol>
+            </div>
 
-          </section>
+          )}
 
-        ) : null}
+        </section>
 
       </div>
 
     </div>
   );
 }
-
 
 // ==================================================
 // PROPS DEL COMPONENTE GENÉRICO

@@ -1,54 +1,57 @@
-/* --------------------------------------------------
+/* ==================================================
    ESTILOS GENERALES
-   -------------------------------------------------- */
+   ================================================== */
 
-/*
-  Aplicamos un pequeño margen interior
-  a toda la aplicación.
-*/
-main {
-  padding: 20px;
+* {
+  box-sizing: border-box;
 }
 
 
-/* --------------------------------------------------
+body {
+  margin: 0;
+
+  background-color: #f6f7f9;
+}
+
+
+main {
+  width: 100%;
+
+  max-width: 1500px;
+
+  margin: 0 auto;
+
+  padding: 28px;
+}
+
+
+/* ==================================================
    CABECERA DE VISIÓN FIT
-   -------------------------------------------------- */
+   ================================================== */
 
-/*
-  Centramos únicamente la parte inicial:
-
-  - título;
-  - selección de ejercicio;
-  - selección de fuente.
-
-  La cámara, el vídeo y los datos técnicos
-  mantienen después su distribución
-  en dos columnas.
-*/
 .vision-fit-header {
   width: 100%;
 
-  text-align: center;
+  margin-bottom: 36px;
 
-  margin-bottom: 32px;
+  text-align: center;
 }
 
 
-/*
-  Separación entre el título principal
-  y la selección de ejercicio.
-*/
 .vision-fit-header h1 {
   margin-top: 0;
 
   margin-bottom: 32px;
+
+  font-size: 38px;
+
+  line-height: 1.1;
 }
 
 
-/* --------------------------------------------------
-   SELECCIÓN DE EJERCICIO
-   -------------------------------------------------- */
+/* ==================================================
+   SELECTOR DE EJERCICIO
+   ================================================== */
 
 .exercise-selector {
   width: 100%;
@@ -57,31 +60,20 @@ main {
 }
 
 
-/*
-  Título:
-
-  "Selecciona un ejercicio"
-*/
 .exercise-selector h2 {
   margin-top: 0;
 
   margin-bottom: 16px;
+
+  font-size: 20px;
 }
 
 
-/*
-  Contenedor de los botones
-  de ejercicios.
-
-  justify-content: center
-  permite centrarlos horizontalmente.
-*/
 .exercise-buttons {
   display: flex;
 
-  justify-content: center;
-
   align-items: center;
+  justify-content: center;
 
   flex-wrap: wrap;
 
@@ -89,37 +81,45 @@ main {
 }
 
 
-/*
-  Botón normal de ejercicio.
-*/
 .exercise-button {
-  padding: 10px 16px;
+  padding: 11px 18px;
 
-  font-size: 16px;
+  border: 1px solid #d8dce2;
+  border-radius: 10px;
+
+  background-color: #ffffff;
+
+  font-size: 15px;
+  font-weight: 500;
 
   cursor: pointer;
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
 }
 
 
-/*
-  Ejercicio seleccionado actualmente.
-*/
+.exercise-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 5px 14px
+    rgba(0, 0, 0, 0.08);
+}
+
+
 .exercise-button-active {
-  font-weight: bold;
+  border-color: #222222;
 
-  outline: 2px solid currentColor;
+  font-weight: 700;
+
+  outline: 2px solid #222222;
+  outline-offset: 1px;
 }
 
 
-/*
-  Ejercicios que todavía
-  no hemos implementado.
-
-  Por ejemplo:
-
-  - sentadilla;
-  - press de hombro.
-*/
 .exercise-button:disabled {
   cursor: not-allowed;
 
@@ -127,47 +127,32 @@ main {
 }
 
 
-/* --------------------------------------------------
+/* ==================================================
    FUENTE DE ANÁLISIS
-   -------------------------------------------------- */
+   ================================================== */
 
-/*
-  Esta sección aparece únicamente
-  después de seleccionar un ejercicio.
-*/
 .analysis-source-selector {
   width: 100%;
 
   margin-top: 24px;
-
   margin-bottom: 20px;
 }
 
 
-/*
-  Título:
-
-  "Fuente de análisis"
-*/
 .analysis-source-selector h2 {
   margin-top: 0;
 
   margin-bottom: 16px;
+
+  font-size: 20px;
 }
 
 
-/*
-  Contenedor de:
-
-  - Encender cámara;
-  - Cargar vídeo.
-*/
 .analysis-source-buttons {
   display: flex;
 
-  justify-content: center;
-
   align-items: center;
+  justify-content: center;
 
   flex-wrap: wrap;
 
@@ -175,275 +160,840 @@ main {
 }
 
 
-/* --------------------------------------------------
+/* ==================================================
    BOTONES GENERALES
-   -------------------------------------------------- */
+   ================================================== */
 
 button {
-  padding: 10px 16px;
+  padding: 11px 17px;
 
-  font-size: 16px;
+  border: 1px solid #d8dce2;
+  border-radius: 10px;
+
+  background-color: #ffffff;
+
+  font-size: 15px;
+  font-weight: 500;
 
   cursor: pointer;
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 
-/* --------------------------------------------------
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 5px 14px
+    rgba(0, 0, 0, 0.08);
+}
+
+
+/* ==================================================
    DISTRIBUCIÓN PRINCIPAL
-   -------------------------------------------------- */
+   ==================================================
+   
+   Izquierda:
+   
+   - cámara;
+   - vídeo.
+   
+   Derecha:
+   
+   - feedback actual;
+   - resumen;
+   - historial.
+   ================================================== */
 
-/*
-  Una vez comienza el análisis,
-  utilizamos dos columnas:
-
-  izquierda -> cámara o vídeo;
-  derecha   -> información técnica.
-*/
 .vision-fit-layout {
   display: grid;
 
-  /*
-    Primera columna:
-    máximo aproximado de 640 px.
-
-    Segunda columna:
-    espacio restante para los datos.
-  */
   grid-template-columns:
     minmax(0, 640px)
-    minmax(280px, 1fr);
+    minmax(340px, 1fr);
 
-  gap: 32px;
+  gap: 36px;
 
   align-items: start;
 
-  margin-top: 20px;
+  width: 100%;
+
+  margin-top: 24px;
 }
 
 
-/* --------------------------------------------------
-   COLUMNA DE CÁMARA / VÍDEO
-   -------------------------------------------------- */
+/* ==================================================
+   COLUMNA CÁMARA / VÍDEO
+   ================================================== */
 
 .vision-fit-camera-column {
   width: 100%;
+
+  min-width: 0;
 }
 
 
-/* --------------------------------------------------
+.vision-fit-camera-column > h3,
+.vision-fit-camera-column > p {
+  margin-top: 0;
+
+  margin-bottom: 14px;
+}
+
+
+/* ==================================================
    CÁMARA
-   -------------------------------------------------- */
+   ================================================== */
 
-/*
-  Contenedor común del vídeo
-  de la webcam y su canvas.
-
-  position: relative permite colocar
-  el canvas exactamente encima.
-*/
 .camera-container {
   position: relative;
 
   width: 100%;
 
   max-width: 640px;
+
+  overflow: hidden;
+
+  border-radius: 18px;
+
+  background-color: #111111;
+
+  box-shadow:
+    0 12px 35px
+    rgba(0, 0, 0, 0.12);
 }
 
 
-/* --------------------------------------------------
-   VÍDEO DE LA WEBCAM
-   -------------------------------------------------- */
+/* ==================================================
+   VÍDEO DE WEBCAM
+   ================================================== */
 
 .camera-video {
-  width: 100%;
-
-  height: auto;
-
-  display: block;
-
   position: relative;
 
   z-index: 1;
 
+  display: block;
 
-  /*
-    La webcam funciona como un espejo.
-  */
+  width: 100%;
+  height: auto;
+
   transform: scaleX(-1);
 
-
-  /*
-    Redondeamos ligeramente
-    las esquinas.
-  */
-  border-radius: 8px;
+  border-radius: 18px;
 }
 
 
-/* --------------------------------------------------
-   CANVAS DE LA WEBCAM
-   -------------------------------------------------- */
+/* ==================================================
+   CANVAS WEBCAM
+   ================================================== */
 
 .camera-canvas {
-  /*
-    Lo situamos exactamente
-    encima del vídeo.
-  */
   position: absolute;
 
   top: 0;
-
   left: 0;
-
-  width: 100%;
-
-  height: 100%;
-
-  display: block;
 
   z-index: 2;
 
+  display: block;
 
-  /*
-    Evita que el canvas bloquee
-    cualquier interacción.
-  */
+  width: 100%;
+  height: 100%;
+
   pointer-events: none;
 
-
-  /*
-    Como el vídeo de la webcam
-    está invertido horizontalmente,
-    el canvas también debe estarlo.
-
-    Así los landmarks coinciden
-    con el cuerpo.
-  */
   transform: scaleX(-1);
 
-
-  border-radius: 8px;
+  border-radius: 18px;
 }
 
 
-/* --------------------------------------------------
+/* ==================================================
    COLUMNA DE INFORMACIÓN
-   -------------------------------------------------- */
+   ================================================== */
 
 .vision-fit-data-column {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 20px;
+
   width: 100%;
 
-  /*
-    Evita problemas de desbordamiento
-    dentro del grid.
-  */
   min-width: 0;
 }
 
 
-/* --------------------------------------------------
-   BLOQUES DE ANÁLISIS
-   -------------------------------------------------- */
+/* ==================================================
+   TARJETAS PRINCIPALES
+   ================================================== */
 
-/*
-  Cada grupo de información:
-
-  - movimiento;
-  - técnica;
-  - resumen;
-  - historial.
-
-  aparece como una sección diferenciada.
-*/
 .analysis-section {
-  margin-bottom: 24px;
+  width: 100%;
 
-  padding-bottom: 16px;
+  margin: 0;
 
-  border-bottom: 1px solid #dddddd;
+  padding: 24px;
+
+  border: 1px solid #e1e4e8;
+  border-radius: 18px;
+
+  background-color: #ffffff;
+
+  box-shadow:
+    0 5px 18px
+    rgba(0, 0, 0, 0.045);
 }
 
 
-/*
-  Quitamos espacio superior innecesario
-  en los títulos de cada sección.
-*/
-.analysis-section h2,
+.analysis-section h2 {
+  margin-top: 4px;
+
+  margin-bottom: 22px;
+
+  font-size: 24px;
+
+  line-height: 1.2;
+}
+
+
 .analysis-section h3 {
   margin-top: 0;
 
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+
+  font-size: 18px;
 }
 
 
-/*
-  Reducimos un poco el espacio
-  entre cada dato.
-*/
 .analysis-section p {
-  margin-top: 6px;
+  margin-top: 5px;
 
+  margin-bottom: 5px;
+}
+
+
+/* ==================================================
+   ETIQUETA DE SECCIÓN
+   ================================================== */
+
+.analysis-section-label {
+  display: block;
+
+  margin-bottom: 3px;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  letter-spacing: 0.1em;
+
+  text-transform: uppercase;
+
+  opacity: 0.5;
+}
+
+
+/* ==================================================
+   FEEDBACK ACTUAL
+   ==================================================
+   
+   Esta es la tarjeta principal
+   mientras el usuario entrena.
+   ================================================== */
+
+.analysis-current {
+  border: 2px solid #cfd4da;
+
+  box-shadow:
+    0 8px 28px
+    rgba(0, 0, 0, 0.07);
+}
+
+
+/* ==================================================
+   CABECERA DEL FEEDBACK
+   ================================================== */
+
+.analysis-section-header {
+  display: flex;
+
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap: 24px;
+
+  margin-bottom: 20px;
+}
+
+
+.analysis-section-header h2 {
+  margin-bottom: 0;
+}
+
+
+/* ==================================================
+   CONTADOR DE REPETICIONES
+   ================================================== */
+
+.analysis-repetition-counter {
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  min-width: 125px;
+
+  padding: 14px 20px;
+
+  border: 1px solid #dde1e5;
+  border-radius: 16px;
+
+  background-color: #f2f4f6;
+}
+
+
+.analysis-repetition-counter span {
+  font-size: 12px;
+  font-weight: 600;
+
+  text-transform: uppercase;
+
+  opacity: 0.6;
+}
+
+
+.analysis-repetition-counter strong {
+  margin-top: 3px;
+
+  font-size: 38px;
+
+  line-height: 1;
+}
+
+
+/* ==================================================
+   MÉTRICAS EN TIEMPO REAL
+   ================================================== */
+
+.analysis-metrics-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  gap: 12px;
+
+  margin-bottom: 16px;
+}
+
+
+.analysis-metric {
+  display: flex;
+
+  flex-direction: column;
+
+  justify-content: center;
+
+  min-height: 78px;
+
+  padding: 14px 16px;
+
+  border: 1px solid #eceef0;
+  border-radius: 14px;
+
+  background-color: #f7f8f9;
+}
+
+
+.analysis-metric span {
+  margin-bottom: 5px;
+
+  font-size: 12px;
+  font-weight: 500;
+
+  opacity: 0.6;
+}
+
+
+.analysis-metric strong {
+  font-size: 21px;
+
+  line-height: 1.2;
+}
+
+
+/* ==================================================
+   MENSAJE PRINCIPAL
+   ================================================== */
+
+.analysis-feedback-main {
+  display: flex;
+
+  flex-direction: column;
+
+  margin-bottom: 24px;
+
+  padding: 18px;
+
+  border: 1px solid #e1e4e8;
+  border-radius: 14px;
+
+  background-color: #f2f4f6;
+}
+
+
+.analysis-feedback-main span {
+  margin-bottom: 6px;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  text-transform: uppercase;
+
+  opacity: 0.55;
+}
+
+
+.analysis-feedback-main strong {
+  font-size: 19px;
+
+  line-height: 1.4;
+}
+
+
+/* ==================================================
+   TÉCNICA ACTUAL
+   ================================================== */
+
+.analysis-technique {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 0;
+}
+
+
+.analysis-technique h3 {
   margin-bottom: 6px;
 }
 
 
-/* --------------------------------------------------
-   HISTORIAL DE REPETICIONES
-   -------------------------------------------------- */
+.analysis-technique-item {
+  display: flex;
 
-.repetition-history {
-  padding-left: 22px;
+  align-items: center;
+  justify-content: space-between;
 
-  margin-top: 10px;
+  gap: 20px;
+
+  min-height: 64px;
+
+  padding: 13px 4px;
+
+  border-bottom: 1px solid #eeeeee;
 }
 
 
-/*
-  Separamos ligeramente
-  cada repetición.
-*/
+.analysis-technique-item:last-of-type {
+  border-bottom: none;
+}
+
+
+.analysis-technique-item > div {
+  min-width: 0;
+}
+
+
+.analysis-technique-item strong {
+  font-size: 15px;
+}
+
+
+.analysis-technique-item p {
+  margin-top: 4px;
+
+  margin-bottom: 0;
+
+  font-size: 13px;
+
+  line-height: 1.4;
+
+  opacity: 0.68;
+}
+
+
+.analysis-technique-item > span {
+  flex-shrink: 0;
+
+  padding: 7px 10px;
+
+  border-radius: 8px;
+
+  background-color: #f2f4f6;
+
+  font-size: 15px;
+  font-weight: 700;
+}
+
+
+/* ==================================================
+   LÍMITES TÉCNICOS
+   ================================================== */
+
+.analysis-limits {
+  display: flex;
+
+  justify-content: space-between;
+
+  gap: 20px;
+
+  margin-top: 12px;
+
+  padding-top: 12px;
+
+  border-top: 1px dashed #dddddd;
+}
+
+
+.analysis-limits small {
+  font-size: 11px;
+
+  opacity: 0.55;
+}
+
+
+/* ==================================================
+   RESUMEN DE SESIÓN
+   ================================================== */
+
+.analysis-summary-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  gap: 12px;
+}
+
+
+.analysis-summary-item {
+  display: flex;
+
+  flex-direction: column;
+
+  justify-content: center;
+
+  min-height: 80px;
+
+  padding: 14px 16px;
+
+  border: 1px solid #eceef0;
+  border-radius: 14px;
+
+  background-color: #f7f8f9;
+}
+
+
+.analysis-summary-item span {
+  margin-bottom: 5px;
+
+  font-size: 12px;
+
+  opacity: 0.62;
+}
+
+
+.analysis-summary-item strong {
+  font-size: 23px;
+
+  line-height: 1.1;
+}
+
+
+/* ==================================================
+   ERROR MÁS FRECUENTE
+   ================================================== */
+
+.analysis-most-common-error {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  margin-top: 12px;
+
+  padding: 15px 16px;
+
+  border: 1px solid #eceef0;
+  border-radius: 14px;
+
+  background-color: #f7f8f9;
+}
+
+
+.analysis-most-common-error span {
+  font-size: 13px;
+
+  opacity: 0.65;
+}
+
+
+.analysis-most-common-error strong {
+  text-align: right;
+}
+
+
+/* ==================================================
+   HISTORIAL
+   ================================================== */
+
+.analysis-history {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 9px;
+}
+
+
+.analysis-history-item {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  padding: 14px 16px;
+
+  border: 1px solid #eceef0;
+  border-radius: 12px;
+
+  background-color: #f7f8f9;
+}
+
+
+.analysis-history-item > div {
+  text-align: right;
+}
+
+
+.analysis-history-item p {
+  margin: 3px 0 0;
+
+  font-size: 12px;
+
+  opacity: 0.65;
+}
+
+
+.analysis-history-number {
+  flex-shrink: 0;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  opacity: 0.6;
+}
+
+
+.analysis-empty-message {
+  margin-bottom: 0;
+
+  padding: 18px;
+
+  border-radius: 12px;
+
+  background-color: #f7f8f9;
+
+  text-align: center;
+
+  font-size: 14px;
+
+  opacity: 0.65;
+}
+
+
+/* ==================================================
+   HISTORIAL ANTIGUO
+   ==================================================
+   
+   Lo mantenemos porque alguna sección
+   puede seguir utilizando <ol>.
+   ================================================== */
+
+.repetition-history {
+  margin-top: 10px;
+
+  margin-bottom: 0;
+
+  padding-left: 22px;
+}
+
+
 .repetition-history li {
   margin-bottom: 8px;
 }
 
 
-/* --------------------------------------------------
-   RESPONSIVE
-   -------------------------------------------------- */
+/* ==================================================
+   MENSAJE DE ERROR DEL SISTEMA
+   ==================================================
+   
+   El error sustituye solo
+   la zona del análisis.
+   
+   La cabecera y los controles
+   siguen visibles.
+   ================================================== */
 
-/*
-  En pantallas medianas o pequeñas
-  dejamos de mostrar:
+.system-error-screen {
+  display: flex;
 
-  cámara/vídeo | datos
+  align-items: center;
+  justify-content: center;
 
-  y pasamos a:
+  width: 100%;
 
-  cámara/vídeo
-       ↓
-     datos
-*/
-@media (max-width: 900px) {
+  min-height: 450px;
+
+  padding: 40px 24px;
+}
+
+
+.system-error-content {
+  width: 100%;
+
+  max-width: 650px;
+
+  text-align: center;
+}
+
+
+.system-error-icon {
+  margin-bottom: 20px;
+
+  font-size: 64px;
+
+  line-height: 1;
+}
+
+
+.system-error-content h1 {
+  margin-top: 0;
+
+  margin-bottom: 16px;
+
+  font-size: 32px;
+
+  line-height: 1.2;
+}
+
+
+.system-error-content p {
+  margin: 0;
+
+  font-size: 18px;
+
+  line-height: 1.6;
+}
+
+
+/* ==================================================
+   TABLET
+   ================================================== */
+
+@media (max-width: 1100px) {
   .vision-fit-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns:
+      minmax(0, 55%)
+      minmax(320px, 45%);
+
+    gap: 26px;
+  }
+}
+
+
+/* ==================================================
+   PANTALLAS PEQUEÑAS
+   ================================================== */
+
+@media (max-width: 900px) {
+  main {
+    max-width: 760px;
+  }
+
+
+  .vision-fit-layout {
+    grid-template-columns:
+      1fr;
 
     gap: 24px;
   }
 
 
+  .vision-fit-camera-column {
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+  }
+
+
   .camera-container {
+    width: 100%;
+
     max-width: 640px;
   }
 }
 
 
-/*
-  En móviles hacemos también
-  verticales los botones iniciales.
-*/
+/* ==================================================
+   MÓVIL
+   ================================================== */
+
 @media (max-width: 600px) {
   main {
     padding: 16px;
+  }
+
+
+  /* ----------------------------------------------
+     CABECERA
+     ---------------------------------------------- */
+
+  .vision-fit-header {
+    margin-bottom: 26px;
+  }
+
+
+  .vision-fit-header h1 {
+    margin-bottom: 24px;
+
+    font-size: 32px;
   }
 
 
@@ -480,100 +1030,106 @@ button {
 
 
   /* ----------------------------------------------
-     CABECERA
+     TARJETAS
      ---------------------------------------------- */
 
-  .vision-fit-header h1 {
-    margin-bottom: 24px;
+  .analysis-section {
+    padding: 18px;
+
+    border-radius: 15px;
   }
-}
-/* ==================================================
-   MENSAJE DE ERROR DEL SISTEMA
-   ==================================================
-   
-   El error sustituye únicamente
-   la zona de análisis.
-   
-   La cabecera, los selectores
-   y los botones de App.tsx
-   continúan visibles.
-   ================================================== */
-
-.system-error-screen {
-  width: 100%;
-
-  min-height: 450px;
-
-  display: flex;
-
-  align-items: center;
-  justify-content: center;
-
-  padding: 40px 24px;
-
-  box-sizing: border-box;
-}
 
 
-/* --------------------------------------------------
-   CONTENIDO
-   -------------------------------------------------- */
-
-.system-error-content {
-  width: 100%;
-
-  max-width: 650px;
-
-  text-align: center;
-}
+  .analysis-section h2 {
+    font-size: 21px;
+  }
 
 
-/* --------------------------------------------------
-   ICONO
-   -------------------------------------------------- */
+  /* ----------------------------------------------
+     CABECERA DEL FEEDBACK
+     ---------------------------------------------- */
 
-.system-error-icon {
-  margin-bottom: 20px;
+  .analysis-section-header {
+    flex-direction: column;
 
-  font-size: 64px;
-
-  line-height: 1;
-}
+    gap: 14px;
+  }
 
 
-/* --------------------------------------------------
-   TÍTULO
-   -------------------------------------------------- */
+  /* ----------------------------------------------
+     CONTADOR
+     ---------------------------------------------- */
 
-.system-error-content h1 {
-  margin-top: 0;
+  .analysis-repetition-counter {
+    width: 100%;
 
-  margin-bottom: 16px;
-
-  font-size: 32px;
-
-  line-height: 1.2;
-}
+    min-width: 0;
+  }
 
 
-/* --------------------------------------------------
-   MENSAJE
-   -------------------------------------------------- */
-
-.system-error-content p {
-  margin: 0;
-
-  font-size: 18px;
-
-  line-height: 1.6;
-}
+  .analysis-repetition-counter strong {
+    font-size: 34px;
+  }
 
 
-/* ==================================================
-   PANTALLAS PEQUEÑAS
-   ================================================== */
+  /* ----------------------------------------------
+     MÉTRICAS
+     ---------------------------------------------- */
 
-@media (max-width: 600px) {
+  .analysis-metrics-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .analysis-summary-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  /* ----------------------------------------------
+     TÉCNICA
+     ---------------------------------------------- */
+
+  .analysis-technique-item {
+    align-items: flex-start;
+  }
+
+
+  /* ----------------------------------------------
+     LÍMITES
+     ---------------------------------------------- */
+
+  .analysis-limits {
+    flex-direction: column;
+
+    gap: 5px;
+  }
+
+
+  /* ----------------------------------------------
+     HISTORIAL
+     ---------------------------------------------- */
+
+  .analysis-history-item {
+    align-items: flex-start;
+
+    flex-direction: column;
+
+    gap: 8px;
+  }
+
+
+  .analysis-history-item > div {
+    text-align: left;
+  }
+
+
+  /* ----------------------------------------------
+     ERROR
+     ---------------------------------------------- */
+
   .system-error-screen {
     min-height: 350px;
 
@@ -593,390 +1149,5 @@ button {
 
   .system-error-content p {
     font-size: 16px;
-  }
-}
-/* ==================================================
-   ORGANIZACIÓN DE LA INFORMACIÓN DEL ANÁLISIS
-   ================================================== */
-
-.vision-fit-data-column {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-
-/* ==================================================
-   TARJETAS
-   ================================================== */
-
-.analysis-section {
-  padding: 24px;
-
-  border: 1px solid #e5e5e5;
-  border-radius: 16px;
-
-  background-color: #ffffff;
-}
-
-
-.analysis-section h2 {
-  margin-top: 4px;
-  margin-bottom: 20px;
-}
-
-
-.analysis-section h3 {
-  margin-top: 0;
-}
-
-
-.analysis-section-label {
-  display: block;
-
-  font-size: 13px;
-  font-weight: 600;
-
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-
-  opacity: 0.6;
-}
-
-
-/* ==================================================
-   FEEDBACK ACTUAL
-   ================================================== */
-
-.analysis-current {
-  border-width: 2px;
-}
-
-
-.analysis-section-header {
-  display: flex;
-
-  align-items: flex-start;
-  justify-content: space-between;
-
-  gap: 20px;
-}
-
-
-/* ==================================================
-   CONTADOR DE REPETICIONES
-   ================================================== */
-
-.analysis-repetition-counter {
-  display: flex;
-  flex-direction: column;
-
-  align-items: center;
-
-  min-width: 100px;
-
-  padding: 12px 18px;
-
-  border-radius: 12px;
-
-  background-color: #f5f5f5;
-}
-
-
-.analysis-repetition-counter span {
-  font-size: 12px;
-
-  opacity: 0.7;
-}
-
-
-.analysis-repetition-counter strong {
-  margin-top: 2px;
-
-  font-size: 30px;
-}
-
-
-/* ==================================================
-   MÉTRICAS ACTUALES
-   ================================================== */
-
-.analysis-metrics-grid {
-  display: grid;
-
-  grid-template-columns:
-    repeat(
-      2,
-      minmax(
-        0,
-        1fr
-      )
-    );
-
-  gap: 12px;
-
-  margin-bottom: 16px;
-}
-
-
-.analysis-metric {
-  display: flex;
-  flex-direction: column;
-
-  padding: 14px;
-
-  border-radius: 12px;
-
-  background-color: #f5f5f5;
-}
-
-
-.analysis-metric span {
-  margin-bottom: 4px;
-
-  font-size: 13px;
-
-  opacity: 0.7;
-}
-
-
-.analysis-metric strong {
-  font-size: 20px;
-}
-
-
-/* ==================================================
-   FEEDBACK PRINCIPAL
-   ================================================== */
-
-.analysis-feedback-main {
-  display: flex;
-  flex-direction: column;
-
-  margin-bottom: 22px;
-
-  padding: 16px;
-
-  border-radius: 12px;
-
-  background-color: #f5f5f5;
-}
-
-
-.analysis-feedback-main span {
-  margin-bottom: 5px;
-
-  font-size: 13px;
-
-  opacity: 0.7;
-}
-
-
-.analysis-feedback-main strong {
-  font-size: 18px;
-}
-
-
-/* ==================================================
-   TÉCNICA
-   ================================================== */
-
-.analysis-technique {
-  display: flex;
-  flex-direction: column;
-
-  gap: 10px;
-}
-
-
-.analysis-technique-item {
-  display: flex;
-
-  align-items: center;
-  justify-content: space-between;
-
-  gap: 20px;
-
-  padding: 12px 0;
-
-  border-bottom: 1px solid #eeeeee;
-}
-
-
-.analysis-technique-item p {
-  margin: 4px 0 0;
-
-  font-size: 14px;
-
-  opacity: 0.75;
-}
-
-
-.analysis-technique-item > span {
-  flex-shrink: 0;
-
-  font-weight: 700;
-}
-
-
-.analysis-limits {
-  display: flex;
-
-  justify-content: space-between;
-
-  gap: 20px;
-
-  margin-top: 5px;
-
-  opacity: 0.6;
-}
-
-
-/* ==================================================
-   RESUMEN DE SESIÓN
-   ================================================== */
-
-.analysis-summary-grid {
-  display: grid;
-
-  grid-template-columns:
-    repeat(
-      2,
-      minmax(
-        0,
-        1fr
-      )
-    );
-
-  gap: 12px;
-}
-
-
-.analysis-summary-item {
-  display: flex;
-  flex-direction: column;
-
-  padding: 14px;
-
-  border-radius: 12px;
-
-  background-color: #f5f5f5;
-}
-
-
-.analysis-summary-item span {
-  margin-bottom: 4px;
-
-  font-size: 13px;
-
-  opacity: 0.7;
-}
-
-
-.analysis-summary-item strong {
-  font-size: 20px;
-}
-
-
-.analysis-most-common-error {
-  display: flex;
-
-  align-items: center;
-  justify-content: space-between;
-
-  gap: 15px;
-
-  margin-top: 12px;
-
-  padding: 14px;
-
-  border-radius: 12px;
-
-  background-color: #f5f5f5;
-}
-
-
-/* ==================================================
-   HISTORIAL
-   ================================================== */
-
-.analysis-history {
-  display: flex;
-  flex-direction: column;
-
-  gap: 8px;
-}
-
-
-.analysis-history-item {
-  display: flex;
-
-  align-items: center;
-  justify-content: space-between;
-
-  gap: 20px;
-
-  padding: 12px 14px;
-
-  border-radius: 10px;
-
-  background-color: #f5f5f5;
-}
-
-
-.analysis-history-number {
-  opacity: 0.7;
-}
-
-
-.analysis-empty-message {
-  margin-bottom: 0;
-
-  opacity: 0.7;
-}
-
-
-/* ==================================================
-   RESPONSIVE
-   ================================================== */
-
-@media (max-width: 600px) {
-  .analysis-section {
-    padding: 18px;
-  }
-
-
-  .analysis-section-header {
-    flex-direction: column;
-  }
-
-
-  .analysis-repetition-counter {
-    width: 100%;
-
-    box-sizing: border-box;
-  }
-
-
-  .analysis-metrics-grid,
-  .analysis-summary-grid {
-    grid-template-columns:
-      1fr;
-  }
-
-
-  .analysis-limits {
-    flex-direction: column;
-
-    gap: 4px;
-  }
-
-
-  .analysis-history-item {
-    align-items: flex-start;
-
-    flex-direction: column;
-
-    gap: 4px;
   }
 }
