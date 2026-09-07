@@ -10,14 +10,28 @@ import type {
   PoseLandmarker
 } from "@mediapipe/tasks-vision";
 
-// Función común para crear MediaPipe.
+
+// --------------------------------------------------
+// MEDIAPIPE
+// --------------------------------------------------
+
 import {
   crearPoseLandmarker
 } from "../mediapipe/pose";
 
 
 // --------------------------------------------------
-// UTILIDADES COMUNES DE MEDIAPIPE
+// GESTIÓN DE ERRORES
+// --------------------------------------------------
+
+import {
+  obtenerMensajeErrorCamara,
+  obtenerMensajeErrorMediaPipe
+} from "../mediapipe/errores";
+
+
+// --------------------------------------------------
+// UTILIDADES DE DIBUJO
 // --------------------------------------------------
 
 import {
@@ -106,23 +120,57 @@ import type {
 
 
 // ==================================================
-// PROPS CURL
+// MENSAJE DE ERROR DEL SISTEMA
 // ==================================================
 
-interface CurlCameraPreviewProps {
-  lado: Lado;
+interface MensajeErrorSistemaProps {
+  mensaje: string;
+}
+
+
+function MensajeErrorSistema(
+  props: MensajeErrorSistemaProps
+) {
+  return (
+    <div className="system-error-screen">
+
+      <div className="system-error-content">
+
+        <div className="system-error-icon">
+          ⚠
+        </div>
+
+
+        <h1>
+          No se puede iniciar el análisis
+        </h1>
+
+
+        <p>
+          {props.mensaje}
+        </p>
+
+      </div>
+
+    </div>
+  );
 }
 
 
 // ==================================================
-// CÁMARA DEL CURL
+// CURL
 // ==================================================
+
+interface CurlCameraPreviewProps {
+  lado: Lado;
+
+  reinicioId: number;
+}
+
 
 function CurlCameraPreview(
   props: CurlCameraPreviewProps
 ) {
-  // Elegimos los landmarks
-  // correspondientes al lado seleccionado.
   const landmarksCurl =
     LANDMARKS_CURL[
       props.lado
@@ -262,6 +310,15 @@ function CurlCameraPreview(
     );
 
 
+  const [
+    errorSistema,
+    setErrorSistema
+  ] =
+    useState<string | null>(
+      null
+    );
+
+
   // ==================================================
   // RESUMEN
   // ==================================================
@@ -270,6 +327,75 @@ function CurlCameraPreview(
     calcularResumenSesion(
       historial
     );
+
+
+  // ==================================================
+  // REINICIAR SESIÓN
+  // ==================================================
+
+  useEffect(
+    function () {
+      estadoCurlRef.current =
+        crearEstadoCurl();
+
+
+      verdeHastaRef.current =
+        0;
+
+
+      ultimaActualizacionUIRef.current =
+        0;
+
+
+      setRepeticiones(
+        0
+      );
+
+
+      setAnguloActual(
+        0
+      );
+
+
+      setFaseActual(
+        "abajo"
+      );
+
+
+      setFeedback(
+        "Colócate frente a la cámara"
+      );
+
+
+      setFeedbackCodo(
+        "Extiende el brazo para calibrar el codo"
+      );
+
+
+      setFeedbackHombro(
+        "Extiende el brazo para calibrar el tronco"
+      );
+
+
+      setDesplazamientoCodo(
+        null
+      );
+
+
+      setDesplazamientoHombro(
+        null
+      );
+
+
+      setHistorial(
+        []
+      );
+
+    },
+    [
+      props.reinicioId
+    ]
+  );
 
 
   // ==================================================
@@ -287,8 +413,17 @@ function CurlCameraPreview(
 
 
     async function iniciarSistema() {
+      setErrorSistema(
+        null
+      );
+
+
+      let nuevoStream:
+        MediaStream;
+
+
       try {
-        const nuevoStream =
+        nuevoStream =
           await navigator.mediaDevices.getUserMedia({
             video:
               true,
@@ -297,40 +432,57 @@ function CurlCameraPreview(
               false
           });
 
-
-        if (
-          !componenteActivo
-        ) {
-          nuevoStream
-            .getTracks()
-            .forEach(
-              function (track) {
-                track.stop();
-              }
-            );
-
-
-          return;
-        }
-
-
-        stream =
-          nuevoStream;
-
-
-        if (
-          videoRef.current
-        ) {
-          videoRef.current.srcObject =
-            stream;
-        }
-
-
-        console.log(
-          "Cargando MediaPipe..."
+      } catch (error) {
+        console.error(
+          "Error al iniciar la cámara del curl:",
+          error
         );
 
 
+        if (
+          componenteActivo
+        ) {
+          setErrorSistema(
+            obtenerMensajeErrorCamara(
+              error
+            )
+          );
+        }
+
+
+        return;
+      }
+
+
+      if (
+        !componenteActivo
+      ) {
+        nuevoStream
+          .getTracks()
+          .forEach(
+            function (track) {
+              track.stop();
+            }
+          );
+
+
+        return;
+      }
+
+
+      stream =
+        nuevoStream;
+
+
+      if (
+        videoRef.current
+      ) {
+        videoRef.current.srcObject =
+          stream;
+      }
+
+
+      try {
         const poseLandmarker =
           await crearPoseLandmarker();
 
@@ -346,8 +498,8 @@ function CurlCameraPreview(
           poseLandmarker;
 
 
-        console.log(
-          "MediaPipe cargado"
+        setErrorSistema(
+          null
         );
 
 
@@ -360,10 +512,40 @@ function CurlCameraPreview(
         }
 
       } catch (error) {
-        console.error(
-          "Error al iniciar cámara o MediaPipe:",
-          error
-        );
+        if (
+          stream
+        ) {
+          stream
+            .getTracks()
+            .forEach(
+              function (track) {
+                track.stop();
+              }
+            );
+
+
+          stream =
+            null;
+        }
+
+
+        if (
+          videoRef.current
+        ) {
+          videoRef.current.srcObject =
+            null;
+        }
+
+
+        if (
+          componenteActivo
+        ) {
+          setErrorSistema(
+            obtenerMensajeErrorMediaPipe(
+              error
+            )
+          );
+        }
       }
     }
 
@@ -409,11 +591,6 @@ function CurlCameraPreview(
         videoRef.current.srcObject =
           null;
       }
-
-
-      console.log(
-        "Cámara y análisis de curl detenidos"
-      );
     };
   }, []);
 
@@ -586,10 +763,6 @@ function CurlCameraPreview(
           resultado.landmarks[0];
 
 
-        // ----------------------------------------
-        // LANDMARKS DEL LADO SELECCIONADO
-        // ----------------------------------------
-
         const hombroNormalizado =
           landmarks[
             landmarksCurl.hombro
@@ -617,206 +790,205 @@ function CurlCameraPreview(
         if (
           hombroNormalizado &&
           codoNormalizado &&
-          munecaNormalizada
+          munecaNormalizada &&
+          esLandmarkValido(
+            hombroNormalizado
+          ) &&
+          esLandmarkValido(
+            codoNormalizado
+          ) &&
+          esLandmarkValido(
+            munecaNormalizada
+          )
         ) {
+          const hombro =
+            convertirAPixeles(
+              hombroNormalizado,
+              canvas
+            );
+
+
+          const codo =
+            convertirAPixeles(
+              codoNormalizado,
+              canvas
+            );
+
+
+          const muneca =
+            convertirAPixeles(
+              munecaNormalizada,
+              canvas
+            );
+
+
+          let cadera:
+            Punto | null =
+            null;
+
+
           if (
+            caderaNormalizada &&
             esLandmarkValido(
-              hombroNormalizado
-            ) &&
-            esLandmarkValido(
-              codoNormalizado
-            ) &&
-            esLandmarkValido(
-              munecaNormalizada
+              caderaNormalizada
             )
           ) {
-            const hombro =
+            cadera =
               convertirAPixeles(
-                hombroNormalizado,
+                caderaNormalizada,
                 canvas
               );
+          }
 
 
-            const codo =
-              convertirAPixeles(
-                codoNormalizado,
-                canvas
-              );
+          const analisis =
+            analizarFrameCurl(
+              estadoCurlRef.current,
+              hombro,
+              codo,
+              muneca,
+              cadera
+            );
 
 
-            const muneca =
-              convertirAPixeles(
-                munecaNormalizada,
-                canvas
-              );
+          if (
+            analisis.cambioFase
+          ) {
+            activarFeedbackVerde();
 
 
-            let cadera:
-              Punto | null =
-              null;
+            setFaseActual(
+              analisis.fase
+            );
+          }
 
 
-            if (
-              caderaNormalizada &&
-              esLandmarkValido(
-                caderaNormalizada
-              )
-            ) {
-              cadera =
-                convertirAPixeles(
-                  caderaNormalizada,
-                  canvas
-                );
-            }
+          if (
+            analisis.repeticionSumada
+          ) {
+            setRepeticiones(
+              estadoCurlRef.current
+                .repeticiones
+            );
+          }
 
 
-            const analisis =
-              analizarFrameCurl(
-                estadoCurlRef.current,
-                hombro,
-                codo,
-                muneca,
-                cadera
-              );
-
-
-            if (
-              analisis.cambioFase
-            ) {
-              activarFeedbackVerde();
-
-
-              setFaseActual(
-                analisis.fase
-              );
-            }
-
-
-            if (
-              analisis.repeticionSumada
-            ) {
-              setRepeticiones(
-                estadoCurlRef.current
-                  .repeticiones
-              );
-            }
-
-
+          if (
+            analisis.repeticionFinalizada !==
+            null
+          ) {
             const repeticionFinalizada =
               analisis
                 .repeticionFinalizada;
 
 
+            setHistorial(
+              function (
+                historialAnterior
+              ) {
+                return [
+                  ...historialAnterior,
+                  repeticionFinalizada
+                ];
+              }
+            );
+          }
+
+
+          if (
+            timestamp -
+              ultimaActualizacionUIRef
+                .current >=
+            100
+          ) {
+            setAnguloActual(
+              Math.round(
+                analisis.anguloCodo
+              )
+            );
+
+
+            setFaseActual(
+              analisis.fase
+            );
+
+
+            setFeedback(
+              analisis
+                .feedbackMovimiento
+            );
+
+
+            setFeedbackCodo(
+              analisis
+                .feedbackCodo
+            );
+
+
+            setFeedbackHombro(
+              analisis
+                .feedbackHombro
+            );
+
+
             if (
-              repeticionFinalizada !==
+              analisis
+                .desplazamientoCodo !==
               null
             ) {
-              setHistorial(
-                function (
-                  historialAnterior
-                ) {
-                  return [
-                    ...historialAnterior,
-                    repeticionFinalizada
-                  ];
-                }
-              );
-            }
-
-
-            if (
-              timestamp -
-                ultimaActualizacionUIRef
-                  .current >=
-              100
-            ) {
-              setAnguloActual(
+              setDesplazamientoCodo(
                 Math.round(
-                  analisis.anguloCodo
+                  analisis
+                    .desplazamientoCodo *
+                  100
                 )
               );
 
-
-              setFaseActual(
-                analisis.fase
-              );
-
-
-              setFeedback(
-                analisis
-                  .feedbackMovimiento
-              );
-
-
-              setFeedbackCodo(
-                analisis
-                  .feedbackCodo
-              );
-
-
-              setFeedbackHombro(
-                analisis
-                  .feedbackHombro
-              );
-
-
-              if (
-                analisis
-                  .desplazamientoCodo !==
+            } else {
+              setDesplazamientoCodo(
                 null
-              ) {
-                setDesplazamientoCodo(
-                  Math.round(
-                    analisis
-                      .desplazamientoCodo *
-                    100
-                  )
-                );
-              } else {
-                setDesplazamientoCodo(
-                  null
-                );
-              }
-
-
-              if (
-                analisis
-                  .desplazamientoHombro !==
-                null
-              ) {
-                setDesplazamientoHombro(
-                  Math.round(
-                    analisis
-                      .desplazamientoHombro *
-                    100
-                  )
-                );
-              } else {
-                setDesplazamientoHombro(
-                  null
-                );
-              }
-
-
-              ultimaActualizacionUIRef
-                .current =
-                timestamp;
+              );
             }
 
 
-            dibujarBrazo(
-              contexto,
-              hombro,
-              codo,
-              muneca
-            );
+            if (
+              analisis
+                .desplazamientoHombro !==
+              null
+            ) {
+              setDesplazamientoHombro(
+                Math.round(
+                  analisis
+                    .desplazamientoHombro *
+                  100
+                )
+              );
+
+            } else {
+              setDesplazamientoHombro(
+                null
+              );
+            }
+
+
+            ultimaActualizacionUIRef
+              .current =
+              timestamp;
           }
+
+
+          dibujarBrazo(
+            contexto,
+            hombro,
+            codo,
+            muneca
+          );
         }
       }
 
     } catch (error) {
       console.error(
-        "Error analizando el curl:",
+        "Error analizando curl:",
         error
       );
     }
@@ -828,10 +1000,6 @@ function CurlCameraPreview(
       );
   }
 
-
-  // ==================================================
-  // INICIAR
-  // ==================================================
 
   function iniciarAnalisis() {
     if (
@@ -860,6 +1028,20 @@ function CurlCameraPreview(
 
   function videoPreparado() {
     iniciarAnalisis();
+  }
+
+
+  if (
+    errorSistema !==
+    null
+  ) {
+    return (
+      <MensajeErrorSistema
+        mensaje={
+          errorSistema
+        }
+      />
+    );
   }
 
 
@@ -906,223 +1088,353 @@ function CurlCameraPreview(
 
       <div className="vision-fit-data-column">
 
+        {/* ==========================================
+            FEEDBACK ACTUAL
+            ========================================== */}
+
+        <section className="analysis-section analysis-current">
+
+          <div className="analysis-section-header">
+
+            <div>
+
+              <span className="analysis-section-label">
+                Análisis en tiempo real
+              </span>
+
+
+              <h2>
+                Feedback actual
+              </h2>
+
+            </div>
+
+
+            <div className="analysis-repetition-counter">
+
+              <span>
+                Repeticiones
+              </span>
+
+
+              <strong>
+                {repeticiones}
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          <div className="analysis-metrics-grid">
+
+            <div className="analysis-metric">
+
+              <span>
+                Fase
+              </span>
+
+
+              <strong>
+                {faseActual}
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-metric">
+
+              <span>
+                Ángulo del codo
+              </span>
+
+
+              <strong>
+                {anguloActual}°
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          <div className="analysis-feedback-main">
+
+            <span>
+              Movimiento
+            </span>
+
+
+            <strong>
+              {feedback}
+            </strong>
+
+          </div>
+
+
+          <div className="analysis-technique">
+
+            <h3>
+              Técnica
+            </h3>
+
+
+            <div className="analysis-technique-item">
+
+              <div>
+
+                <strong>
+                  Codo
+                </strong>
+
+
+                <p>
+                  {feedbackCodo}
+                </p>
+
+              </div>
+
+
+              <span>
+                {desplazamientoCodo ===
+                null
+                  ? "--"
+                  : desplazamientoCodo +
+                    " %"}
+              </span>
+
+            </div>
+
+
+            <div className="analysis-technique-item">
+
+              <div>
+
+                <strong>
+                  Tronco
+                </strong>
+
+
+                <p>
+                  {feedbackHombro}
+                </p>
+
+              </div>
+
+
+              <span>
+                {desplazamientoHombro ===
+                null
+                  ? "--"
+                  : desplazamientoHombro +
+                    " %"}
+              </span>
+
+            </div>
+
+
+            <div className="analysis-limits">
+
+              <small>
+                Límite codo:{" "}
+                {Math.round(
+                  DESPLAZAMIENTO_MAXIMO_CODO *
+                    100
+                )}
+                %
+              </small>
+
+
+              <small>
+                Límite tronco:{" "}
+                {Math.round(
+                  DESPLAZAMIENTO_MAXIMO_HOMBRO *
+                    100
+                )}
+                %
+              </small>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        {/* ==========================================
+            RESUMEN
+            ========================================== */}
+
         <section className="analysis-section">
 
+          <span className="analysis-section-label">
+            Sesión
+          </span>
+
+
           <h2>
-            Repeticiones: {repeticiones}
+            Resumen
           </h2>
 
 
-          <p>
+          <div className="analysis-summary-grid">
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Analizadas
+              </span>
+
+
+              <strong>
+                {resumenSesion.total}
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Correctas
+              </span>
+
+
+              <strong>
+                {resumenSesion.correctas}
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Técnica correcta
+              </span>
+
+
+              <strong>
+                {
+                  resumenSesion
+                    .porcentajeCorrectas
+                }
+                %
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Errores de codo
+              </span>
+
+
+              <strong>
+                {resumenSesion.erroresCodo}
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Balanceo tronco
+              </span>
+
+
+              <strong>
+                {resumenSesion.erroresTronco}
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          <div className="analysis-most-common-error">
+
+            <span>
+              Error más frecuente
+            </span>
+
+
             <strong>
-              Ángulo del codo:
-            </strong>{" "}
-            {anguloActual}°
-          </p>
+              {
+                resumenSesion
+                  .errorMasFrecuente
+              }
+            </strong>
 
-
-          <p>
-            <strong>
-              Fase:
-            </strong>{" "}
-            {faseActual}
-          </p>
-
-
-          <p>
-            <strong>
-              Movimiento:
-            </strong>{" "}
-            {feedback}
-          </p>
+          </div>
 
         </section>
 
 
-        <section className="analysis-section">
-
-          <h3>
-            Técnica del curl
-          </h3>
-
-
-          <p>
-            <strong>
-              Codo:
-            </strong>{" "}
-            {feedbackCodo}
-          </p>
-
-
-          <p>
-            <strong>
-              Desplazamiento:
-            </strong>{" "}
-
-            {desplazamientoCodo ===
-            null
-              ? "--"
-              : desplazamientoCodo +
-                " %"}
-          </p>
-
-
-          <p>
-            <strong>
-              Límite:
-            </strong>{" "}
-
-            {Math.round(
-              DESPLAZAMIENTO_MAXIMO_CODO *
-                100
-            )} %
-          </p>
-
-
-          <p>
-            <strong>
-              Tronco:
-            </strong>{" "}
-            {feedbackHombro}
-          </p>
-
-
-          <p>
-            <strong>
-              Desplazamiento:
-            </strong>{" "}
-
-            {desplazamientoHombro ===
-            null
-              ? "--"
-              : desplazamientoHombro +
-                " %"}
-          </p>
-
-
-          <p>
-            <strong>
-              Límite:
-            </strong>{" "}
-
-            {Math.round(
-              DESPLAZAMIENTO_MAXIMO_HOMBRO *
-                100
-            )} %
-          </p>
-
-        </section>
-
+        {/* ==========================================
+            HISTORIAL
+            ========================================== */}
 
         <section className="analysis-section">
 
-          <h3>
-            Resumen de sesión
-          </h3>
+          <span className="analysis-section-label">
+            Detalle
+          </span>
 
 
-          <p>
-            <strong>
-              Repeticiones analizadas:
-            </strong>{" "}
-            {resumenSesion.total}
-          </p>
-
-
-          <p>
-            <strong>
-              Correctas:
-            </strong>{" "}
-            {resumenSesion.correctas}
-          </p>
-
-
-          <p>
-            <strong>
-              Técnica correcta:
-            </strong>{" "}
-            {
-              resumenSesion
-                .porcentajeCorrectas
-            } %
-          </p>
-
-
-          <p>
-            <strong>
-              Errores de codo:
-            </strong>{" "}
-            {resumenSesion.erroresCodo}
-          </p>
-
-
-          <p>
-            <strong>
-              Balanceos de tronco:
-            </strong>{" "}
-            {
-              resumenSesion
-                .erroresTronco
-            }
-          </p>
-
-
-          <p>
-            <strong>
-              Error más frecuente:
-            </strong>{" "}
-            {
-              resumenSesion
-                .errorMasFrecuente
-            }
-          </p>
-
-        </section>
-
-
-        <section className="analysis-section">
-
-          <h3>
+          <h2>
             Historial
-          </h3>
+          </h2>
 
 
           {historial.length ===
           0 ? (
 
-            <p>
-              Completa una repetición
-              para ver su análisis.
+            <p className="analysis-empty-message">
+              Completa una repetición para
+              empezar a generar el historial.
             </p>
 
           ) : (
 
-            <ol className="repetition-history">
+            <div className="analysis-history">
 
               {historial.map(
-                function (repeticion) {
+                function (
+                  repeticion
+                ) {
                   return (
-                    <li
+                    <div
                       key={
                         repeticion.numero
                       }
-                    >
-                      <strong>
-                        Rep {
-                          repeticion.numero
-                        }:
-                      </strong>{" "}
 
-                      {
-                        repeticion
-                          .resultado
-                      }
-                    </li>
+                      className="analysis-history-item"
+                    >
+
+                      <span className="analysis-history-number">
+                        Rep{" "}
+                        {
+                          repeticion.numero
+                        }
+                      </span>
+
+
+                      <strong>
+                        {
+                          repeticion.resultado
+                        }
+                      </strong>
+
+                    </div>
                   );
                 }
               )}
 
-            </ol>
+            </div>
 
           )}
 
@@ -1136,23 +1448,19 @@ function CurlCameraPreview(
 
 
 // ==================================================
-// PROPS SENTADILLA
+// SENTADILLA
 // ==================================================
 
 interface SentadillaCameraPreviewProps {
   lado: Lado;
+
+  reinicioId: number;
 }
 
-
-// ==================================================
-// CÁMARA DE SENTADILLA
-// ==================================================
 
 function SentadillaCameraPreview(
   props: SentadillaCameraPreviewProps
 ) {
-  // Elegimos los landmarks
-  // correspondientes al lado seleccionado.
   const landmarksSentadilla =
     LANDMARKS_SENTADILLA[
       props.lado
@@ -1286,6 +1594,15 @@ function SentadillaCameraPreview(
     );
 
 
+  const [
+    errorSistema,
+    setErrorSistema
+  ] =
+    useState<string | null>(
+      null
+    );
+
+
   // ==================================================
   // RESUMEN
   // ==================================================
@@ -1294,6 +1611,71 @@ function SentadillaCameraPreview(
     calcularResumenSesionSentadilla(
       historial
     );
+
+
+  // ==================================================
+  // REINICIAR SESIÓN
+  // ==================================================
+
+  useEffect(
+    function () {
+      estadoSentadillaRef.current =
+        crearEstadoSentadilla();
+
+
+      verdeHastaRef.current =
+        0;
+
+
+      setRepeticiones(
+        0
+      );
+
+
+      setAnguloRodilla(
+        0
+      );
+
+
+      setInclinacionTronco(
+        null
+      );
+
+
+      setFase(
+        "arriba"
+      );
+
+
+      setFeedback(
+        "Colócate de forma que se vea la pierna completa"
+      );
+
+
+      setFeedbackTronco(
+        "Esperando detección"
+      );
+
+
+      setMensaje(
+        "Esperando detección"
+      );
+
+
+      setMensajeTronco(
+        "Esperando detección"
+      );
+
+
+      setHistorial(
+        []
+      );
+
+    },
+    [
+      props.reinicioId
+    ]
+  );
 
 
   // ==================================================
@@ -1311,8 +1693,17 @@ function SentadillaCameraPreview(
 
 
     async function iniciarSistema() {
+      setErrorSistema(
+        null
+      );
+
+
+      let nuevoStream:
+        MediaStream;
+
+
       try {
-        const nuevoStream =
+        nuevoStream =
           await navigator.mediaDevices.getUserMedia({
             video:
               true,
@@ -1321,40 +1712,57 @@ function SentadillaCameraPreview(
               false
           });
 
-
-        if (
-          !componenteActivo
-        ) {
-          nuevoStream
-            .getTracks()
-            .forEach(
-              function (track) {
-                track.stop();
-              }
-            );
-
-
-          return;
-        }
-
-
-        stream =
-          nuevoStream;
-
-
-        if (
-          videoRef.current
-        ) {
-          videoRef.current.srcObject =
-            stream;
-        }
-
-
-        console.log(
-          "Cargando MediaPipe para sentadilla..."
+      } catch (error) {
+        console.error(
+          "Error al iniciar cámara de sentadilla:",
+          error
         );
 
 
+        if (
+          componenteActivo
+        ) {
+          setErrorSistema(
+            obtenerMensajeErrorCamara(
+              error
+            )
+          );
+        }
+
+
+        return;
+      }
+
+
+      if (
+        !componenteActivo
+      ) {
+        nuevoStream
+          .getTracks()
+          .forEach(
+            function (track) {
+              track.stop();
+            }
+          );
+
+
+        return;
+      }
+
+
+      stream =
+        nuevoStream;
+
+
+      if (
+        videoRef.current
+      ) {
+        videoRef.current.srcObject =
+          stream;
+      }
+
+
+      try {
         const poseLandmarker =
           await crearPoseLandmarker();
 
@@ -1370,8 +1778,8 @@ function SentadillaCameraPreview(
           poseLandmarker;
 
 
-        console.log(
-          "MediaPipe preparado para sentadilla"
+        setErrorSistema(
+          null
         );
 
 
@@ -1384,10 +1792,40 @@ function SentadillaCameraPreview(
         }
 
       } catch (error) {
-        console.error(
-          "Error iniciando sentadilla:",
-          error
-        );
+        if (
+          stream
+        ) {
+          stream
+            .getTracks()
+            .forEach(
+              function (track) {
+                track.stop();
+              }
+            );
+
+
+          stream =
+            null;
+        }
+
+
+        if (
+          videoRef.current
+        ) {
+          videoRef.current.srcObject =
+            null;
+        }
+
+
+        if (
+          componenteActivo
+        ) {
+          setErrorSistema(
+            obtenerMensajeErrorMediaPipe(
+              error
+            )
+          );
+        }
       }
     }
 
@@ -1433,11 +1871,6 @@ function SentadillaCameraPreview(
         videoRef.current.srcObject =
           null;
       }
-
-
-      console.log(
-        "Análisis de sentadilla detenido"
-      );
     };
   }, []);
 
@@ -1548,10 +1981,6 @@ function SentadillaCameraPreview(
       canvasRef.current;
 
 
-    const poseLandmarker =
-      poseLandmarkerRef.current;
-
-
     if (
       video.readyState <
       2
@@ -1604,7 +2033,7 @@ function SentadillaCameraPreview(
 
     try {
       const resultado =
-        poseLandmarker.detectForVideo(
+        poseLandmarkerRef.current.detectForVideo(
           video,
           timestamp
         );
@@ -1617,10 +2046,6 @@ function SentadillaCameraPreview(
         const landmarks =
           resultado.landmarks[0];
 
-
-        // ----------------------------------------
-        // LANDMARKS DEL LADO SELECCIONADO
-        // ----------------------------------------
 
         const hombroNormalizado =
           landmarks[
@@ -1649,189 +2074,186 @@ function SentadillaCameraPreview(
         if (
           caderaNormalizada &&
           rodillaNormalizada &&
-          tobilloNormalizado
+          tobilloNormalizado &&
+          esLandmarkValido(
+            caderaNormalizada
+          ) &&
+          esLandmarkValido(
+            rodillaNormalizada
+          ) &&
+          esLandmarkValido(
+            tobilloNormalizado
+          )
         ) {
+          const cadera =
+            convertirAPixeles(
+              caderaNormalizada,
+              canvas
+            );
+
+
+          const rodilla =
+            convertirAPixeles(
+              rodillaNormalizada,
+              canvas
+            );
+
+
+          const tobillo =
+            convertirAPixeles(
+              tobilloNormalizado,
+              canvas
+            );
+
+
+          let hombro:
+            PuntoSentadilla | null =
+            null;
+
+
           if (
+            hombroNormalizado &&
             esLandmarkValido(
-              caderaNormalizada
-            ) &&
-            esLandmarkValido(
-              rodillaNormalizada
-            ) &&
-            esLandmarkValido(
-              tobilloNormalizado
+              hombroNormalizado
             )
           ) {
-            const cadera =
+            hombro =
               convertirAPixeles(
-                caderaNormalizada,
+                hombroNormalizado,
                 canvas
               );
 
 
-            const rodilla =
-              convertirAPixeles(
-                rodillaNormalizada,
-                canvas
-              );
-
-
-            const tobillo =
-              convertirAPixeles(
-                tobilloNormalizado,
-                canvas
-              );
-
-
-            let hombro:
-              PuntoSentadilla | null =
-              null;
-
-
-            if (
-              hombroNormalizado &&
-              esLandmarkValido(
-                hombroNormalizado
-              )
-            ) {
-              hombro =
-                convertirAPixeles(
-                  hombroNormalizado,
-                  canvas
-                );
-
-
-              setMensajeTronco(
-                "Tronco detectado correctamente"
-              );
-
-            } else {
-              setMensajeTronco(
-                "Asegúrate de que se vea el hombro"
-              );
-            }
-
-
-            const profundidadAntes =
-              estadoSentadillaRef
-                .current
-                .profundidadAlcanzada;
-
-
-            const analisis =
-              analizarSentadilla(
-                estadoSentadillaRef.current,
-                hombro,
-                cadera,
-                rodilla,
-                tobillo
-              );
-
-
-            const profundidadDespues =
-              estadoSentadillaRef
-                .current
-                .profundidadAlcanzada;
-
-
-            if (
-              !profundidadAntes &&
-              profundidadDespues
-            ) {
-              verdeHastaRef.current =
-                timestamp +
-                300;
-            }
-
-
-            if (
-              analisis.repeticionSumada
-            ) {
-              verdeHastaRef.current =
-                timestamp +
-                300;
-            }
-
-
-            const mostrarVerde =
-              timestamp <
-              verdeHastaRef.current;
-
-
-            setAnguloRodilla(
-              Math.round(
-                analisis.anguloRodilla
-              )
-            );
-
-
-            if (
-              analisis.inclinacionTronco !==
-              null
-            ) {
-              setInclinacionTronco(
-                Math.round(
-                  analisis.inclinacionTronco
-                )
-              );
-
-            } else {
-              setInclinacionTronco(
-                null
-              );
-            }
-
-
-            setFase(
-              analisis.fase
-            );
-
-
-            setFeedback(
-              analisis.feedbackMovimiento
-            );
-
-
-            setFeedbackTronco(
-              analisis.feedbackTronco
-            );
-
-
-            setMensaje(
-              "Pierna detectada correctamente"
-            );
-
-
-            if (
-              analisis.repeticionSumada
-            ) {
-              setRepeticiones(
-                analisis.repeticiones
-              );
-
-
-              setHistorial(
-                [
-                  ...analisis.historial
-                ]
-              );
-            }
-
-
-            dibujarCuerpo(
-              contexto,
-              hombro,
-              cadera,
-              rodilla,
-              tobillo,
-              mostrarVerde
+            setMensajeTronco(
+              "Tronco detectado correctamente"
             );
 
           } else {
-            setMensaje(
-              "Asegúrate de que se vea la pierna completa"
+            setMensajeTronco(
+              "Asegúrate de que se vea el hombro"
             );
           }
+
+
+          const profundidadAntes =
+            estadoSentadillaRef
+              .current
+              .profundidadAlcanzada;
+
+
+          const analisis =
+            analizarSentadilla(
+              estadoSentadillaRef.current,
+              hombro,
+              cadera,
+              rodilla,
+              tobillo
+            );
+
+
+          const profundidadDespues =
+            estadoSentadillaRef
+              .current
+              .profundidadAlcanzada;
+
+
+          if (
+            !profundidadAntes &&
+            profundidadDespues
+          ) {
+            verdeHastaRef.current =
+              timestamp +
+              300;
+          }
+
+
+          if (
+            analisis.repeticionSumada
+          ) {
+            verdeHastaRef.current =
+              timestamp +
+              300;
+          }
+
+
+          const mostrarVerde =
+            timestamp <
+            verdeHastaRef.current;
+
+
+          setAnguloRodilla(
+            Math.round(
+              analisis.anguloRodilla
+            )
+          );
+
+
+          if (
+            analisis.inclinacionTronco !==
+            null
+          ) {
+            setInclinacionTronco(
+              Math.round(
+                analisis.inclinacionTronco
+              )
+            );
+
+          } else {
+            setInclinacionTronco(
+              null
+            );
+          }
+
+
+          setFase(
+            analisis.fase
+          );
+
+
+          setFeedback(
+            analisis.feedbackMovimiento
+          );
+
+
+          setFeedbackTronco(
+            analisis.feedbackTronco
+          );
+
+
+          setMensaje(
+            "Pierna detectada correctamente"
+          );
+
+
+          if (
+            analisis.repeticionSumada
+          ) {
+            setRepeticiones(
+              analisis.repeticiones
+            );
+
+
+            setHistorial(
+              [
+                ...analisis.historial
+              ]
+            );
+          }
+
+
+          dibujarCuerpo(
+            contexto,
+            hombro,
+            cadera,
+            rodilla,
+            tobillo,
+            mostrarVerde
+          );
+
+        } else {
+          setMensaje(
+            "Asegúrate de que se vea la pierna completa"
+          );
         }
       }
 
@@ -1849,10 +2271,6 @@ function SentadillaCameraPreview(
       );
   }
 
-
-  // ==================================================
-  // INICIAR
-  // ==================================================
 
   function iniciarAnalisis() {
     if (
@@ -1881,6 +2299,20 @@ function SentadillaCameraPreview(
 
   function videoPreparado() {
     iniciarAnalisis();
+  }
+
+
+  if (
+    errorSistema !==
+    null
+  ) {
+    return (
+      <MensajeErrorSistema
+        mensaje={
+          errorSistema
+        }
+      />
+    );
   }
 
 
@@ -1927,212 +2359,391 @@ function SentadillaCameraPreview(
 
       <div className="vision-fit-data-column">
 
-        <section className="analysis-section">
+        {/* ==========================================
+            FEEDBACK ACTUAL
+            ========================================== */}
 
-          <h2>
-            Sentadilla
-          </h2>
+        <section className="analysis-section analysis-current">
+
+          <div className="analysis-section-header">
+
+            <div>
+
+              <span className="analysis-section-label">
+                Análisis en tiempo real
+              </span>
 
 
-          <p>
+              <h2>
+                Feedback actual
+              </h2>
+
+            </div>
+
+
+            <div className="analysis-repetition-counter">
+
+              <span>
+                Repeticiones
+              </span>
+
+
+              <strong>
+                {repeticiones}
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          {/* ========================================
+              MÉTRICAS
+              ======================================== */}
+
+          <div className="analysis-metrics-grid">
+
+            <div className="analysis-metric">
+
+              <span>
+                Fase
+              </span>
+
+
+              <strong>
+                {fase}
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-metric">
+
+              <span>
+                Ángulo de rodilla
+              </span>
+
+
+              <strong>
+                {anguloRodilla}°
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-metric">
+
+              <span>
+                Inclinación del tronco
+              </span>
+
+
+              <strong>
+                {inclinacionTronco !==
+                null
+                  ? inclinacionTronco +
+                    "°"
+                  : "--"}
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          {/* ========================================
+              MOVIMIENTO
+              ======================================== */}
+
+          <div className="analysis-feedback-main">
+
+            <span>
+              Movimiento
+            </span>
+
+
             <strong>
-              Repeticiones:
-            </strong>{" "}
-            {repeticiones}
-          </p>
+              {feedback}
+            </strong>
+
+          </div>
 
 
-          <p>
-            <strong>
-              Ángulo de rodilla:
-            </strong>{" "}
-            {anguloRodilla}°
-          </p>
+          {/* ========================================
+              TÉCNICA
+              ======================================== */}
+
+          <div className="analysis-technique">
+
+            <h3>
+              Técnica
+            </h3>
 
 
-          <p>
-            <strong>
-              Inclinación del tronco:
-            </strong>{" "}
+            <div className="analysis-technique-item">
 
-            {inclinacionTronco !==
-            null
-              ? inclinacionTronco +
-                "°"
-              : "No disponible"}
-          </p>
+              <div>
+
+                <strong>
+                  Pierna
+                </strong>
 
 
-          <p>
-            <strong>
-              Fase:
-            </strong>{" "}
-            {fase}
-          </p>
+                <p>
+                  {mensaje}
+                </p>
+
+              </div>
+
+            </div>
 
 
-          <p>
-            <strong>
-              Movimiento:
-            </strong>{" "}
-            {feedback}
-          </p>
+            <div className="analysis-technique-item">
+
+              <div>
+
+                <strong>
+                  Tronco
+                </strong>
 
 
-          <p>
-            <strong>
-              Técnica del tronco:
-            </strong>{" "}
-            {feedbackTronco}
-          </p>
+                <p>
+                  {feedbackTronco}
+                </p>
+
+              </div>
 
 
-          <p>
-            <strong>
-              Pierna:
-            </strong>{" "}
-            {mensaje}
-          </p>
+              <span>
+                {inclinacionTronco !==
+                null
+                  ? inclinacionTronco +
+                    "°"
+                  : "--"}
+              </span>
+
+            </div>
 
 
-          <p>
-            <strong>
-              Tronco:
-            </strong>{" "}
-            {mensajeTronco}
-          </p>
+            <div className="analysis-technique-item">
+
+              <div>
+
+                <strong>
+                  Detección de tronco
+                </strong>
+
+
+                <p>
+                  {mensajeTronco}
+                </p>
+
+              </div>
+
+            </div>
+
+          </div>
 
         </section>
 
 
-        {historial.length >
-        0 ? (
+        {/* ==========================================
+            RESUMEN
+            ========================================== */}
 
-          <section className="analysis-section">
+        <section className="analysis-section">
 
-            <h2>
-              Resumen de sesión
-            </h2>
+          <span className="analysis-section-label">
+            Sesión
+          </span>
 
 
-            <p>
+          <h2>
+            Resumen
+          </h2>
+
+
+          <div className="analysis-summary-grid">
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Analizadas
+              </span>
+
+
               <strong>
-                Repeticiones:
-              </strong>{" "}
-              {resumen.total}
+                {resumen.total}
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Correctas
+              </span>
+
+
+              <strong>
+                {resumen.correctas}
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Técnica correcta
+              </span>
+
+
+              <strong>
+                {Math.round(
+                  resumen
+                    .porcentajeCorrectas
+                )}
+                %
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Profundidad insuficiente
+              </span>
+
+
+              <strong>
+                {
+                  resumen
+                    .profundidadInsuficiente
+                }
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Exceso de inclinación
+              </span>
+
+
+              <strong>
+                {
+                  resumen
+                    .excesoInclinacionTronco
+                }
+              </strong>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        {/* ==========================================
+            HISTORIAL
+            ========================================== */}
+
+        <section className="analysis-section">
+
+          <span className="analysis-section-label">
+            Detalle
+          </span>
+
+
+          <h2>
+            Historial
+          </h2>
+
+
+          {historial.length ===
+          0 ? (
+
+            <p className="analysis-empty-message">
+              Completa una repetición para
+              empezar a generar el historial.
             </p>
 
+          ) : (
 
-            <p>
-              <strong>
-                Correctas:
-              </strong>{" "}
-              {resumen.correctas}
-            </p>
-
-
-            <p>
-              <strong>
-                Técnica correcta:
-              </strong>{" "}
-
-              {Math.round(
-                resumen.porcentajeCorrectas
-              )}
-              %
-            </p>
-
-
-            <p>
-              <strong>
-                Profundidad insuficiente:
-              </strong>{" "}
-
-              {
-                resumen.profundidadInsuficiente
-              }
-            </p>
-
-
-            <p>
-              <strong>
-                Exceso de inclinación:
-              </strong>{" "}
-
-              {
-                resumen.excesoInclinacionTronco
-              }
-            </p>
-
-          </section>
-
-        ) : null}
-
-
-        {historial.length >
-        0 ? (
-
-          <section className="analysis-section">
-
-            <h2>
-              Historial
-            </h2>
-
-
-            <ol className="repetition-history">
+            <div className="analysis-history">
 
               {historial.map(
-                function (repeticion) {
+                function (
+                  repeticion
+                ) {
                   return (
-                    <li
+                    <div
                       key={
                         repeticion.numero
                       }
+
+                      className="analysis-history-item"
                     >
-                      <strong>
+
+                      <span className="analysis-history-number">
+
                         Rep{" "}
                         {
                           repeticion.numero
                         }
-                        :
-                      </strong>{" "}
 
-                      {
-                        repeticion.resultado
-                      }
+                      </span>
 
-                      {" — "}
 
-                      rodilla mín.:{" "}
+                      <div>
 
-                      {Math.round(
-                        repeticion.anguloMinimo
-                      )}
-                      °
+                        <strong>
+                          {
+                            repeticion.resultado
+                          }
+                        </strong>
 
-                      {" — "}
 
-                      tronco máx.:{" "}
-
-                      {repeticion
-                        .inclinacionTroncoMaxima !==
-                      null
-                        ? Math.round(
+                        <p>
+                          Rodilla mín.:{" "}
+                          {Math.round(
                             repeticion
-                              .inclinacionTroncoMaxima
-                          ) +
-                          "°"
-                        : "N/D"}
-                    </li>
+                              .anguloMinimo
+                          )}
+                          °
+                        </p>
+
+
+                        <p>
+                          Tronco máx.:{" "}
+                          {repeticion
+                            .inclinacionTroncoMaxima !==
+                          null
+                            ? Math.round(
+                                repeticion
+                                  .inclinacionTroncoMaxima
+                              ) +
+                              "°"
+                            : "N/D"}
+                        </p>
+
+                      </div>
+
+                    </div>
                   );
                 }
               )}
 
-            </ol>
+            </div>
 
-          </section>
+          )}
 
-        ) : null}
+        </section>
 
       </div>
 
@@ -2142,16 +2753,18 @@ function SentadillaCameraPreview(
 
 
 // ==================================================
-// CÁMARA DEL PRESS DE HOMBRO
-// ==================================================
-//
-// El Press no recibe lado.
-//
-// Continúa siendo bilateral
-// y analiza ambos brazos simultáneamente.
+// PRESS DE HOMBRO
 // ==================================================
 
-function PressHombroCameraPreview() {
+interface PressHombroCameraPreviewProps {
+  reinicioId: number;
+}
+
+
+function PressHombroCameraPreview(
+  props:
+    PressHombroCameraPreviewProps
+) {
   // ==================================================
   // REFERENCIAS
   // ==================================================
@@ -2279,6 +2892,15 @@ function PressHombroCameraPreview() {
     );
 
 
+  const [
+    errorSistema,
+    setErrorSistema
+  ] =
+    useState<string | null>(
+      null
+    );
+
+
   // ==================================================
   // RESUMEN
   // ==================================================
@@ -2287,6 +2909,71 @@ function PressHombroCameraPreview() {
     calcularResumenSesionPress(
       historial
     );
+
+
+  // ==================================================
+  // REINICIAR SESIÓN
+  // ==================================================
+
+  useEffect(
+    function () {
+      estadoPressRef.current =
+        crearEstadoPressHombro();
+
+
+      verdeHastaRef.current =
+        0;
+
+
+      setRepeticiones(
+        0
+      );
+
+
+      setAnguloIzquierdo(
+        0
+      );
+
+
+      setAnguloDerecho(
+        0
+      );
+
+
+      setDiferenciaAngular(
+        0
+      );
+
+
+      setFase(
+        "esperando"
+      );
+
+
+      setFeedbackMovimiento(
+        "Coloca ambos brazos en posición baja"
+      );
+
+
+      setFeedbackSimetria(
+        "Esperando detección"
+      );
+
+
+      setMensaje(
+        "Colócate de frente y muestra los dos brazos"
+      );
+
+
+      setHistorial(
+        []
+      );
+
+    },
+    [
+      props.reinicioId
+    ]
+  );
 
 
   // ==================================================
@@ -2304,8 +2991,17 @@ function PressHombroCameraPreview() {
 
 
     async function iniciarSistema() {
+      setErrorSistema(
+        null
+      );
+
+
+      let nuevoStream:
+        MediaStream;
+
+
       try {
-        const nuevoStream =
+        nuevoStream =
           await navigator.mediaDevices.getUserMedia({
             video:
               true,
@@ -2314,40 +3010,57 @@ function PressHombroCameraPreview() {
               false
           });
 
-
-        if (
-          !componenteActivo
-        ) {
-          nuevoStream
-            .getTracks()
-            .forEach(
-              function (track) {
-                track.stop();
-              }
-            );
-
-
-          return;
-        }
-
-
-        stream =
-          nuevoStream;
-
-
-        if (
-          videoRef.current
-        ) {
-          videoRef.current.srcObject =
-            stream;
-        }
-
-
-        console.log(
-          "Cargando MediaPipe para press de hombro..."
+      } catch (error) {
+        console.error(
+          "Error al iniciar cámara del press:",
+          error
         );
 
 
+        if (
+          componenteActivo
+        ) {
+          setErrorSistema(
+            obtenerMensajeErrorCamara(
+              error
+            )
+          );
+        }
+
+
+        return;
+      }
+
+
+      if (
+        !componenteActivo
+      ) {
+        nuevoStream
+          .getTracks()
+          .forEach(
+            function (track) {
+              track.stop();
+            }
+          );
+
+
+        return;
+      }
+
+
+      stream =
+        nuevoStream;
+
+
+      if (
+        videoRef.current
+      ) {
+        videoRef.current.srcObject =
+          stream;
+      }
+
+
+      try {
         const poseLandmarker =
           await crearPoseLandmarker();
 
@@ -2363,8 +3076,8 @@ function PressHombroCameraPreview() {
           poseLandmarker;
 
 
-        console.log(
-          "MediaPipe preparado para press de hombro"
+        setErrorSistema(
+          null
         );
 
 
@@ -2377,10 +3090,40 @@ function PressHombroCameraPreview() {
         }
 
       } catch (error) {
-        console.error(
-          "Error iniciando press de hombro:",
-          error
-        );
+        if (
+          stream
+        ) {
+          stream
+            .getTracks()
+            .forEach(
+              function (track) {
+                track.stop();
+              }
+            );
+
+
+          stream =
+            null;
+        }
+
+
+        if (
+          videoRef.current
+        ) {
+          videoRef.current.srcObject =
+            null;
+        }
+
+
+        if (
+          componenteActivo
+        ) {
+          setErrorSistema(
+            obtenerMensajeErrorMediaPipe(
+              error
+            )
+          );
+        }
       }
     }
 
@@ -2426,11 +3169,6 @@ function PressHombroCameraPreview() {
         videoRef.current.srcObject =
           null;
       }
-
-
-      console.log(
-        "Análisis de press detenido"
-      );
     };
   }, []);
 
@@ -2519,10 +3257,6 @@ function PressHombroCameraPreview() {
       canvasRef.current;
 
 
-    const poseLandmarker =
-      poseLandmarkerRef.current;
-
-
     if (
       video.readyState <
       2
@@ -2575,7 +3309,7 @@ function PressHombroCameraPreview() {
 
     try {
       const resultado =
-        poseLandmarker.detectForVideo(
+        poseLandmarkerRef.current.detectForVideo(
           video,
           timestamp
         );
@@ -2588,10 +3322,6 @@ function PressHombroCameraPreview() {
         const landmarks =
           resultado.landmarks[0];
 
-
-        // ========================================
-        // BRAZO IZQUIERDO
-        // ========================================
 
         const hombroIzquierdoNormalizado =
           landmarks[
@@ -2617,10 +3347,6 @@ function PressHombroCameraPreview() {
           ];
 
 
-        // ========================================
-        // BRAZO DERECHO
-        // ========================================
-
         const hombroDerechoNormalizado =
           landmarks[
             LANDMARKS_PRESS_HOMBRO
@@ -2645,10 +3371,6 @@ function PressHombroCameraPreview() {
           ];
 
 
-        // ========================================
-        // COMPROBAR EXISTENCIA
-        // ========================================
-
         if (
           hombroIzquierdoNormalizado &&
           codoIzquierdoNormalizado &&
@@ -2657,10 +3379,6 @@ function PressHombroCameraPreview() {
           codoDerechoNormalizado &&
           munecaDerechaNormalizada
         ) {
-          // ======================================
-          // VISIBILIDAD
-          // ======================================
-
           const brazoIzquierdoValido =
             esLandmarkValido(
               hombroIzquierdoNormalizado
@@ -2689,10 +3407,6 @@ function PressHombroCameraPreview() {
             brazoIzquierdoValido &&
             brazoDerechoValido
           ) {
-            // ====================================
-            // IZQUIERDO
-            // ====================================
-
             const hombroIzquierdo =
               convertirAPixeles(
                 hombroIzquierdoNormalizado,
@@ -2713,10 +3427,6 @@ function PressHombroCameraPreview() {
                 canvas
               );
 
-
-            // ====================================
-            // DERECHO
-            // ====================================
 
             const hombroDerecho =
               convertirAPixeles(
@@ -2739,10 +3449,6 @@ function PressHombroCameraPreview() {
               );
 
 
-            // ====================================
-            // ANALIZAR PRESS
-            // ====================================
-
             const analisis =
               analizarPressHombro(
                 estadoPressRef.current,
@@ -2756,10 +3462,6 @@ function PressHombroCameraPreview() {
                 munecaDerecha
               );
 
-
-            // ====================================
-            // FEEDBACK VERDE
-            // ====================================
 
             if (
               analisis.posicionBajaAlcanzada ||
@@ -2775,10 +3477,6 @@ function PressHombroCameraPreview() {
               timestamp <
               verdeHastaRef.current;
 
-
-            // ====================================
-            // INTERFAZ
-            // ====================================
 
             setAnguloIzquierdo(
               Math.round(
@@ -2837,10 +3535,6 @@ function PressHombroCameraPreview() {
             }
 
 
-            // ====================================
-            // DIBUJAR
-            // ====================================
-
             dibujarBrazo(
               contexto,
               hombroIzquierdo,
@@ -2868,7 +3562,7 @@ function PressHombroCameraPreview() {
 
     } catch (error) {
       console.error(
-        "Error analizando press de hombro:",
+        "Error analizando press:",
         error
       );
     }
@@ -2880,10 +3574,6 @@ function PressHombroCameraPreview() {
       );
   }
 
-
-  // ==================================================
-  // INICIAR
-  // ==================================================
 
   function iniciarAnalisis() {
     if (
@@ -2912,6 +3602,20 @@ function PressHombroCameraPreview() {
 
   function videoPreparado() {
     iniciarAnalisis();
+  }
+
+
+  if (
+    errorSistema !==
+    null
+  ) {
+    return (
+      <MensajeErrorSistema
+        mensaje={
+          errorSistema
+        }
+      />
+    );
   }
 
 
@@ -2958,197 +3662,368 @@ function PressHombroCameraPreview() {
 
       <div className="vision-fit-data-column">
 
-        <section className="analysis-section">
+        {/* ==========================================
+            FEEDBACK ACTUAL
+            ========================================== */}
 
-          <h2>
-            Press de hombro
-          </h2>
+        <section className="analysis-section analysis-current">
+
+          <div className="analysis-section-header">
+
+            <div>
+
+              <span className="analysis-section-label">
+                Análisis en tiempo real
+              </span>
 
 
-          <p>
+              <h2>
+                Feedback actual
+              </h2>
+
+            </div>
+
+
+            <div className="analysis-repetition-counter">
+
+              <span>
+                Repeticiones
+              </span>
+
+
+              <strong>
+                {repeticiones}
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          {/* ========================================
+              MÉTRICAS
+              ======================================== */}
+
+          <div className="analysis-metrics-grid">
+
+            <div className="analysis-metric">
+
+              <span>
+                Fase
+              </span>
+
+
+              <strong>
+                {fase}
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-metric">
+
+              <span>
+                Ángulo izquierdo
+              </span>
+
+
+              <strong>
+                {anguloIzquierdo}°
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-metric">
+
+              <span>
+                Ángulo derecho
+              </span>
+
+
+              <strong>
+                {anguloDerecho}°
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-metric">
+
+              <span>
+                Diferencia
+              </span>
+
+
+              <strong>
+                {diferenciaAngular}°
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          {/* ========================================
+              MOVIMIENTO
+              ======================================== */}
+
+          <div className="analysis-feedback-main">
+
+            <span>
+              Movimiento
+            </span>
+
+
             <strong>
-              Repeticiones:
-            </strong>{" "}
-            {repeticiones}
-          </p>
+              {feedbackMovimiento}
+            </strong>
+
+          </div>
 
 
-          <p>
-            <strong>
-              Ángulo izquierdo:
-            </strong>{" "}
-            {anguloIzquierdo}°
-          </p>
+          {/* ========================================
+              TÉCNICA
+              ======================================== */}
+
+          <div className="analysis-technique">
+
+            <h3>
+              Técnica
+            </h3>
 
 
-          <p>
-            <strong>
-              Ángulo derecho:
-            </strong>{" "}
-            {anguloDerecho}°
-          </p>
+            <div className="analysis-technique-item">
+
+              <div>
+
+                <strong>
+                  Simetría
+                </strong>
 
 
-          <p>
-            <strong>
-              Diferencia actual:
-            </strong>{" "}
-            {diferenciaAngular}°
-          </p>
+                <p>
+                  {feedbackSimetria}
+                </p>
+
+              </div>
 
 
-          <p>
-            <strong>
-              Fase:
-            </strong>{" "}
-            {fase}
-          </p>
+              <span>
+                {diferenciaAngular}°
+              </span>
+
+            </div>
 
 
-          <p>
-            <strong>
-              Movimiento:
-            </strong>{" "}
-            {feedbackMovimiento}
-          </p>
+            <div className="analysis-technique-item">
+
+              <div>
+
+                <strong>
+                  Detección
+                </strong>
 
 
-          <p>
-            <strong>
-              Simetría:
-            </strong>{" "}
-            {feedbackSimetria}
-          </p>
+                <p>
+                  {mensaje}
+                </p>
 
+              </div>
 
-          <p>
-            <strong>
-              Detección:
-            </strong>{" "}
-            {mensaje}
-          </p>
+            </div>
+
+          </div>
 
         </section>
 
 
-        {historial.length >
-        0 ? (
+        {/* ==========================================
+            RESUMEN
+            ========================================== */}
 
-          <section className="analysis-section">
+        <section className="analysis-section">
 
-            <h2>
-              Resumen de sesión
-            </h2>
+          <span className="analysis-section-label">
+            Sesión
+          </span>
 
 
-            <p>
+          <h2>
+            Resumen
+          </h2>
+
+
+          <div className="analysis-summary-grid">
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Analizadas
+              </span>
+
+
               <strong>
-                Repeticiones:
-              </strong>{" "}
-              {resumen.total}
+                {resumen.total}
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Correctas
+              </span>
+
+
+              <strong>
+                {resumen.correctas}
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Técnica correcta
+              </span>
+
+
+              <strong>
+                {Math.round(
+                  resumen
+                    .porcentajeCorrectas
+                )}
+                %
+              </strong>
+
+            </div>
+
+
+            <div className="analysis-summary-item">
+
+              <span>
+                Descompensadas
+              </span>
+
+
+              <strong>
+                {
+                  resumen
+                    .descompensadas
+                }
+              </strong>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        {/* ==========================================
+            HISTORIAL
+            ========================================== */}
+
+        <section className="analysis-section">
+
+          <span className="analysis-section-label">
+            Detalle
+          </span>
+
+
+          <h2>
+            Historial
+          </h2>
+
+
+          {historial.length ===
+          0 ? (
+
+            <p className="analysis-empty-message">
+              Completa una repetición para
+              empezar a generar el historial.
             </p>
 
+          ) : (
 
-            <p>
-              <strong>
-                Correctas:
-              </strong>{" "}
-              {resumen.correctas}
-            </p>
-
-
-            <p>
-              <strong>
-                Técnica correcta:
-              </strong>{" "}
-
-              {Math.round(
-                resumen.porcentajeCorrectas
-              )}
-              %
-            </p>
-
-
-            <p>
-              <strong>
-                Descompensación:
-              </strong>{" "}
-              {resumen.descompensadas}
-            </p>
-
-          </section>
-
-        ) : null}
-
-
-        {historial.length >
-        0 ? (
-
-          <section className="analysis-section">
-
-            <h2>
-              Historial
-            </h2>
-
-
-            <ol className="repetition-history">
+            <div className="analysis-history">
 
               {historial.map(
-                function (repeticion) {
+                function (
+                  repeticion
+                ) {
                   return (
-                    <li
+                    <div
                       key={
                         repeticion.numero
                       }
+
+                      className="analysis-history-item"
                     >
-                      <strong>
+
+                      <span className="analysis-history-number">
+
                         Rep{" "}
                         {
                           repeticion.numero
                         }
-                        :
-                      </strong>{" "}
 
-                      {
-                        repeticion.resultado
-                      }
+                      </span>
 
-                      {" — "}
 
-                      diferencia media:{" "}
+                      <div>
 
-                      {Math.round(
-                        repeticion.diferenciaMedia
-                      )}
-                      °
+                        <strong>
+                          {
+                            repeticion.resultado
+                          }
+                        </strong>
 
-                      {" — "}
 
-                      máxima:{" "}
+                        <p>
+                          Diferencia media:{" "}
+                          {Math.round(
+                            repeticion
+                              .diferenciaMedia
+                          )}
+                          °
+                        </p>
 
-                      {Math.round(
-                        repeticion.diferenciaMaxima
-                      )}
-                      °
 
-                      {" — "}
+                        <p>
+                          Diferencia máxima:{" "}
+                          {Math.round(
+                            repeticion
+                              .diferenciaMaxima
+                          )}
+                          °
+                        </p>
 
-                      descompensado:{" "}
 
-                      {Math.round(
-                        repeticion.porcentajeDescompensado
-                      )}
-                      %
-                    </li>
+                        <p>
+                          Descompensado:{" "}
+                          {Math.round(
+                            repeticion
+                              .porcentajeDescompensado
+                          )}
+                          %
+                        </p>
+
+                      </div>
+
+                    </div>
                   );
                 }
               )}
 
-            </ol>
+            </div>
 
-          </section>
+          )}
 
-        ) : null}
+        </section>
 
       </div>
 
@@ -3158,31 +4033,21 @@ function PressHombroCameraPreview() {
 
 
 // ==================================================
-// PROPS DEL COMPONENTE GENÉRICO
+// COMPONENTE GENÉRICO
 // ==================================================
 
 interface CameraPreviewProps {
   ejercicio: EjercicioId;
 
-  // Temporalmente es opcional.
-  //
-  // Mientras App.tsx todavía
-  // no tenga selector visual,
-  // se utilizará el lado derecho.
   lado?: Lado;
+
+  reinicioId: number;
 }
 
-
-// ==================================================
-// CAMERA PREVIEW GENÉRICO
-// ==================================================
 
 function CameraPreview(
   props: CameraPreviewProps
 ) {
-  // Mientras App todavía
-  // no tenga selector de lado,
-  // utilizamos derecho por defecto.
   const lado =
     props.lado ??
     "derecho";
@@ -3200,6 +4065,10 @@ function CameraPreview(
       <CurlCameraPreview
         lado={
           lado
+        }
+
+        reinicioId={
+          props.reinicioId
         }
       />
     );
@@ -3219,6 +4088,10 @@ function CameraPreview(
         lado={
           lado
         }
+
+        reinicioId={
+          props.reinicioId
+        }
       />
     );
   }
@@ -3227,17 +4100,15 @@ function CameraPreview(
   // ------------------------------------------------
   // PRESS DE HOMBRO
   // ------------------------------------------------
-  //
-  // El Press no recibe lado
-  // porque continúa siendo bilateral.
-  // ------------------------------------------------
 
   return (
-    <PressHombroCameraPreview />
+    <PressHombroCameraPreview
+      reinicioId={
+        props.reinicioId
+      }
+    />
   );
 }
 
 
-// Exportamos el único
-// componente de cámara.
 export default CameraPreview;

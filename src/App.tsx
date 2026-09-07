@@ -5,8 +5,8 @@ import {
   useState
 } from "react";
 
-// Tipo utilizado por el selector
-// de archivos.
+// Tipo del evento utilizado
+// al seleccionar un archivo.
 import type {
   ChangeEvent
 } from "react";
@@ -65,13 +65,6 @@ function App() {
   // ==================================================
   // LADO
   // ==================================================
-  //
-  // Curl y Sentadilla utilizan
-  // el lado seleccionado.
-  //
-  // El Press ignora este valor
-  // porque continúa siendo bilateral.
-  // ==================================================
 
   const [
     ladoSeleccionado,
@@ -92,6 +85,24 @@ function App() {
   ] =
     useState<boolean>(
       false
+    );
+
+
+  // ==================================================
+  // REINICIO DEL ANÁLISIS
+  // ==================================================
+  //
+  // Cada vez que este número cambia,
+  // los componentes reciben la orden
+  // de comenzar una sesión nueva.
+  // ==================================================
+
+  const [
+    reinicioAnalisis,
+    setReinicioAnalisis
+  ] =
+    useState<number>(
+      0
     );
 
 
@@ -130,14 +141,7 @@ function App() {
 
 
   // ==================================================
-  // ¿EL EJERCICIO UTILIZA LADO?
-  // ==================================================
-  //
-  // Actualmente:
-  //
-  // Curl        -> sí
-  // Sentadilla  -> sí
-  // Press       -> no, es bilateral
+  // SELECTOR DE LADO
   // ==================================================
 
   const mostrarSelectorLado =
@@ -148,11 +152,27 @@ function App() {
 
 
   // ==================================================
+  // ¿HAY UN ANÁLISIS ACTIVO?
+  // ==================================================
+  //
+  // Mostramos el botón de reinicio
+  // si existe cámara activa
+  // o un vídeo seleccionado.
+  // ==================================================
+
+  const hayAnalisis =
+    mostrarCamara ||
+    urlVideo !==
+      null;
+
+
+  // ==================================================
   // LIMPIAR VÍDEO
   // ==================================================
 
   function limpiarVideoSeleccionado() {
-    // Liberamos la URL temporal anterior.
+    // Liberamos la URL temporal
+    // del vídeo anterior.
     if (
       urlVideoRef.current !==
       null
@@ -178,7 +198,7 @@ function App() {
 
 
     // Reiniciamos el input
-    // para poder seleccionar
+    // para permitir seleccionar
     // posteriormente el mismo archivo.
     if (
       inputVideoRef.current
@@ -223,7 +243,7 @@ function App() {
     );
 
 
-    // Si cambiamos realmente
+    // Si realmente cambiamos
     // de ejercicio,
     // eliminamos el vídeo anterior.
     if (
@@ -236,6 +256,20 @@ function App() {
 
     setEjercicioSeleccionado(
       ejercicio
+    );
+
+
+    // Consideramos la selección
+    // de ejercicio como una nueva sesión.
+    setReinicioAnalisis(
+      function (
+        valorAnterior
+      ) {
+        return (
+          valorAnterior +
+          1
+        );
+      }
     );
 
 
@@ -253,8 +287,6 @@ function App() {
   function seleccionarLado(
     lado: Lado
   ) {
-    // Si ya está seleccionado,
-    // no hacemos nada.
     if (
       ladoSeleccionado ===
       lado
@@ -268,9 +300,55 @@ function App() {
     );
 
 
+    // Cambiar de lado implica
+    // iniciar una sesión nueva.
+    setReinicioAnalisis(
+      function (
+        valorAnterior
+      ) {
+        return (
+          valorAnterior +
+          1
+        );
+      }
+    );
+
+
     console.log(
       "Lado seleccionado:",
       lado
+    );
+  }
+
+
+  // ==================================================
+  // REINICIAR ANÁLISIS
+  // ==================================================
+
+  function reiniciarAnalisisActual() {
+    // Solo cambiamos este contador.
+    //
+    // En cámara:
+    // se reinicia la lógica
+    // sin destruir el componente.
+    //
+    // En vídeo:
+    // la key cambia y React
+    // crea una sesión nueva.
+    setReinicioAnalisis(
+      function (
+        valorAnterior
+      ) {
+        return (
+          valorAnterior +
+          1
+        );
+      }
+    );
+
+
+    console.log(
+      "Análisis reiniciado"
     );
   }
 
@@ -281,7 +359,13 @@ function App() {
 
   function cambiarCamara() {
     setMostrarCamara(
-      !mostrarCamara
+      function (
+        valorAnterior
+      ) {
+        return (
+          !valorAnterior
+        );
+      }
     );
   }
 
@@ -361,7 +445,8 @@ function App() {
     }
 
 
-    // Creamos una URL local.
+    // Creamos una URL local
+    // para reproducir el archivo.
     const nuevaUrl =
       URL.createObjectURL(
         archivo
@@ -386,6 +471,20 @@ function App() {
     // apagamos la cámara.
     setMostrarCamara(
       false
+    );
+
+
+    // El vídeo nuevo comienza
+    // una sesión nueva.
+    setReinicioAnalisis(
+      function (
+        valorAnterior
+      ) {
+        return (
+          valorAnterior +
+          1
+        );
+      }
     );
 
 
@@ -506,14 +605,6 @@ function App() {
 
         {/* ============================================
             SELECTOR DE LADO
-            ============================================
-        
-            Solo aparece para:
-        
-            - Curl
-            - Sentadilla
-        
-            El Press sigue siendo bilateral.
             ============================================ */}
 
         {mostrarSelectorLado ? (
@@ -526,10 +617,6 @@ function App() {
 
 
             <div className="exercise-buttons">
-
-              {/* -------------------------------------
-                  IZQUIERDO
-                  ------------------------------------- */}
 
               <button
                 type="button"
@@ -552,10 +639,6 @@ function App() {
                 Izquierdo
               </button>
 
-
-              {/* -------------------------------------
-                  DERECHO
-                  ------------------------------------- */}
 
               <button
                 type="button"
@@ -632,6 +715,25 @@ function App() {
                 Cargar vídeo
               </button>
 
+
+              {/* ======================================
+                  REINICIAR
+                  ====================================== */}
+
+              {hayAnalisis ? (
+
+                <button
+                  type="button"
+
+                  onClick={
+                    reiniciarAnalisisActual
+                  }
+                >
+                  Reiniciar análisis
+                </button>
+
+              ) : null}
+
             </div>
 
           </section>
@@ -669,13 +771,14 @@ function App() {
           CÁMARA
           ==============================================
       
-          Pasamos ahora:
+          Importante:
       
-          - ejercicio;
-          - lado.
+          reinicioAnalisis NO está dentro
+          de la key de CameraPreview.
       
-          La key hace que al cambiar de lado
-          se cree una sesión de análisis nueva.
+          Así podemos reiniciar los datos
+          sin apagar ni volver a crear
+          la cámara.
           ============================================== */}
 
       {mostrarCamara &&
@@ -696,6 +799,10 @@ function App() {
           lado={
             ladoSeleccionado
           }
+
+          reinicioId={
+            reinicioAnalisis
+          }
         />
 
       ) : null}
@@ -705,12 +812,11 @@ function App() {
           VÍDEO
           ==============================================
       
-          También pasamos el lado seleccionado
-          al análisis de vídeo.
+          En vídeo sí añadimos
+          reinicioAnalisis a la key.
       
-          Al cambiar de lado se reinicia
-          la sesión de análisis,
-          pero se mantiene el vídeo cargado.
+          De esta manera React crea
+          una sesión completamente nueva.
           ============================================== */}
 
       {urlVideo !==
@@ -724,7 +830,9 @@ function App() {
             "-" +
             ladoSeleccionado +
             "-" +
-            urlVideo
+            urlVideo +
+            "-" +
+            reinicioAnalisis
           }
 
           ejercicio={

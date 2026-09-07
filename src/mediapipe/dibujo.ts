@@ -1,49 +1,31 @@
 // --------------------------------------------------
-// UTILIDADES COMUNES DE MEDIAPIPE
+// CONFIGURACIÓN DE DIBUJO
 // --------------------------------------------------
 //
-// Este archivo contiene funciones que pueden
-// utilizar todos los ejercicios de Visión Fit.
+// Estos valores representan ahora
+// el tamaño VISUAL aproximado
+// que queremos ver en pantalla.
 //
-// Su objetivo es evitar repetir en cada componente:
+// Ya no representan directamente
+// píxeles internos del canvas.
 //
-// - el tipo de los puntos;
-// - la comprobación de visibilidad;
-// - la conversión de coordenadas;
-// - el dibujo de landmarks;
-// - el dibujo de conexiones.
-//
-// IMPORTANTE:
-//
-// Por ahora mantenemos exactamente los mismos
-// tamaños y colores que ya utilizamos.
-//
-// Más adelante podremos mejorar aquí
-// el escalado para vídeos 1080p / 4K
-// sin modificar todos los componentes.
+// Esto permite que un vídeo 4K,
+// 1080p o 720p muestre los puntos
+// con un tamaño visual parecido.
 // --------------------------------------------------
 
-
-// --------------------------------------------------
-// CONFIGURACIÓN GENERAL
-// --------------------------------------------------
-
-// Visibilidad mínima que hemos utilizado
-// hasta ahora en los ejercicios.
 export const VISIBILIDAD_MINIMA =
   0.7;
 
 
-// Radio actual de cada landmark.
-//
-// Lo mantenemos en 8 píxeles
-// para no cambiar todavía
-// el comportamiento visual.
+// Radio visual aproximado
+// de cada landmark.
 export const RADIO_LANDMARK =
   8;
 
 
-// Grosor actual de las conexiones.
+// Grosor visual aproximado
+// de las conexiones.
 export const GROSOR_CONEXION =
   4;
 
@@ -52,14 +34,6 @@ export const GROSOR_CONEXION =
 // TIPO DE PUNTO
 // --------------------------------------------------
 
-// MediaPipe devuelve:
-//
-// x -> posición horizontal normalizada;
-// y -> posición vertical normalizada;
-// visibility -> confianza de visibilidad.
-//
-// Cuando convertimos el punto a píxeles,
-// seguimos utilizando la misma interfaz.
 export interface PuntoPose {
   x: number;
 
@@ -69,19 +43,21 @@ export interface PuntoPose {
 }
 
 
-// --------------------------------------------------
+// ==================================================
 // COMPROBAR VISIBILIDAD
-// --------------------------------------------------
+// ==================================================
 
 export function esLandmarkValido(
   punto: PuntoPose,
   visibilidadMinima:
-    number = VISIBILIDAD_MINIMA
+    number =
+    VISIBILIDAD_MINIMA
 ): boolean {
-  // Algunos resultados pueden no incluir
-  // la propiedad visibility.
+  // Algunos puntos creados manualmente
+  // pueden no tener visibility.
   //
-  // En ese caso no descartamos el punto.
+  // En ese caso consideramos
+  // que el punto es válido.
   if (
     punto.visibility ===
     undefined
@@ -97,17 +73,19 @@ export function esLandmarkValido(
 }
 
 
-// --------------------------------------------------
+// ==================================================
 // CONVERTIR COORDENADAS A PÍXELES
-// --------------------------------------------------
-
+// ==================================================
+//
 // MediaPipe devuelve normalmente:
 //
-// x = 0 - 1
-// y = 0 - 1
+// x -> entre 0 y 1
+// y -> entre 0 y 1
 //
-// Para dibujar sobre el canvas
-// necesitamos coordenadas reales.
+// Las convertimos a las dimensiones
+// internas reales del canvas.
+// ==================================================
+
 export function convertirAPixeles(
   punto: PuntoPose,
   canvas: HTMLCanvasElement
@@ -127,37 +105,182 @@ export function convertirAPixeles(
 }
 
 
-// --------------------------------------------------
+// ==================================================
+// CALCULAR ESCALA DEL CANVAS
+// ==================================================
+//
+// El canvas tiene dos tamaños:
+//
+// 1. Tamaño interno:
+//
+//    canvas.width
+//
+//    Por ejemplo:
+//    3840 px.
+//
+// 2. Tamaño mostrado mediante CSS:
+//
+//    getBoundingClientRect().width
+//
+//    Por ejemplo:
+//    640 px.
+//
+// Si dibujásemos siempre un punto
+// de radio 8 dentro de un canvas 4K,
+// al reducirse visualmente sería
+// prácticamente invisible.
+//
+// Por eso calculamos:
+//
+// tamaño interno / tamaño mostrado.
+//
+// Ejemplo:
+//
+// 3840 / 640 = 6
+//
+// Después multiplicaremos el tamaño
+// del punto y de la línea por 6.
+// ==================================================
+
+export function calcularEscalaCanvas(
+  canvas: HTMLCanvasElement
+): number {
+  const rectangulo =
+    canvas.getBoundingClientRect();
+
+
+  const anchoMostrado =
+    rectangulo.width;
+
+
+  // Si el canvas todavía no está
+  // visible o no tiene tamaño CSS,
+  // evitamos dividir entre cero.
+  if (
+    anchoMostrado <=
+    0
+  ) {
+    return 1;
+  }
+
+
+  const escala =
+    canvas.width /
+    anchoMostrado;
+
+
+  // Protección adicional
+  // por si apareciese un valor
+  // no válido.
+  if (
+    !Number.isFinite(
+      escala
+    ) ||
+    escala <=
+    0
+  ) {
+    return 1;
+  }
+
+
+  return escala;
+}
+
+
+// ==================================================
+// RADIO RESPONSIVE
+// ==================================================
+//
+// Devuelve el radio interno
+// que debemos utilizar para que
+// el punto mantenga aproximadamente
+// RADIO_LANDMARK píxeles visuales.
+// ==================================================
+
+export function calcularRadioLandmark(
+  canvas: HTMLCanvasElement
+): number {
+  const escala =
+    calcularEscalaCanvas(
+      canvas
+    );
+
+
+  return (
+    RADIO_LANDMARK *
+    escala
+  );
+}
+
+
+// ==================================================
+// GROSOR RESPONSIVE
+// ==================================================
+//
+// Hace lo mismo para las líneas.
+// ==================================================
+
+export function calcularGrosorConexion(
+  canvas: HTMLCanvasElement
+): number {
+  const escala =
+    calcularEscalaCanvas(
+      canvas
+    );
+
+
+  return (
+    GROSOR_CONEXION *
+    escala
+  );
+}
+
+
+// ==================================================
 // DIBUJAR LANDMARK
-// --------------------------------------------------
+// ==================================================
 
 export function dibujarLandmark(
   contexto:
     CanvasRenderingContext2D,
-
   punto:
     PuntoPose,
-
   verde:
-    boolean = false
+    boolean =
+    false
 ): void {
+  // Obtenemos automáticamente
+  // el canvas asociado al contexto.
+  const canvas =
+    contexto.canvas;
+
+
+  // Calculamos el radio
+  // adaptado a la resolución.
+  const radio =
+    calcularRadioLandmark(
+      canvas
+    );
+
+
   contexto.beginPath();
 
 
   contexto.arc(
     punto.x,
     punto.y,
-    RADIO_LANDMARK,
+    radio,
     0,
-    Math.PI * 2
+    Math.PI *
+      2
   );
 
 
-  // Mantenemos exactamente
-  // el código visual actual:
+  // Verde cuando existe
+  // feedback positivo.
   //
-  // rojo -> estado normal;
-  // verde -> posición correcta.
+  // Rojo durante
+  // el análisis normal.
   contexto.fillStyle =
     verde
       ? "limegreen"
@@ -168,23 +291,33 @@ export function dibujarLandmark(
 }
 
 
-// --------------------------------------------------
+// ==================================================
 // DIBUJAR CONEXIÓN
-// --------------------------------------------------
+// ==================================================
 
 export function dibujarConexion(
   contexto:
     CanvasRenderingContext2D,
-
   inicio:
     PuntoPose,
-
   fin:
     PuntoPose,
-
   verde:
-    boolean = false
+    boolean =
+    false
 ): void {
+  const canvas =
+    contexto.canvas;
+
+
+  // Calculamos el grosor
+  // adaptado a la resolución.
+  const grosor =
+    calcularGrosorConexion(
+      canvas
+    );
+
+
   contexto.beginPath();
 
 
@@ -201,13 +334,9 @@ export function dibujarConexion(
 
 
   contexto.lineWidth =
-    GROSOR_CONEXION;
+    grosor;
 
 
-  // Igual que antes:
-  //
-  // azul -> movimiento normal;
-  // verde -> rango alcanzado.
   contexto.strokeStyle =
     verde
       ? "limegreen"
@@ -218,53 +347,49 @@ export function dibujarConexion(
 }
 
 
-// --------------------------------------------------
-// DIBUJAR UNA CADENA DE PUNTOS
-// --------------------------------------------------
+// ==================================================
+// DIBUJAR CADENA DE PUNTOS
+// ==================================================
 //
-// Esta función será útil para:
+// Permite dibujar:
 //
-// CURL
-// hombro -> codo -> muñeca
+// punto -> punto -> punto...
 //
-// SENTADILLA
-// hombro -> cadera -> rodilla -> tobillo
-//
-// PRESS
-// hombro -> codo -> muñeca
-//
-// De momento los componentes pueden seguir
-// utilizando dibujarLandmark y dibujarConexion
-// individualmente.
-//
-// La dejamos preparada para la refactorización
-// que haremos posteriormente.
-// --------------------------------------------------
+// Aunque actualmente algunos ejercicios
+// dibujan sus conexiones manualmente,
+// mantenemos esta utilidad común.
+// ==================================================
 
 export function dibujarCadena(
   contexto:
     CanvasRenderingContext2D,
-
   puntos:
     PuntoPose[],
-
   verde:
-    boolean = false
+    boolean =
+    false
 ): void {
   // ----------------------------------------------
   // CONEXIONES
   // ----------------------------------------------
 
   for (
-    let indice = 0;
+    let indice =
+      0;
     indice <
-    puntos.length - 1;
+    puntos.length -
+      1;
     indice++
   ) {
     dibujarConexion(
       contexto,
-      puntos[indice],
-      puntos[indice + 1],
+      puntos[
+        indice
+      ],
+      puntos[
+        indice +
+        1
+      ],
       verde
     );
   }
@@ -275,7 +400,9 @@ export function dibujarCadena(
   // ----------------------------------------------
 
   puntos.forEach(
-    function (punto) {
+    function (
+      punto
+    ) {
       dibujarLandmark(
         contexto,
         punto,
