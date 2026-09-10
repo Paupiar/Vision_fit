@@ -1,5 +1,6 @@
 // Importamos los hooks necesarios de React.
 import {
+  useCallback,
   useEffect,
   useRef,
   useState
@@ -168,6 +169,12 @@ interface CurlCameraPreviewProps {
 }
 
 
+type EstadoPreparacionCurl =
+  "preparacion" |
+  "cuenta-atras" |
+  "analizando";
+
+
 function CurlCameraPreview(
   props: CurlCameraPreviewProps
 ) {
@@ -220,6 +227,25 @@ function CurlCameraPreview(
   const ultimaActualizacionUIRef =
     useRef<number>(
       0
+    );
+
+
+  // Indica si la lógica del curl puede
+  // modificar repeticiones, fase e historial.
+  //
+  // MediaPipe seguirá detectando y dibujando
+  // landmarks aunque este valor sea false.
+  const analisisActivoRef =
+    useRef<boolean>(
+      false
+    );
+
+
+  // Guardamos aquí el intervalo utilizado
+  // para la cuenta atrás 3 - 2 - 1.
+  const intervaloCuentaAtrasRef =
+    useRef<number | null>(
+      null
     );
 
 
@@ -319,6 +345,24 @@ function CurlCameraPreview(
     );
 
 
+  const [
+    estadoPreparacion,
+    setEstadoPreparacion
+  ] =
+    useState<EstadoPreparacionCurl>(
+      "preparacion"
+    );
+
+
+  const [
+    cuentaAtras,
+    setCuentaAtras
+  ] =
+    useState<number | null>(
+      null
+    );
+
+
   // ==================================================
   // RESUMEN
   // ==================================================
@@ -335,6 +379,9 @@ function CurlCameraPreview(
 
   useEffect(
     function () {
+      // Reiniciamos inmediatamente
+      // el estado interno que no provoca
+      // un render de React.
       estadoCurlRef.current =
         crearEstadoCurl();
 
@@ -347,55 +394,695 @@ function CurlCameraPreview(
         0;
 
 
-      setRepeticiones(
-        0
-      );
+      // Al reiniciar una sesión, la lógica
+      // de conteo vuelve a quedar bloqueada.
+      analisisActivoRef.current =
+        false;
 
 
-      setAnguloActual(
-        0
-      );
-
-
-      setFaseActual(
-        "abajo"
-      );
-
-
-      setFeedback(
-        "Colócate frente a la cámara"
-      );
-
-
-      setFeedbackCodo(
-        "Extiende el brazo para calibrar el codo"
-      );
-
-
-      setFeedbackHombro(
-        "Extiende el brazo para calibrar el tronco"
-      );
-
-
-      setDesplazamientoCodo(
+      // Si el usuario reinicia mientras está
+      // en la cuenta atrás, la cancelamos.
+      if (
+        intervaloCuentaAtrasRef.current !==
         null
-      );
+      ) {
+        window.clearInterval(
+          intervaloCuentaAtrasRef.current
+        );
 
 
-      setDesplazamientoHombro(
-        null
-      );
+        intervaloCuentaAtrasRef.current =
+          null;
+      }
 
 
-      setHistorial(
-        []
-      );
+      // Los estados de React se reinician
+      // de forma asíncrona.
+      //
+      // Así evitamos realizar varios setState()
+      // de forma síncrona dentro del efecto,
+      // que es lo que marca ESLint con
+      // react-hooks/set-state-in-effect.
+      const temporizadorReinicio =
+        window.setTimeout(
+          function () {
+            setRepeticiones(
+              0
+            );
+
+
+            setAnguloActual(
+              0
+            );
+
+
+            setFaseActual(
+              "abajo"
+            );
+
+
+            setFeedback(
+              "Colócate frente a la cámara"
+            );
+
+
+            setFeedbackCodo(
+              "Extiende el brazo para calibrar el codo"
+            );
+
+
+            setFeedbackHombro(
+              "Extiende el brazo para calibrar el tronco"
+            );
+
+
+            setDesplazamientoCodo(
+              null
+            );
+
+
+            setDesplazamientoHombro(
+              null
+            );
+
+
+            setHistorial(
+              []
+            );
+
+
+            // La interfaz vuelve a la pantalla
+            // de preparación sin apagar la cámara.
+            setEstadoPreparacion(
+              "preparacion"
+            );
+
+
+            setCuentaAtras(
+              null
+            );
+          },
+          0
+        );
+
+
+      return function cancelarReinicioPendiente() {
+        window.clearTimeout(
+          temporizadorReinicio
+        );
+      };
 
     },
     [
       props.reinicioId
     ]
   );
+
+
+  // ==================================================
+  // FEEDBACK VERDE
+  // ==================================================
+
+  const activarFeedbackVerde =
+    useCallback(
+      function activarFeedbackVerdeCallback() {
+    verdeHastaRef.current =
+      performance.now() +
+      300;
+      },
+      []
+    );
+
+
+  // ==================================================
+  // DIBUJAR BRAZO
+  // ==================================================
+
+  const dibujarBrazo =
+    useCallback(
+      function dibujarBrazoCallback(
+    contexto:
+      CanvasRenderingContext2D,
+    hombro:
+      Punto,
+    codo:
+      Punto,
+    muneca:
+      Punto
+  ) {
+    const verdeActivo =
+      performance.now() <
+      verdeHastaRef.current;
+
+
+    dibujarConexion(
+      contexto,
+      hombro,
+      codo,
+      verdeActivo
+    );
+
+
+    dibujarConexion(
+      contexto,
+      codo,
+      muneca,
+      verdeActivo
+    );
+
+
+    dibujarLandmark(
+      contexto,
+      hombro,
+      verdeActivo
+    );
+
+
+    dibujarLandmark(
+      contexto,
+      codo,
+      verdeActivo
+    );
+
+
+    dibujarLandmark(
+      contexto,
+      muneca,
+      verdeActivo
+    );
+      },
+      []
+    );
+
+
+  // ==================================================
+  // ANALIZAR FRAME
+  // ==================================================
+
+  const analizarFrame =
+    useCallback(
+      function analizarFrameCallback(
+    timestamp: number
+  ) {
+    if (
+      !videoRef.current ||
+      !canvasRef.current ||
+      !poseLandmarkerRef.current
+    ) {
+      animationFrameRef.current =
+        requestAnimationFrame(
+          analizarFrameCallback
+        );
+
+
+      return;
+    }
+
+
+    const video =
+      videoRef.current;
+
+
+    const canvas =
+      canvasRef.current;
+
+
+    const poseLandmarker =
+      poseLandmarkerRef.current;
+
+
+    if (
+      video.readyState <
+      2
+    ) {
+      animationFrameRef.current =
+        requestAnimationFrame(
+          analizarFrameCallback
+        );
+
+
+      return;
+    }
+
+
+    if (
+      canvas.width !==
+        video.videoWidth ||
+      canvas.height !==
+        video.videoHeight
+    ) {
+      canvas.width =
+        video.videoWidth;
+
+
+      canvas.height =
+        video.videoHeight;
+    }
+
+
+    const contexto =
+      canvas.getContext(
+        "2d"
+      );
+
+
+    if (
+      !contexto
+    ) {
+      return;
+    }
+
+
+    contexto.clearRect(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+
+    try {
+      const resultado =
+        poseLandmarker.detectForVideo(
+          video,
+          timestamp
+        );
+
+
+      if (
+        resultado.landmarks.length >
+        0
+      ) {
+        const landmarks =
+          resultado.landmarks[0];
+
+
+        const hombroNormalizado =
+          landmarks[
+            landmarksCurl.hombro
+          ];
+
+
+        const codoNormalizado =
+          landmarks[
+            landmarksCurl.codo
+          ];
+
+
+        const munecaNormalizada =
+          landmarks[
+            landmarksCurl.muneca
+          ];
+
+
+        const caderaNormalizada =
+          landmarks[
+            landmarksCurl.cadera
+          ];
+
+
+        if (
+          hombroNormalizado &&
+          codoNormalizado &&
+          munecaNormalizada &&
+          esLandmarkValido(
+            hombroNormalizado
+          ) &&
+          esLandmarkValido(
+            codoNormalizado
+          ) &&
+          esLandmarkValido(
+            munecaNormalizada
+          )
+        ) {
+          const hombro =
+            convertirAPixeles(
+              hombroNormalizado,
+              canvas
+            );
+
+
+          const codo =
+            convertirAPixeles(
+              codoNormalizado,
+              canvas
+            );
+
+
+          const muneca =
+            convertirAPixeles(
+              munecaNormalizada,
+              canvas
+            );
+
+
+          let cadera:
+            Punto | null =
+            null;
+
+
+          if (
+            caderaNormalizada &&
+            esLandmarkValido(
+              caderaNormalizada
+            )
+          ) {
+            cadera =
+              convertirAPixeles(
+                caderaNormalizada,
+                canvas
+              );
+          }
+
+
+          // Durante la preparación seguimos detectando
+          // y dibujando el brazo, pero NO dejamos que
+          // analizarFrameCurl modifique la sesión.
+          if (
+            analisisActivoRef.current
+          ) {
+            const analisis =
+              analizarFrameCurl(
+                estadoCurlRef.current,
+                hombro,
+                codo,
+                muneca,
+                cadera
+              );
+
+
+            if (
+              analisis.cambioFase
+            ) {
+            activarFeedbackVerde();
+
+
+            setFaseActual(
+              analisis.fase
+            );
+          }
+
+
+          if (
+            analisis.repeticionSumada
+          ) {
+            setRepeticiones(
+              estadoCurlRef.current
+                .repeticiones
+            );
+          }
+
+
+          if (
+            analisis.repeticionFinalizada !==
+            null
+          ) {
+            const repeticionFinalizada =
+              analisis
+                .repeticionFinalizada;
+
+
+            setHistorial(
+              function (
+                historialAnterior
+              ) {
+                return [
+                  ...historialAnterior,
+                  repeticionFinalizada
+                ];
+              }
+            );
+          }
+
+
+          if (
+            timestamp -
+              ultimaActualizacionUIRef
+                .current >=
+            100
+          ) {
+            setAnguloActual(
+              Math.round(
+                analisis.anguloCodo
+              )
+            );
+
+
+            setFaseActual(
+              analisis.fase
+            );
+
+
+            setFeedback(
+              analisis
+                .feedbackMovimiento
+            );
+
+
+            setFeedbackCodo(
+              analisis
+                .feedbackCodo
+            );
+
+
+            setFeedbackHombro(
+              analisis
+                .feedbackHombro
+            );
+
+
+            if (
+              analisis
+                .desplazamientoCodo !==
+              null
+            ) {
+              setDesplazamientoCodo(
+                Math.round(
+                  analisis
+                    .desplazamientoCodo *
+                  100
+                )
+              );
+
+            } else {
+              setDesplazamientoCodo(
+                null
+              );
+            }
+
+
+            if (
+              analisis
+                .desplazamientoHombro !==
+              null
+            ) {
+              setDesplazamientoHombro(
+                Math.round(
+                  analisis
+                    .desplazamientoHombro *
+                  100
+                )
+              );
+
+            } else {
+              setDesplazamientoHombro(
+                null
+              );
+            }
+
+
+              ultimaActualizacionUIRef
+                .current =
+                timestamp;
+            }
+          }
+
+
+          // El brazo se dibuja siempre, incluso
+          // durante la preparación y la cuenta atrás.
+          dibujarBrazo(
+            contexto,
+            hombro,
+            codo,
+            muneca
+          );
+        }
+      }
+
+    } catch (error) {
+      console.error(
+        "Error analizando curl:",
+        error
+      );
+    }
+
+
+    animationFrameRef.current =
+      requestAnimationFrame(
+        analizarFrameCallback
+      );
+      },
+      [
+        activarFeedbackVerde,
+        dibujarBrazo,
+        landmarksCurl
+      ]
+    );
+
+
+
+  const iniciarAnalisis =
+    useCallback(
+      function iniciarAnalisisCallback() {
+    if (
+      !poseLandmarkerRef.current
+    ) {
+      return;
+    }
+
+
+    if (
+      animationFrameRef.current !==
+      null
+    ) {
+      cancelAnimationFrame(
+        animationFrameRef.current
+      );
+    }
+
+
+    animationFrameRef.current =
+      requestAnimationFrame(
+        analizarFrame
+      );
+      },
+      [
+        analizarFrame
+      ]
+    );
+
+
+
+  function videoPreparado() {
+    iniciarAnalisis();
+  }
+
+
+  // ==================================================
+  // PREPARACIÓN DEL CURL
+  // ==================================================
+
+  function empezarAnalisisCurl() {
+    // Evitamos lanzar dos cuentas atrás
+    // si el usuario pulsa varias veces.
+    if (
+      estadoPreparacion !==
+      "preparacion"
+    ) {
+      return;
+    }
+
+
+    // Por seguridad, cancelamos cualquier
+    // intervalo anterior que pudiera quedar vivo.
+    if (
+      intervaloCuentaAtrasRef.current !==
+      null
+    ) {
+      window.clearInterval(
+        intervaloCuentaAtrasRef.current
+      );
+
+
+      intervaloCuentaAtrasRef.current =
+        null;
+    }
+
+
+    analisisActivoRef.current =
+      false;
+
+
+    setEstadoPreparacion(
+      "cuenta-atras"
+    );
+
+
+    setCuentaAtras(
+      3
+    );
+
+
+    let valorCuentaAtras =
+      3;
+
+
+    intervaloCuentaAtrasRef.current =
+      window.setInterval(
+        function () {
+          valorCuentaAtras -=
+            1;
+
+
+          if (
+            valorCuentaAtras >
+            0
+          ) {
+            setCuentaAtras(
+              valorCuentaAtras
+            );
+
+
+            return;
+          }
+
+
+          // La cuenta atrás ha terminado.
+          if (
+            intervaloCuentaAtrasRef.current !==
+            null
+          ) {
+            window.clearInterval(
+              intervaloCuentaAtrasRef.current
+            );
+
+
+            intervaloCuentaAtrasRef.current =
+              null;
+          }
+
+
+          // Empezamos la sesión desde un estado
+          // limpio justo cuando termina el 3 - 2 - 1.
+          estadoCurlRef.current =
+            crearEstadoCurl();
+
+
+          verdeHastaRef.current =
+            0;
+
+
+          ultimaActualizacionUIRef.current =
+            0;
+
+
+          analisisActivoRef.current =
+            true;
+
+
+          setCuentaAtras(
+            null
+          );
+
+
+          setEstadoPreparacion(
+            "analizando"
+          );
+        },
+        1000
+      );
+  }
+
 
 
   // ==================================================
@@ -412,12 +1099,20 @@ function CurlCameraPreview(
       true;
 
 
+    // Guardamos la referencia actual
+    // del elemento de vídeo.
+    //
+    // La utilizaremos también en el cleanup
+    // para evitar el aviso de ESLint
+    // sobre el uso de ref.current.
+    const videoActual =
+      videoRef.current;
+
+
     async function iniciarSistema() {
-      setErrorSistema(
-        null
-      );
-
-
+      // El estado de error ya comienza en null.
+      // No hacemos setState síncrono al arrancar
+      // el efecto para evitar renders innecesarios.
       let nuevoStream:
         MediaStream;
 
@@ -572,6 +1267,22 @@ function CurlCameraPreview(
       }
 
 
+      // Si el componente se desmonta durante
+      // la cuenta atrás, cancelamos el intervalo.
+      if (
+        intervaloCuentaAtrasRef.current !==
+        null
+      ) {
+        window.clearInterval(
+          intervaloCuentaAtrasRef.current
+        );
+
+
+        intervaloCuentaAtrasRef.current =
+          null;
+      }
+
+
       if (
         stream
       ) {
@@ -585,450 +1296,20 @@ function CurlCameraPreview(
       }
 
 
+      // Utilizamos la referencia guardada
+      // al crear el efecto.
+      //
+      // Así el cleanup no depende de
+      // un posible valor diferente de
+      // videoRef.current.
       if (
-        videoRef.current
+        videoActual
       ) {
-        videoRef.current.srcObject =
+        videoActual.srcObject =
           null;
       }
     };
-  }, []);
-
-
-  // ==================================================
-  // FEEDBACK VERDE
-  // ==================================================
-
-  function activarFeedbackVerde() {
-    verdeHastaRef.current =
-      performance.now() +
-      300;
-  }
-
-
-  // ==================================================
-  // DIBUJAR BRAZO
-  // ==================================================
-
-  function dibujarBrazo(
-    contexto:
-      CanvasRenderingContext2D,
-    hombro:
-      Punto,
-    codo:
-      Punto,
-    muneca:
-      Punto
-  ) {
-    const verdeActivo =
-      performance.now() <
-      verdeHastaRef.current;
-
-
-    dibujarConexion(
-      contexto,
-      hombro,
-      codo,
-      verdeActivo
-    );
-
-
-    dibujarConexion(
-      contexto,
-      codo,
-      muneca,
-      verdeActivo
-    );
-
-
-    dibujarLandmark(
-      contexto,
-      hombro,
-      verdeActivo
-    );
-
-
-    dibujarLandmark(
-      contexto,
-      codo,
-      verdeActivo
-    );
-
-
-    dibujarLandmark(
-      contexto,
-      muneca,
-      verdeActivo
-    );
-  }
-
-
-  // ==================================================
-  // ANALIZAR FRAME
-  // ==================================================
-
-  function analizarFrame(
-    timestamp: number
-  ) {
-    if (
-      !videoRef.current ||
-      !canvasRef.current ||
-      !poseLandmarkerRef.current
-    ) {
-      animationFrameRef.current =
-        requestAnimationFrame(
-          analizarFrame
-        );
-
-
-      return;
-    }
-
-
-    const video =
-      videoRef.current;
-
-
-    const canvas =
-      canvasRef.current;
-
-
-    const poseLandmarker =
-      poseLandmarkerRef.current;
-
-
-    if (
-      video.readyState <
-      2
-    ) {
-      animationFrameRef.current =
-        requestAnimationFrame(
-          analizarFrame
-        );
-
-
-      return;
-    }
-
-
-    if (
-      canvas.width !==
-        video.videoWidth ||
-      canvas.height !==
-        video.videoHeight
-    ) {
-      canvas.width =
-        video.videoWidth;
-
-
-      canvas.height =
-        video.videoHeight;
-    }
-
-
-    const contexto =
-      canvas.getContext(
-        "2d"
-      );
-
-
-    if (
-      !contexto
-    ) {
-      return;
-    }
-
-
-    contexto.clearRect(
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-
-
-    try {
-      const resultado =
-        poseLandmarker.detectForVideo(
-          video,
-          timestamp
-        );
-
-
-      if (
-        resultado.landmarks.length >
-        0
-      ) {
-        const landmarks =
-          resultado.landmarks[0];
-
-
-        const hombroNormalizado =
-          landmarks[
-            landmarksCurl.hombro
-          ];
-
-
-        const codoNormalizado =
-          landmarks[
-            landmarksCurl.codo
-          ];
-
-
-        const munecaNormalizada =
-          landmarks[
-            landmarksCurl.muneca
-          ];
-
-
-        const caderaNormalizada =
-          landmarks[
-            landmarksCurl.cadera
-          ];
-
-
-        if (
-          hombroNormalizado &&
-          codoNormalizado &&
-          munecaNormalizada &&
-          esLandmarkValido(
-            hombroNormalizado
-          ) &&
-          esLandmarkValido(
-            codoNormalizado
-          ) &&
-          esLandmarkValido(
-            munecaNormalizada
-          )
-        ) {
-          const hombro =
-            convertirAPixeles(
-              hombroNormalizado,
-              canvas
-            );
-
-
-          const codo =
-            convertirAPixeles(
-              codoNormalizado,
-              canvas
-            );
-
-
-          const muneca =
-            convertirAPixeles(
-              munecaNormalizada,
-              canvas
-            );
-
-
-          let cadera:
-            Punto | null =
-            null;
-
-
-          if (
-            caderaNormalizada &&
-            esLandmarkValido(
-              caderaNormalizada
-            )
-          ) {
-            cadera =
-              convertirAPixeles(
-                caderaNormalizada,
-                canvas
-              );
-          }
-
-
-          const analisis =
-            analizarFrameCurl(
-              estadoCurlRef.current,
-              hombro,
-              codo,
-              muneca,
-              cadera
-            );
-
-
-          if (
-            analisis.cambioFase
-          ) {
-            activarFeedbackVerde();
-
-
-            setFaseActual(
-              analisis.fase
-            );
-          }
-
-
-          if (
-            analisis.repeticionSumada
-          ) {
-            setRepeticiones(
-              estadoCurlRef.current
-                .repeticiones
-            );
-          }
-
-
-          if (
-            analisis.repeticionFinalizada !==
-            null
-          ) {
-            const repeticionFinalizada =
-              analisis
-                .repeticionFinalizada;
-
-
-            setHistorial(
-              function (
-                historialAnterior
-              ) {
-                return [
-                  ...historialAnterior,
-                  repeticionFinalizada
-                ];
-              }
-            );
-          }
-
-
-          if (
-            timestamp -
-              ultimaActualizacionUIRef
-                .current >=
-            100
-          ) {
-            setAnguloActual(
-              Math.round(
-                analisis.anguloCodo
-              )
-            );
-
-
-            setFaseActual(
-              analisis.fase
-            );
-
-
-            setFeedback(
-              analisis
-                .feedbackMovimiento
-            );
-
-
-            setFeedbackCodo(
-              analisis
-                .feedbackCodo
-            );
-
-
-            setFeedbackHombro(
-              analisis
-                .feedbackHombro
-            );
-
-
-            if (
-              analisis
-                .desplazamientoCodo !==
-              null
-            ) {
-              setDesplazamientoCodo(
-                Math.round(
-                  analisis
-                    .desplazamientoCodo *
-                  100
-                )
-              );
-
-            } else {
-              setDesplazamientoCodo(
-                null
-              );
-            }
-
-
-            if (
-              analisis
-                .desplazamientoHombro !==
-              null
-            ) {
-              setDesplazamientoHombro(
-                Math.round(
-                  analisis
-                    .desplazamientoHombro *
-                  100
-                )
-              );
-
-            } else {
-              setDesplazamientoHombro(
-                null
-              );
-            }
-
-
-            ultimaActualizacionUIRef
-              .current =
-              timestamp;
-          }
-
-
-          dibujarBrazo(
-            contexto,
-            hombro,
-            codo,
-            muneca
-          );
-        }
-      }
-
-    } catch (error) {
-      console.error(
-        "Error analizando curl:",
-        error
-      );
-    }
-
-
-    animationFrameRef.current =
-      requestAnimationFrame(
-        analizarFrame
-      );
-  }
-
-
-  function iniciarAnalisis() {
-    if (
-      !poseLandmarkerRef.current
-    ) {
-      return;
-    }
-
-
-    if (
-      animationFrameRef.current !==
-      null
-    ) {
-      cancelAnimationFrame(
-        animationFrameRef.current
-      );
-    }
-
-
-    animationFrameRef.current =
-      requestAnimationFrame(
-        analizarFrame
-      );
-  }
-
-
-  function videoPreparado() {
-    iniciarAnalisis();
-  }
+  }, [iniciarAnalisis]);
 
 
   if (
@@ -1087,6 +1368,116 @@ function CurlCameraPreview(
 
 
       <div className="vision-fit-data-column">
+
+        {estadoPreparacion !==
+        "analizando" ? (
+
+          <section className="analysis-section analysis-current analysis-preparation">
+
+            <span className="analysis-section-label">
+              Preparación
+            </span>
+
+
+            {estadoPreparacion ===
+            "preparacion" ? (
+
+              <>
+
+                <h2>
+                  Antes de empezar
+                </h2>
+
+
+                <p className="analysis-preparation-intro">
+                  Colócate correctamente antes de iniciar el análisis del curl.
+                </p>
+
+
+                <div className="analysis-preparation-list">
+
+                  <p>
+                    <strong>1.</strong>{" "}
+                    Colócate de lado a la cámara.
+                  </p>
+
+
+                  <p>
+                    <strong>2.</strong>{" "}
+                    Mantén visibles hombro, codo y muñeca del brazo {props.lado}.
+                  </p>
+
+
+                  <p>
+                    <strong>3.</strong>{" "}
+                    Intenta que la cadera también sea visible para analizar el tronco.
+                  </p>
+
+
+                  <p>
+                    <strong>4.</strong>{" "}
+                    Empieza con el brazo completamente extendido.
+                  </p>
+
+                </div>
+
+
+                <div className="analysis-preparation-side">
+
+                  <span>
+                    Lado seleccionado
+                  </span>
+
+
+                  <strong>
+                    {props.lado ===
+                    "derecho"
+                      ? "Derecho"
+                      : "Izquierdo"}
+                  </strong>
+
+                </div>
+
+
+                <button
+                  type="button"
+                  className="analysis-start-button"
+                  onClick={
+                    empezarAnalisisCurl
+                  }
+                >
+                  Empezar análisis
+                </button>
+
+              </>
+
+            ) : (
+
+              <div className="analysis-countdown">
+
+                <h2>
+                  Prepárate
+                </h2>
+
+
+                <div className="analysis-countdown-number">
+                  {cuentaAtras}
+                </div>
+
+
+                <p>
+                  Mantén el brazo extendido. El análisis comenzará al terminar la cuenta atrás.
+                </p>
+
+              </div>
+
+            )}
+
+          </section>
+
+        ) : (
+
+          <>
 
         {/* ==========================================
             FEEDBACK ACTUAL
@@ -1440,6 +1831,10 @@ function CurlCameraPreview(
 
         </section>
 
+          </>
+
+        )}
+
       </div>
 
     </div>
@@ -1619,6 +2014,8 @@ function SentadillaCameraPreview(
 
   useEffect(
     function () {
+      // Reiniciamos primero
+      // el estado interno del ejercicio.
       estadoSentadillaRef.current =
         crearEstadoSentadilla();
 
@@ -1627,49 +2024,65 @@ function SentadillaCameraPreview(
         0;
 
 
-      setRepeticiones(
-        0
-      );
+      // Posponemos los setState()
+      // para no ejecutarlos de forma
+      // síncrona dentro del efecto.
+      const temporizadorReinicio =
+        window.setTimeout(
+          function () {
+            setRepeticiones(
+              0
+            );
 
 
-      setAnguloRodilla(
-        0
-      );
+            setAnguloRodilla(
+              0
+            );
 
 
-      setInclinacionTronco(
-        null
-      );
+            setInclinacionTronco(
+              null
+            );
 
 
-      setFase(
-        "arriba"
-      );
+            setFase(
+              "arriba"
+            );
 
 
-      setFeedback(
-        "Colócate de forma que se vea la pierna completa"
-      );
+            setFeedback(
+              "Colócate de forma que se vea la pierna completa"
+            );
 
 
-      setFeedbackTronco(
-        "Esperando detección"
-      );
+            setFeedbackTronco(
+              "Esperando detección"
+            );
 
 
-      setMensaje(
-        "Esperando detección"
-      );
+            setMensaje(
+              "Esperando detección"
+            );
 
 
-      setMensajeTronco(
-        "Esperando detección"
-      );
+            setMensajeTronco(
+              "Esperando detección"
+            );
 
 
-      setHistorial(
-        []
-      );
+            setHistorial(
+              []
+            );
+          },
+          0
+        );
+
+
+      return function cancelarReinicioPendiente() {
+        window.clearTimeout(
+          temporizadorReinicio
+        );
+      };
 
     },
     [
@@ -1679,207 +2092,12 @@ function SentadillaCameraPreview(
 
 
   // ==================================================
-  // CÁMARA Y MEDIAPIPE
-  // ==================================================
-
-  useEffect(function () {
-    let stream:
-      MediaStream | null =
-      null;
-
-
-    let componenteActivo =
-      true;
-
-
-    async function iniciarSistema() {
-      setErrorSistema(
-        null
-      );
-
-
-      let nuevoStream:
-        MediaStream;
-
-
-      try {
-        nuevoStream =
-          await navigator.mediaDevices.getUserMedia({
-            video:
-              true,
-
-            audio:
-              false
-          });
-
-      } catch (error) {
-        console.error(
-          "Error al iniciar cámara de sentadilla:",
-          error
-        );
-
-
-        if (
-          componenteActivo
-        ) {
-          setErrorSistema(
-            obtenerMensajeErrorCamara(
-              error
-            )
-          );
-        }
-
-
-        return;
-      }
-
-
-      if (
-        !componenteActivo
-      ) {
-        nuevoStream
-          .getTracks()
-          .forEach(
-            function (track) {
-              track.stop();
-            }
-          );
-
-
-        return;
-      }
-
-
-      stream =
-        nuevoStream;
-
-
-      if (
-        videoRef.current
-      ) {
-        videoRef.current.srcObject =
-          stream;
-      }
-
-
-      try {
-        const poseLandmarker =
-          await crearPoseLandmarker();
-
-
-        if (
-          !componenteActivo
-        ) {
-          return;
-        }
-
-
-        poseLandmarkerRef.current =
-          poseLandmarker;
-
-
-        setErrorSistema(
-          null
-        );
-
-
-        if (
-          videoRef.current &&
-          videoRef.current.readyState >=
-            2
-        ) {
-          iniciarAnalisis();
-        }
-
-      } catch (error) {
-        if (
-          stream
-        ) {
-          stream
-            .getTracks()
-            .forEach(
-              function (track) {
-                track.stop();
-              }
-            );
-
-
-          stream =
-            null;
-        }
-
-
-        if (
-          videoRef.current
-        ) {
-          videoRef.current.srcObject =
-            null;
-        }
-
-
-        if (
-          componenteActivo
-        ) {
-          setErrorSistema(
-            obtenerMensajeErrorMediaPipe(
-              error
-            )
-          );
-        }
-      }
-    }
-
-
-    iniciarSistema();
-
-
-    return function detenerSistema() {
-      componenteActivo =
-        false;
-
-
-      if (
-        animationFrameRef.current !==
-        null
-      ) {
-        cancelAnimationFrame(
-          animationFrameRef.current
-        );
-
-
-        animationFrameRef.current =
-          null;
-      }
-
-
-      if (
-        stream
-      ) {
-        stream
-          .getTracks()
-          .forEach(
-            function (track) {
-              track.stop();
-            }
-          );
-      }
-
-
-      if (
-        videoRef.current
-      ) {
-        videoRef.current.srcObject =
-          null;
-      }
-    };
-  }, []);
-
-
-  // ==================================================
   // DIBUJAR CUERPO
   // ==================================================
 
-  function dibujarCuerpo(
+  const dibujarCuerpo =
+    useCallback(
+      function dibujarCuerpoCallback(
     contexto:
       CanvasRenderingContext2D,
     hombro:
@@ -1948,14 +2166,18 @@ function SentadillaCameraPreview(
       tobillo,
       verde
     );
-  }
+      },
+      []
+    );
 
 
   // ==================================================
   // ANALIZAR FRAME
   // ==================================================
 
-  function analizarFrame(
+  const analizarFrame =
+    useCallback(
+      function analizarFrameCallback(
     timestamp: number
   ) {
     if (
@@ -1965,7 +2187,7 @@ function SentadillaCameraPreview(
     ) {
       animationFrameRef.current =
         requestAnimationFrame(
-          analizarFrame
+          analizarFrameCallback
         );
 
 
@@ -1987,7 +2209,7 @@ function SentadillaCameraPreview(
     ) {
       animationFrameRef.current =
         requestAnimationFrame(
-          analizarFrame
+          analizarFrameCallback
         );
 
 
@@ -2267,12 +2489,20 @@ function SentadillaCameraPreview(
 
     animationFrameRef.current =
       requestAnimationFrame(
-        analizarFrame
+        analizarFrameCallback
       );
-  }
+      },
+      [
+        dibujarCuerpo,
+        landmarksSentadilla
+      ]
+    );
 
 
-  function iniciarAnalisis() {
+
+  const iniciarAnalisis =
+    useCallback(
+      function iniciarAnalisisCallback() {
     if (
       !poseLandmarkerRef.current
     ) {
@@ -2294,12 +2524,230 @@ function SentadillaCameraPreview(
       requestAnimationFrame(
         analizarFrame
       );
-  }
+      },
+      [
+        analizarFrame
+      ]
+    );
+
 
 
   function videoPreparado() {
     iniciarAnalisis();
   }
+
+
+
+
+  // ==================================================
+  // CÁMARA Y MEDIAPIPE
+  // ==================================================
+
+  useEffect(function () {
+    let stream:
+      MediaStream | null =
+      null;
+
+
+    let componenteActivo =
+      true;
+
+
+    // Guardamos la referencia actual
+    // del elemento de vídeo.
+    //
+    // La utilizaremos también en el cleanup
+    // para evitar el aviso de ESLint
+    // sobre el uso de ref.current.
+    const videoActual =
+      videoRef.current;
+
+
+    async function iniciarSistema() {
+      // El estado de error ya comienza en null.
+      // No hacemos setState síncrono al arrancar
+      // el efecto para evitar renders innecesarios.
+      let nuevoStream:
+        MediaStream;
+
+
+      try {
+        nuevoStream =
+          await navigator.mediaDevices.getUserMedia({
+            video:
+              true,
+
+            audio:
+              false
+          });
+
+      } catch (error) {
+        console.error(
+          "Error al iniciar cámara de sentadilla:",
+          error
+        );
+
+
+        if (
+          componenteActivo
+        ) {
+          setErrorSistema(
+            obtenerMensajeErrorCamara(
+              error
+            )
+          );
+        }
+
+
+        return;
+      }
+
+
+      if (
+        !componenteActivo
+      ) {
+        nuevoStream
+          .getTracks()
+          .forEach(
+            function (track) {
+              track.stop();
+            }
+          );
+
+
+        return;
+      }
+
+
+      stream =
+        nuevoStream;
+
+
+      if (
+        videoRef.current
+      ) {
+        videoRef.current.srcObject =
+          stream;
+      }
+
+
+      try {
+        const poseLandmarker =
+          await crearPoseLandmarker();
+
+
+        if (
+          !componenteActivo
+        ) {
+          return;
+        }
+
+
+        poseLandmarkerRef.current =
+          poseLandmarker;
+
+
+        setErrorSistema(
+          null
+        );
+
+
+        if (
+          videoRef.current &&
+          videoRef.current.readyState >=
+            2
+        ) {
+          iniciarAnalisis();
+        }
+
+      } catch (error) {
+        if (
+          stream
+        ) {
+          stream
+            .getTracks()
+            .forEach(
+              function (track) {
+                track.stop();
+              }
+            );
+
+
+          stream =
+            null;
+        }
+
+
+        if (
+          videoRef.current
+        ) {
+          videoRef.current.srcObject =
+            null;
+        }
+
+
+        if (
+          componenteActivo
+        ) {
+          setErrorSistema(
+            obtenerMensajeErrorMediaPipe(
+              error
+            )
+          );
+        }
+      }
+    }
+
+
+    iniciarSistema();
+
+
+    return function detenerSistema() {
+      componenteActivo =
+        false;
+
+
+      if (
+        animationFrameRef.current !==
+        null
+      ) {
+        cancelAnimationFrame(
+          animationFrameRef.current
+        );
+
+
+        animationFrameRef.current =
+          null;
+      }
+
+
+      if (
+        stream
+      ) {
+        stream
+          .getTracks()
+          .forEach(
+            function (track) {
+              track.stop();
+            }
+          );
+      }
+
+
+      // Utilizamos la referencia guardada
+      // al crear el efecto.
+      //
+      // Así el cleanup no depende de
+      // un posible valor diferente de
+      // videoRef.current.
+      if (
+        videoActual
+      ) {
+        videoActual.srcObject =
+          null;
+      }
+    };
+  }, [iniciarAnalisis]);
 
 
   if (
@@ -2917,6 +3365,8 @@ function PressHombroCameraPreview(
 
   useEffect(
     function () {
+      // Reiniciamos primero
+      // el estado interno del press.
       estadoPressRef.current =
         crearEstadoPressHombro();
 
@@ -2925,49 +3375,65 @@ function PressHombroCameraPreview(
         0;
 
 
-      setRepeticiones(
-        0
-      );
+      // Posponemos los setState()
+      // para evitar el aviso
+      // react-hooks/set-state-in-effect.
+      const temporizadorReinicio =
+        window.setTimeout(
+          function () {
+            setRepeticiones(
+              0
+            );
 
 
-      setAnguloIzquierdo(
-        0
-      );
+            setAnguloIzquierdo(
+              0
+            );
 
 
-      setAnguloDerecho(
-        0
-      );
+            setAnguloDerecho(
+              0
+            );
 
 
-      setDiferenciaAngular(
-        0
-      );
+            setDiferenciaAngular(
+              0
+            );
 
 
-      setFase(
-        "esperando"
-      );
+            setFase(
+              "esperando"
+            );
 
 
-      setFeedbackMovimiento(
-        "Coloca ambos brazos en posición baja"
-      );
+            setFeedbackMovimiento(
+              "Coloca ambos brazos en posición baja"
+            );
 
 
-      setFeedbackSimetria(
-        "Esperando detección"
-      );
+            setFeedbackSimetria(
+              "Esperando detección"
+            );
 
 
-      setMensaje(
-        "Colócate de frente y muestra los dos brazos"
-      );
+            setMensaje(
+              "Colócate de frente y muestra los dos brazos"
+            );
 
 
-      setHistorial(
-        []
-      );
+            setHistorial(
+              []
+            );
+          },
+          0
+        );
+
+
+      return function cancelarReinicioPendiente() {
+        window.clearTimeout(
+          temporizadorReinicio
+        );
+      };
 
     },
     [
@@ -2977,207 +3443,12 @@ function PressHombroCameraPreview(
 
 
   // ==================================================
-  // CÁMARA Y MEDIAPIPE
-  // ==================================================
-
-  useEffect(function () {
-    let stream:
-      MediaStream | null =
-      null;
-
-
-    let componenteActivo =
-      true;
-
-
-    async function iniciarSistema() {
-      setErrorSistema(
-        null
-      );
-
-
-      let nuevoStream:
-        MediaStream;
-
-
-      try {
-        nuevoStream =
-          await navigator.mediaDevices.getUserMedia({
-            video:
-              true,
-
-            audio:
-              false
-          });
-
-      } catch (error) {
-        console.error(
-          "Error al iniciar cámara del press:",
-          error
-        );
-
-
-        if (
-          componenteActivo
-        ) {
-          setErrorSistema(
-            obtenerMensajeErrorCamara(
-              error
-            )
-          );
-        }
-
-
-        return;
-      }
-
-
-      if (
-        !componenteActivo
-      ) {
-        nuevoStream
-          .getTracks()
-          .forEach(
-            function (track) {
-              track.stop();
-            }
-          );
-
-
-        return;
-      }
-
-
-      stream =
-        nuevoStream;
-
-
-      if (
-        videoRef.current
-      ) {
-        videoRef.current.srcObject =
-          stream;
-      }
-
-
-      try {
-        const poseLandmarker =
-          await crearPoseLandmarker();
-
-
-        if (
-          !componenteActivo
-        ) {
-          return;
-        }
-
-
-        poseLandmarkerRef.current =
-          poseLandmarker;
-
-
-        setErrorSistema(
-          null
-        );
-
-
-        if (
-          videoRef.current &&
-          videoRef.current.readyState >=
-            2
-        ) {
-          iniciarAnalisis();
-        }
-
-      } catch (error) {
-        if (
-          stream
-        ) {
-          stream
-            .getTracks()
-            .forEach(
-              function (track) {
-                track.stop();
-              }
-            );
-
-
-          stream =
-            null;
-        }
-
-
-        if (
-          videoRef.current
-        ) {
-          videoRef.current.srcObject =
-            null;
-        }
-
-
-        if (
-          componenteActivo
-        ) {
-          setErrorSistema(
-            obtenerMensajeErrorMediaPipe(
-              error
-            )
-          );
-        }
-      }
-    }
-
-
-    iniciarSistema();
-
-
-    return function detenerSistema() {
-      componenteActivo =
-        false;
-
-
-      if (
-        animationFrameRef.current !==
-        null
-      ) {
-        cancelAnimationFrame(
-          animationFrameRef.current
-        );
-
-
-        animationFrameRef.current =
-          null;
-      }
-
-
-      if (
-        stream
-      ) {
-        stream
-          .getTracks()
-          .forEach(
-            function (track) {
-              track.stop();
-            }
-          );
-      }
-
-
-      if (
-        videoRef.current
-      ) {
-        videoRef.current.srcObject =
-          null;
-      }
-    };
-  }, []);
-
-
-  // ==================================================
   // DIBUJAR BRAZO
   // ==================================================
 
-  function dibujarBrazo(
+  const dibujarBrazo =
+    useCallback(
+      function dibujarBrazoCallback(
     contexto:
       CanvasRenderingContext2D,
     hombro:
@@ -3224,14 +3495,18 @@ function PressHombroCameraPreview(
       muneca,
       verde
     );
-  }
+      },
+      []
+    );
 
 
   // ==================================================
   // ANALIZAR FRAME
   // ==================================================
 
-  function analizarFrame(
+  const analizarFrame =
+    useCallback(
+      function analizarFrameCallback(
     timestamp: number
   ) {
     if (
@@ -3241,7 +3516,7 @@ function PressHombroCameraPreview(
     ) {
       animationFrameRef.current =
         requestAnimationFrame(
-          analizarFrame
+          analizarFrameCallback
         );
 
 
@@ -3263,7 +3538,7 @@ function PressHombroCameraPreview(
     ) {
       animationFrameRef.current =
         requestAnimationFrame(
-          analizarFrame
+          analizarFrameCallback
         );
 
 
@@ -3570,12 +3845,19 @@ function PressHombroCameraPreview(
 
     animationFrameRef.current =
       requestAnimationFrame(
-        analizarFrame
+        analizarFrameCallback
       );
-  }
+      },
+      [
+        dibujarBrazo
+      ]
+    );
 
 
-  function iniciarAnalisis() {
+
+  const iniciarAnalisis =
+    useCallback(
+      function iniciarAnalisisCallback() {
     if (
       !poseLandmarkerRef.current
     ) {
@@ -3597,12 +3879,230 @@ function PressHombroCameraPreview(
       requestAnimationFrame(
         analizarFrame
       );
-  }
+      },
+      [
+        analizarFrame
+      ]
+    );
+
 
 
   function videoPreparado() {
     iniciarAnalisis();
   }
+
+
+
+
+  // ==================================================
+  // CÁMARA Y MEDIAPIPE
+  // ==================================================
+
+  useEffect(function () {
+    let stream:
+      MediaStream | null =
+      null;
+
+
+    let componenteActivo =
+      true;
+
+
+    // Guardamos la referencia actual
+    // del elemento de vídeo.
+    //
+    // La utilizaremos también en el cleanup
+    // para evitar el aviso de ESLint
+    // sobre el uso de ref.current.
+    const videoActual =
+      videoRef.current;
+
+
+    async function iniciarSistema() {
+      // El estado de error ya comienza en null.
+      // No hacemos setState síncrono al arrancar
+      // el efecto para evitar renders innecesarios.
+      let nuevoStream:
+        MediaStream;
+
+
+      try {
+        nuevoStream =
+          await navigator.mediaDevices.getUserMedia({
+            video:
+              true,
+
+            audio:
+              false
+          });
+
+      } catch (error) {
+        console.error(
+          "Error al iniciar cámara del press:",
+          error
+        );
+
+
+        if (
+          componenteActivo
+        ) {
+          setErrorSistema(
+            obtenerMensajeErrorCamara(
+              error
+            )
+          );
+        }
+
+
+        return;
+      }
+
+
+      if (
+        !componenteActivo
+      ) {
+        nuevoStream
+          .getTracks()
+          .forEach(
+            function (track) {
+              track.stop();
+            }
+          );
+
+
+        return;
+      }
+
+
+      stream =
+        nuevoStream;
+
+
+      if (
+        videoRef.current
+      ) {
+        videoRef.current.srcObject =
+          stream;
+      }
+
+
+      try {
+        const poseLandmarker =
+          await crearPoseLandmarker();
+
+
+        if (
+          !componenteActivo
+        ) {
+          return;
+        }
+
+
+        poseLandmarkerRef.current =
+          poseLandmarker;
+
+
+        setErrorSistema(
+          null
+        );
+
+
+        if (
+          videoRef.current &&
+          videoRef.current.readyState >=
+            2
+        ) {
+          iniciarAnalisis();
+        }
+
+      } catch (error) {
+        if (
+          stream
+        ) {
+          stream
+            .getTracks()
+            .forEach(
+              function (track) {
+                track.stop();
+              }
+            );
+
+
+          stream =
+            null;
+        }
+
+
+        if (
+          videoRef.current
+        ) {
+          videoRef.current.srcObject =
+            null;
+        }
+
+
+        if (
+          componenteActivo
+        ) {
+          setErrorSistema(
+            obtenerMensajeErrorMediaPipe(
+              error
+            )
+          );
+        }
+      }
+    }
+
+
+    iniciarSistema();
+
+
+    return function detenerSistema() {
+      componenteActivo =
+        false;
+
+
+      if (
+        animationFrameRef.current !==
+        null
+      ) {
+        cancelAnimationFrame(
+          animationFrameRef.current
+        );
+
+
+        animationFrameRef.current =
+          null;
+      }
+
+
+      if (
+        stream
+      ) {
+        stream
+          .getTracks()
+          .forEach(
+            function (track) {
+              track.stop();
+            }
+          );
+      }
+
+
+      // Utilizamos la referencia guardada
+      // al crear el efecto.
+      //
+      // Así el cleanup no depende de
+      // un posible valor diferente de
+      // videoRef.current.
+      if (
+        videoActual
+      ) {
+        videoActual.srcObject =
+          null;
+      }
+    };
+  }, [iniciarAnalisis]);
 
 
   if (
