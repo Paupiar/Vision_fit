@@ -169,7 +169,7 @@ interface CurlCameraPreviewProps {
 }
 
 
-type EstadoPreparacionCurl =
+type EstadoPreparacionAnalisis =
   "preparacion" |
   "cuenta-atras" |
   "analizando";
@@ -349,7 +349,7 @@ function CurlCameraPreview(
     estadoPreparacion,
     setEstadoPreparacion
   ] =
-    useState<EstadoPreparacionCurl>(
+    useState<EstadoPreparacionAnalisis>(
       "preparacion"
     );
 
@@ -1902,6 +1902,25 @@ function SentadillaCameraPreview(
     );
 
 
+  // Indica si la lógica de la sentadilla
+  // puede modificar la sesión.
+  //
+  // MediaPipe sigue detectando y dibujando
+  // landmarks mientras este valor sea false.
+  const analisisActivoRef =
+    useRef<boolean>(
+      false
+    );
+
+
+  // Intervalo utilizado para la
+  // cuenta atrás 3 - 2 - 1.
+  const intervaloCuentaAtrasRef =
+    useRef<number | null>(
+      null
+    );
+
+
   // ==================================================
   // ESTADOS
   // ==================================================
@@ -1998,6 +2017,24 @@ function SentadillaCameraPreview(
     );
 
 
+  const [
+    estadoPreparacion,
+    setEstadoPreparacion
+  ] =
+    useState<EstadoPreparacionAnalisis>(
+      "preparacion"
+    );
+
+
+  const [
+    cuentaAtras,
+    setCuentaAtras
+  ] =
+    useState<number | null>(
+      null
+    );
+
+
   // ==================================================
   // RESUMEN
   // ==================================================
@@ -2022,6 +2059,28 @@ function SentadillaCameraPreview(
 
       verdeHastaRef.current =
         0;
+
+
+      // Al reiniciar bloqueamos de nuevo
+      // el conteo de repeticiones.
+      analisisActivoRef.current =
+        false;
+
+
+      // Si el usuario reinicia durante
+      // la cuenta atrás, la cancelamos.
+      if (
+        intervaloCuentaAtrasRef.current !==
+        null
+      ) {
+        window.clearInterval(
+          intervaloCuentaAtrasRef.current
+        );
+
+
+        intervaloCuentaAtrasRef.current =
+          null;
+      }
 
 
       // Posponemos los setState()
@@ -2072,6 +2131,18 @@ function SentadillaCameraPreview(
 
             setHistorial(
               []
+            );
+
+
+            // Volvemos a la pantalla
+            // de preparación sin apagar la cámara.
+            setEstadoPreparacion(
+              "preparacion"
+            );
+
+
+            setCuentaAtras(
+              null
             );
           },
           0
@@ -2344,135 +2415,163 @@ function SentadillaCameraPreview(
                 hombroNormalizado,
                 canvas
               );
-
-
-            setMensajeTronco(
-              "Tronco detectado correctamente"
-            );
-
-          } else {
-            setMensajeTronco(
-              "Asegúrate de que se vea el hombro"
-            );
           }
 
 
-          const profundidadAntes =
-            estadoSentadillaRef
-              .current
-              .profundidadAlcanzada;
-
-
-          const analisis =
-            analizarSentadilla(
-              estadoSentadillaRef.current,
-              hombro,
-              cadera,
-              rodilla,
-              tobillo
-            );
-
-
-          const profundidadDespues =
-            estadoSentadillaRef
-              .current
-              .profundidadAlcanzada;
-
-
+          // Durante la preparación seguimos
+          // detectando y dibujando el cuerpo,
+          // pero no dejamos que la lógica
+          // de la sentadilla modifique la sesión.
           if (
-            !profundidadAntes &&
-            profundidadDespues
+            analisisActivoRef.current
           ) {
-            verdeHastaRef.current =
-              timestamp +
-              300;
-          }
+            if (
+              hombro !==
+              null
+            ) {
+              setMensajeTronco(
+                "Tronco detectado correctamente"
+              );
+
+            } else {
+              setMensajeTronco(
+                "Asegúrate de que se vea el hombro"
+              );
+            }
 
 
-          if (
-            analisis.repeticionSumada
-          ) {
-            verdeHastaRef.current =
-              timestamp +
-              300;
-          }
+            const profundidadAntes =
+              estadoSentadillaRef
+                .current
+                .profundidadAlcanzada;
 
 
-          const mostrarVerde =
-            timestamp <
-            verdeHastaRef.current;
+            const analisis =
+              analizarSentadilla(
+                estadoSentadillaRef.current,
+                hombro,
+                cadera,
+                rodilla,
+                tobillo
+              );
 
 
-          setAnguloRodilla(
-            Math.round(
-              analisis.anguloRodilla
-            )
-          );
+            const profundidadDespues =
+              estadoSentadillaRef
+                .current
+                .profundidadAlcanzada;
 
 
-          if (
-            analisis.inclinacionTronco !==
-            null
-          ) {
-            setInclinacionTronco(
+            if (
+              !profundidadAntes &&
+              profundidadDespues
+            ) {
+              verdeHastaRef.current =
+                timestamp +
+                300;
+            }
+
+
+            if (
+              analisis.repeticionSumada
+            ) {
+              verdeHastaRef.current =
+                timestamp +
+                300;
+            }
+
+
+            const mostrarVerde =
+              timestamp <
+              verdeHastaRef.current;
+
+
+            setAnguloRodilla(
               Math.round(
-                analisis.inclinacionTronco
+                analisis.anguloRodilla
               )
             );
 
-          } else {
-            setInclinacionTronco(
+
+            if (
+              analisis.inclinacionTronco !==
               null
+            ) {
+              setInclinacionTronco(
+                Math.round(
+                  analisis.inclinacionTronco
+                )
+              );
+
+            } else {
+              setInclinacionTronco(
+                null
+              );
+            }
+
+
+            setFase(
+              analisis.fase
+            );
+
+
+            setFeedback(
+              analisis.feedbackMovimiento
+            );
+
+
+            setFeedbackTronco(
+              analisis.feedbackTronco
+            );
+
+
+            setMensaje(
+              "Pierna detectada correctamente"
+            );
+
+
+            if (
+              analisis.repeticionSumada
+            ) {
+              setRepeticiones(
+                analisis.repeticiones
+              );
+
+
+              setHistorial(
+                [
+                  ...analisis.historial
+                ]
+              );
+            }
+
+
+            dibujarCuerpo(
+              contexto,
+              hombro,
+              cadera,
+              rodilla,
+              tobillo,
+              mostrarVerde
+            );
+
+          } else {
+            // Antes de empezar solo dibujamos
+            // los landmarks para facilitar
+            // la colocación del usuario.
+            dibujarCuerpo(
+              contexto,
+              hombro,
+              cadera,
+              rodilla,
+              tobillo,
+              false
             );
           }
 
-
-          setFase(
-            analisis.fase
-          );
-
-
-          setFeedback(
-            analisis.feedbackMovimiento
-          );
-
-
-          setFeedbackTronco(
-            analisis.feedbackTronco
-          );
-
-
-          setMensaje(
-            "Pierna detectada correctamente"
-          );
-
-
-          if (
-            analisis.repeticionSumada
-          ) {
-            setRepeticiones(
-              analisis.repeticiones
-            );
-
-
-            setHistorial(
-              [
-                ...analisis.historial
-              ]
-            );
-          }
-
-
-          dibujarCuerpo(
-            contexto,
-            hombro,
-            cadera,
-            rodilla,
-            tobillo,
-            mostrarVerde
-          );
-
-        } else {
+        } else if (
+          analisisActivoRef.current
+        ) {
           setMensaje(
             "Asegúrate de que se vea la pierna completa"
           );
@@ -2537,6 +2636,113 @@ function SentadillaCameraPreview(
   }
 
 
+  // ==================================================
+  // PREPARACIÓN DE LA SENTADILLA
+  // ==================================================
+
+  function empezarAnalisisSentadilla() {
+    // Evitamos iniciar varias cuentas atrás
+    // si el usuario pulsa repetidamente.
+    if (
+      estadoPreparacion !==
+      "preparacion"
+    ) {
+      return;
+    }
+
+
+    if (
+      intervaloCuentaAtrasRef.current !==
+      null
+    ) {
+      window.clearInterval(
+        intervaloCuentaAtrasRef.current
+      );
+
+
+      intervaloCuentaAtrasRef.current =
+        null;
+    }
+
+
+    analisisActivoRef.current =
+      false;
+
+
+    setEstadoPreparacion(
+      "cuenta-atras"
+    );
+
+
+    setCuentaAtras(
+      3
+    );
+
+
+    let valorCuentaAtras =
+      3;
+
+
+    intervaloCuentaAtrasRef.current =
+      window.setInterval(
+        function () {
+          valorCuentaAtras -=
+            1;
+
+
+          if (
+            valorCuentaAtras >
+            0
+          ) {
+            setCuentaAtras(
+              valorCuentaAtras
+            );
+
+
+            return;
+          }
+
+
+          if (
+            intervaloCuentaAtrasRef.current !==
+            null
+          ) {
+            window.clearInterval(
+              intervaloCuentaAtrasRef.current
+            );
+
+
+            intervaloCuentaAtrasRef.current =
+              null;
+          }
+
+
+          // Empezamos con un estado limpio
+          // cuando termina la cuenta atrás.
+          estadoSentadillaRef.current =
+            crearEstadoSentadilla();
+
+
+          verdeHastaRef.current =
+            0;
+
+
+          analisisActivoRef.current =
+            true;
+
+
+          setCuentaAtras(
+            null
+          );
+
+
+          setEstadoPreparacion(
+            "analizando"
+          );
+        },
+        1000
+      );
+  }
 
 
   // ==================================================
@@ -2721,6 +2927,22 @@ function SentadillaCameraPreview(
       }
 
 
+      // Cancelamos también una posible
+      // cuenta atrás pendiente.
+      if (
+        intervaloCuentaAtrasRef.current !==
+        null
+      ) {
+        window.clearInterval(
+          intervaloCuentaAtrasRef.current
+        );
+
+
+        intervaloCuentaAtrasRef.current =
+          null;
+      }
+
+
       if (
         stream
       ) {
@@ -2806,6 +3028,116 @@ function SentadillaCameraPreview(
 
 
       <div className="vision-fit-data-column">
+
+        {estadoPreparacion !==
+        "analizando" ? (
+
+          <section className="analysis-section analysis-current analysis-preparation">
+
+            {estadoPreparacion ===
+            "preparacion" ? (
+
+              <>
+
+                <span className="analysis-section-label">
+                  Antes de empezar
+                </span>
+
+
+                <h2>
+                  Preparación
+                </h2>
+
+
+                <p className="analysis-preparation-intro">
+                  Colócate correctamente antes de iniciar el análisis de la sentadilla.
+                </p>
+
+
+                <div className="analysis-preparation-list">
+
+                  <p>
+                    <strong>1.</strong>{" "}
+                    Colócate de lado a la cámara.
+                  </p>
+
+
+                  <p>
+                    <strong>2.</strong>{" "}
+                    Mantén visibles hombro, cadera, rodilla y tobillo del lado {props.lado}.
+                  </p>
+
+
+                  <p>
+                    <strong>3.</strong>{" "}
+                    Deja suficiente espacio para que la cámara vea el movimiento completo.
+                  </p>
+
+
+                  <p>
+                    <strong>4.</strong>{" "}
+                    Empieza de pie, con la pierna extendida.
+                  </p>
+
+                </div>
+
+
+                <div className="analysis-preparation-side">
+
+                  <span>
+                    Lado seleccionado
+                  </span>
+
+
+                  <strong>
+                    {props.lado ===
+                    "derecho"
+                      ? "Derecho"
+                      : "Izquierdo"}
+                  </strong>
+
+                </div>
+
+
+                <button
+                  type="button"
+                  className="analysis-start-button"
+                  onClick={
+                    empezarAnalisisSentadilla
+                  }
+                >
+                  Empezar análisis
+                </button>
+
+              </>
+
+            ) : (
+
+              <div className="analysis-countdown">
+
+                <h2>
+                  Prepárate
+                </h2>
+
+
+                <div className="analysis-countdown-number">
+                  {cuentaAtras}
+                </div>
+
+
+                <p>
+                  Mantente de pie y completamente visible. El análisis comenzará al terminar la cuenta atrás.
+                </p>
+
+              </div>
+
+            )}
+
+          </section>
+
+        ) : (
+
+          <>
 
         {/* ==========================================
             FEEDBACK ACTUAL
@@ -3193,6 +3525,10 @@ function SentadillaCameraPreview(
 
         </section>
 
+          </>
+
+        )}
+
       </div>
 
     </div>
@@ -3250,6 +3586,25 @@ function PressHombroCameraPreview(
   const verdeHastaRef =
     useRef<number>(
       0
+    );
+
+
+  // Indica si la lógica del press puede
+  // modificar la sesión.
+  //
+  // MediaPipe continúa detectando y dibujando
+  // los dos brazos durante la preparación.
+  const analisisActivoRef =
+    useRef<boolean>(
+      false
+    );
+
+
+  // Intervalo utilizado para la
+  // cuenta atrás 3 - 2 - 1.
+  const intervaloCuentaAtrasRef =
+    useRef<number | null>(
+      null
     );
 
 
@@ -3349,6 +3704,24 @@ function PressHombroCameraPreview(
     );
 
 
+  const [
+    estadoPreparacion,
+    setEstadoPreparacion
+  ] =
+    useState<EstadoPreparacionAnalisis>(
+      "preparacion"
+    );
+
+
+  const [
+    cuentaAtras,
+    setCuentaAtras
+  ] =
+    useState<number | null>(
+      null
+    );
+
+
   // ==================================================
   // RESUMEN
   // ==================================================
@@ -3373,6 +3746,26 @@ function PressHombroCameraPreview(
 
       verdeHastaRef.current =
         0;
+
+
+      // Al reiniciar volvemos a bloquear
+      // el análisis del ejercicio.
+      analisisActivoRef.current =
+        false;
+
+
+      if (
+        intervaloCuentaAtrasRef.current !==
+        null
+      ) {
+        window.clearInterval(
+          intervaloCuentaAtrasRef.current
+        );
+
+
+        intervaloCuentaAtrasRef.current =
+          null;
+      }
 
 
       // Posponemos los setState()
@@ -3423,6 +3816,18 @@ function PressHombroCameraPreview(
 
             setHistorial(
               []
+            );
+
+
+            // Volvemos a preparación sin
+            // reiniciar ni apagar la webcam.
+            setEstadoPreparacion(
+              "preparacion"
+            );
+
+
+            setCuentaAtras(
+              null
             );
           },
           0
@@ -3724,110 +4129,137 @@ function PressHombroCameraPreview(
               );
 
 
-            const analisis =
-              analizarPressHombro(
-                estadoPressRef.current,
+            // Durante la preparación dibujamos
+            // ambos brazos, pero la lógica del press
+            // no modifica repeticiones ni historial.
+            if (
+              analisisActivoRef.current
+            ) {
+              const analisis =
+                analizarPressHombro(
+                  estadoPressRef.current,
 
+                  hombroIzquierdo,
+                  codoIzquierdo,
+                  munecaIzquierda,
+
+                  hombroDerecho,
+                  codoDerecho,
+                  munecaDerecha
+                );
+
+
+              if (
+                analisis.posicionBajaAlcanzada ||
+                analisis.posicionAltaAlcanzada
+              ) {
+                verdeHastaRef.current =
+                  timestamp +
+                  300;
+              }
+
+
+              const mostrarVerde =
+                timestamp <
+                verdeHastaRef.current;
+
+
+              setAnguloIzquierdo(
+                Math.round(
+                  analisis.anguloCodoIzquierdo
+                )
+              );
+
+
+              setAnguloDerecho(
+                Math.round(
+                  analisis.anguloCodoDerecho
+                )
+              );
+
+
+              setDiferenciaAngular(
+                Math.round(
+                  analisis.diferenciaAngular
+                )
+              );
+
+
+              setFase(
+                analisis.fase
+              );
+
+
+              setFeedbackMovimiento(
+                analisis.feedbackMovimiento
+              );
+
+
+              setFeedbackSimetria(
+                analisis.feedbackSimetria
+              );
+
+
+              setMensaje(
+                "Ambos brazos detectados correctamente"
+              );
+
+
+              if (
+                analisis.repeticionSumada
+              ) {
+                setRepeticiones(
+                  analisis.repeticiones
+                );
+
+
+                setHistorial(
+                  [
+                    ...analisis.historial
+                  ]
+                );
+              }
+
+
+              dibujarBrazo(
+                contexto,
                 hombroIzquierdo,
                 codoIzquierdo,
                 munecaIzquierda,
+                mostrarVerde
+              );
 
+
+              dibujarBrazo(
+                contexto,
                 hombroDerecho,
                 codoDerecho,
-                munecaDerecha
+                munecaDerecha,
+                mostrarVerde
+              );
+
+            } else {
+              dibujarBrazo(
+                contexto,
+                hombroIzquierdo,
+                codoIzquierdo,
+                munecaIzquierda,
+                false
               );
 
 
-            if (
-              analisis.posicionBajaAlcanzada ||
-              analisis.posicionAltaAlcanzada
-            ) {
-              verdeHastaRef.current =
-                timestamp +
-                300;
-            }
-
-
-            const mostrarVerde =
-              timestamp <
-              verdeHastaRef.current;
-
-
-            setAnguloIzquierdo(
-              Math.round(
-                analisis.anguloCodoIzquierdo
-              )
-            );
-
-
-            setAnguloDerecho(
-              Math.round(
-                analisis.anguloCodoDerecho
-              )
-            );
-
-
-            setDiferenciaAngular(
-              Math.round(
-                analisis.diferenciaAngular
-              )
-            );
-
-
-            setFase(
-              analisis.fase
-            );
-
-
-            setFeedbackMovimiento(
-              analisis.feedbackMovimiento
-            );
-
-
-            setFeedbackSimetria(
-              analisis.feedbackSimetria
-            );
-
-
-            setMensaje(
-              "Ambos brazos detectados correctamente"
-            );
-
-
-            if (
-              analisis.repeticionSumada
-            ) {
-              setRepeticiones(
-                analisis.repeticiones
-              );
-
-
-              setHistorial(
-                [
-                  ...analisis.historial
-                ]
+              dibujarBrazo(
+                contexto,
+                hombroDerecho,
+                codoDerecho,
+                munecaDerecha,
+                false
               );
             }
 
-
-            dibujarBrazo(
-              contexto,
-              hombroIzquierdo,
-              codoIzquierdo,
-              munecaIzquierda,
-              mostrarVerde
-            );
-
-
-            dibujarBrazo(
-              contexto,
-              hombroDerecho,
-              codoDerecho,
-              munecaDerecha,
-              mostrarVerde
-            );
-
-          } else {
+          } else if (
+            analisisActivoRef.current
+          ) {
             setMensaje(
               "Asegúrate de que se vean completamente los dos brazos"
             );
@@ -3892,6 +4324,111 @@ function PressHombroCameraPreview(
   }
 
 
+  // ==================================================
+  // PREPARACIÓN DEL PRESS DE HOMBRO
+  // ==================================================
+
+  function empezarAnalisisPress() {
+    if (
+      estadoPreparacion !==
+      "preparacion"
+    ) {
+      return;
+    }
+
+
+    if (
+      intervaloCuentaAtrasRef.current !==
+      null
+    ) {
+      window.clearInterval(
+        intervaloCuentaAtrasRef.current
+      );
+
+
+      intervaloCuentaAtrasRef.current =
+        null;
+    }
+
+
+    analisisActivoRef.current =
+      false;
+
+
+    setEstadoPreparacion(
+      "cuenta-atras"
+    );
+
+
+    setCuentaAtras(
+      3
+    );
+
+
+    let valorCuentaAtras =
+      3;
+
+
+    intervaloCuentaAtrasRef.current =
+      window.setInterval(
+        function () {
+          valorCuentaAtras -=
+            1;
+
+
+          if (
+            valorCuentaAtras >
+            0
+          ) {
+            setCuentaAtras(
+              valorCuentaAtras
+            );
+
+
+            return;
+          }
+
+
+          if (
+            intervaloCuentaAtrasRef.current !==
+            null
+          ) {
+            window.clearInterval(
+              intervaloCuentaAtrasRef.current
+            );
+
+
+            intervaloCuentaAtrasRef.current =
+              null;
+          }
+
+
+          // Reiniciamos el estado del press
+          // justo antes de activar el análisis.
+          estadoPressRef.current =
+            crearEstadoPressHombro();
+
+
+          verdeHastaRef.current =
+            0;
+
+
+          analisisActivoRef.current =
+            true;
+
+
+          setCuentaAtras(
+            null
+          );
+
+
+          setEstadoPreparacion(
+            "analizando"
+          );
+        },
+        1000
+      );
+  }
 
 
   // ==================================================
@@ -4076,6 +4613,22 @@ function PressHombroCameraPreview(
       }
 
 
+      // Cancelamos una cuenta atrás
+      // pendiente si se desmonta el componente.
+      if (
+        intervaloCuentaAtrasRef.current !==
+        null
+      ) {
+        window.clearInterval(
+          intervaloCuentaAtrasRef.current
+        );
+
+
+        intervaloCuentaAtrasRef.current =
+          null;
+      }
+
+
       if (
         stream
       ) {
@@ -4161,6 +4714,113 @@ function PressHombroCameraPreview(
 
 
       <div className="vision-fit-data-column">
+
+        {estadoPreparacion !==
+        "analizando" ? (
+
+          <section className="analysis-section analysis-current analysis-preparation">
+
+            {estadoPreparacion ===
+            "preparacion" ? (
+
+              <>
+
+                <span className="analysis-section-label">
+                  Antes de empezar
+                </span>
+
+
+                <h2>
+                  Preparación
+                </h2>
+
+
+                <p className="analysis-preparation-intro">
+                  Colócate correctamente antes de iniciar el análisis del press de hombro.
+                </p>
+
+
+                <div className="analysis-preparation-list">
+
+                  <p>
+                    <strong>1.</strong>{" "}
+                    Colócate de frente a la cámara.
+                  </p>
+
+
+                  <p>
+                    <strong>2.</strong>{" "}
+                    Mantén completamente visibles los dos hombros, codos y muñecas.
+                  </p>
+
+
+                  <p>
+                    <strong>3.</strong>{" "}
+                    Deja espacio por encima de la cabeza para poder extender ambos brazos.
+                  </p>
+
+
+                  <p>
+                    <strong>4.</strong>{" "}
+                    Empieza con ambos brazos en la posición baja del press.
+                  </p>
+
+                </div>
+
+
+                <div className="analysis-preparation-side">
+
+                  <span>
+                    Análisis
+                  </span>
+
+
+                  <strong>
+                    Bilateral
+                  </strong>
+
+                </div>
+
+
+                <button
+                  type="button"
+                  className="analysis-start-button"
+                  onClick={
+                    empezarAnalisisPress
+                  }
+                >
+                  Empezar análisis
+                </button>
+
+              </>
+
+            ) : (
+
+              <div className="analysis-countdown">
+
+                <h2>
+                  Prepárate
+                </h2>
+
+
+                <div className="analysis-countdown-number">
+                  {cuentaAtras}
+                </div>
+
+
+                <p>
+                  Mantén ambos brazos en posición baja. El análisis comenzará al terminar la cuenta atrás.
+                </p>
+
+              </div>
+
+            )}
+
+          </section>
+
+        ) : (
+
+          <>
 
         {/* ==========================================
             FEEDBACK ACTUAL
@@ -4524,6 +5184,10 @@ function PressHombroCameraPreview(
           )}
 
         </section>
+
+          </>
+
+        )}
 
       </div>
 
