@@ -172,7 +172,8 @@ interface CurlCameraPreviewProps {
 type EstadoPreparacionAnalisis =
   "preparacion" |
   "cuenta-atras" |
-  "analizando";
+  "analizando" |
+  "finalizado";
 
 
 function CurlCameraPreview(
@@ -1084,6 +1085,45 @@ function CurlCameraPreview(
   }
 
 
+  // ==================================================
+  // FINALIZAR ANÁLISIS DEL CURL
+  // ==================================================
+
+  function finalizarAnalisisCurl() {
+    // Solo permitimos finalizar una sesión
+    // que esté realmente en marcha.
+    if (
+      estadoPreparacion !==
+      "analizando"
+    ) {
+      return;
+    }
+
+
+    // Bloqueamos inmediatamente la lógica
+    // de conteo y evaluación del curl.
+    //
+    // MediaPipe sigue funcionando para que
+    // la cámara y los landmarks permanezcan
+    // visibles en pantalla.
+    analisisActivoRef.current =
+      false;
+
+
+    // Eliminamos cualquier feedback verde
+    // que pudiera seguir activo unos milisegundos.
+    verdeHastaRef.current =
+      0;
+
+
+    // Mostramos la vista final de la sesión.
+    // El historial y el resumen NO se borran.
+    setEstadoPreparacion(
+      "finalizado"
+    );
+  }
+
+
 
   // ==================================================
   // CÁMARA Y MEDIAPIPE
@@ -1369,8 +1409,8 @@ function CurlCameraPreview(
 
       <div className="vision-fit-data-column">
 
-        {estadoPreparacion !==
-        "analizando" ? (
+        {estadoPreparacion ===
+        "preparacion" ? (
 
           <section className="analysis-section analysis-current analysis-preparation">
 
@@ -1379,99 +1419,100 @@ function CurlCameraPreview(
             </span>
 
 
-            {estadoPreparacion ===
-            "preparacion" ? (
-
-              <>
-
-                <h2>
-                  Antes de empezar
-                </h2>
+            <h2>
+              Antes de empezar
+            </h2>
 
 
-                <p className="analysis-preparation-intro">
-                  Colócate correctamente antes de iniciar el análisis del curl.
-                </p>
+            <p className="analysis-preparation-intro">
+              Colócate correctamente antes de iniciar el análisis del curl.
+            </p>
 
 
-                <div className="analysis-preparation-list">
+            <div className="analysis-preparation-list">
 
-                  <p>
-                    <strong>1.</strong>{" "}
-                    Colócate de lado a la cámara.
-                  </p>
-
-
-                  <p>
-                    <strong>2.</strong>{" "}
-                    Mantén visibles hombro, codo y muñeca del brazo {props.lado}.
-                  </p>
+              <p>
+                <strong>1.</strong>{" "}
+                Colócate de lado a la cámara.
+              </p>
 
 
-                  <p>
-                    <strong>3.</strong>{" "}
-                    Intenta que la cadera también sea visible para analizar el tronco.
-                  </p>
+              <p>
+                <strong>2.</strong>{" "}
+                Mantén visibles hombro, codo y muñeca del brazo {props.lado}.
+              </p>
 
 
-                  <p>
-                    <strong>4.</strong>{" "}
-                    Empieza con el brazo completamente extendido.
-                  </p>
-
-                </div>
+              <p>
+                <strong>3.</strong>{" "}
+                Intenta que la cadera también sea visible para analizar el tronco.
+              </p>
 
 
-                <div className="analysis-preparation-side">
+              <p>
+                <strong>4.</strong>{" "}
+                Empieza con el brazo completamente extendido.
+              </p>
 
-                  <span>
-                    Lado seleccionado
-                  </span>
-
-
-                  <strong>
-                    {props.lado ===
-                    "derecho"
-                      ? "Derecho"
-                      : "Izquierdo"}
-                  </strong>
-
-                </div>
+            </div>
 
 
-                <button
-                  type="button"
-                  className="analysis-start-button"
-                  onClick={
-                    empezarAnalisisCurl
-                  }
-                >
-                  Empezar análisis
-                </button>
+            <div className="analysis-preparation-side">
 
-              </>
-
-            ) : (
-
-              <div className="analysis-countdown">
-
-                <h2>
-                  Prepárate
-                </h2>
+              <span>
+                Lado seleccionado
+              </span>
 
 
-                <div className="analysis-countdown-number">
-                  {cuentaAtras}
-                </div>
+              <strong>
+                {props.lado ===
+                "derecho"
+                  ? "Derecho"
+                  : "Izquierdo"}
+              </strong>
+
+            </div>
 
 
-                <p>
-                  Mantén el brazo extendido. El análisis comenzará al terminar la cuenta atrás.
-                </p>
+            <button
+              type="button"
+              className="analysis-start-button"
+              onClick={
+                empezarAnalisisCurl
+              }
+            >
+              Empezar análisis
+            </button>
 
+          </section>
+
+        ) : estadoPreparacion ===
+        "cuenta-atras" ? (
+
+          <section className="analysis-section analysis-current analysis-preparation">
+
+            <span className="analysis-section-label">
+              Preparación
+            </span>
+
+
+            <div className="analysis-countdown">
+
+              <h2>
+                Prepárate
+              </h2>
+
+
+              <div className="analysis-countdown-number">
+                {cuentaAtras}
               </div>
 
-            )}
+
+              <p>
+                Mantén el brazo extendido. El análisis comenzará al terminar la cuenta atrás.
+              </p>
+
+            </div>
 
           </section>
 
@@ -1479,357 +1520,411 @@ function CurlCameraPreview(
 
           <>
 
-        {/* ==========================================
-            FEEDBACK ACTUAL
-            ========================================== */}
+            {estadoPreparacion ===
+            "finalizado" ? (
 
-        <section className="analysis-section analysis-current">
+              <section className="analysis-section analysis-current analysis-session-finished">
 
-          <div className="analysis-section-header">
-
-            <div>
-
-              <span className="analysis-section-label">
-                Análisis en tiempo real
-              </span>
+                <span className="analysis-section-label">
+                  Sesión completada
+                </span>
 
 
-              <h2>
-                Feedback actual
-              </h2>
-
-            </div>
-
-
-            <div className="analysis-repetition-counter">
-
-              <span>
-                Repeticiones
-              </span>
-
-
-              <strong>
-                {repeticiones}
-              </strong>
-
-            </div>
-
-          </div>
-
-
-          <div className="analysis-metrics-grid">
-
-            <div className="analysis-metric">
-
-              <span>
-                Fase
-              </span>
-
-
-              <strong>
-                {faseActual}
-              </strong>
-
-            </div>
-
-
-            <div className="analysis-metric">
-
-              <span>
-                Ángulo del codo
-              </span>
-
-
-              <strong>
-                {anguloActual}°
-              </strong>
-
-            </div>
-
-          </div>
-
-
-          <div className="analysis-feedback-main">
-
-            <span>
-              Movimiento
-            </span>
-
-
-            <strong>
-              {feedback}
-            </strong>
-
-          </div>
-
-
-          <div className="analysis-technique">
-
-            <h3>
-              Técnica
-            </h3>
-
-
-            <div className="analysis-technique-item">
-
-              <div>
-
-                <strong>
-                  Codo
-                </strong>
+                <h2>
+                  Análisis finalizado
+                </h2>
 
 
                 <p>
-                  {feedbackCodo}
+                  El análisis está detenido. Puedes revisar los resultados de la sesión o pulsar Reiniciar análisis para comenzar una nueva.
                 </p>
 
-              </div>
 
+                <div className="analysis-finished-total">
 
-              <span>
-                {desplazamientoCodo ===
-                null
-                  ? "--"
-                  : desplazamientoCodo +
-                    " %"}
-              </span>
+                  <span>
+                    Repeticiones analizadas
+                  </span>
 
-            </div>
 
+                  <strong>
+                    {resumenSesion.total}
+                  </strong>
 
-            <div className="analysis-technique-item">
+                </div>
 
-              <div>
+              </section>
 
-                <strong>
-                  Tronco
-                </strong>
+            ) : (
 
+              <>
 
-                <p>
-                  {feedbackHombro}
-                </p>
+                {/* ==========================================
+                    FEEDBACK ACTUAL
+                    ========================================== */}
 
-              </div>
+                <section className="analysis-section analysis-current">
 
+                  <div className="analysis-section-header">
 
-              <span>
-                {desplazamientoHombro ===
-                null
-                  ? "--"
-                  : desplazamientoHombro +
-                    " %"}
-              </span>
+                    <div>
 
-            </div>
+                      <span className="analysis-section-label">
+                        Análisis en tiempo real
+                      </span>
 
 
-            <div className="analysis-limits">
+                      <h2>
+                        Feedback actual
+                      </h2>
 
-              <small>
-                Límite codo:{" "}
-                {Math.round(
-                  DESPLAZAMIENTO_MAXIMO_CODO *
-                    100
-                )}
-                %
-              </small>
+                    </div>
 
 
-              <small>
-                Límite tronco:{" "}
-                {Math.round(
-                  DESPLAZAMIENTO_MAXIMO_HOMBRO *
-                    100
-                )}
-                %
-              </small>
+                    <div className="analysis-repetition-counter">
 
-            </div>
-
-          </div>
-
-        </section>
-
-
-        {/* ==========================================
-            RESUMEN
-            ========================================== */}
-
-        <section className="analysis-section">
-
-          <span className="analysis-section-label">
-            Sesión
-          </span>
-
-
-          <h2>
-            Resumen
-          </h2>
-
-
-          <div className="analysis-summary-grid">
-
-            <div className="analysis-summary-item">
-
-              <span>
-                Analizadas
-              </span>
-
-
-              <strong>
-                {resumenSesion.total}
-              </strong>
-
-            </div>
-
-
-            <div className="analysis-summary-item">
-
-              <span>
-                Correctas
-              </span>
-
-
-              <strong>
-                {resumenSesion.correctas}
-              </strong>
-
-            </div>
-
-
-            <div className="analysis-summary-item">
-
-              <span>
-                Técnica correcta
-              </span>
-
-
-              <strong>
-                {
-                  resumenSesion
-                    .porcentajeCorrectas
-                }
-                %
-              </strong>
-
-            </div>
-
-
-            <div className="analysis-summary-item">
-
-              <span>
-                Errores de codo
-              </span>
-
-
-              <strong>
-                {resumenSesion.erroresCodo}
-              </strong>
-
-            </div>
-
-
-            <div className="analysis-summary-item">
-
-              <span>
-                Balanceo tronco
-              </span>
-
-
-              <strong>
-                {resumenSesion.erroresTronco}
-              </strong>
-
-            </div>
-
-          </div>
-
-
-          <div className="analysis-most-common-error">
-
-            <span>
-              Error más frecuente
-            </span>
-
-
-            <strong>
-              {
-                resumenSesion
-                  .errorMasFrecuente
-              }
-            </strong>
-
-          </div>
-
-        </section>
-
-
-        {/* ==========================================
-            HISTORIAL
-            ========================================== */}
-
-        <section className="analysis-section">
-
-          <span className="analysis-section-label">
-            Detalle
-          </span>
-
-
-          <h2>
-            Historial
-          </h2>
-
-
-          {historial.length ===
-          0 ? (
-
-            <p className="analysis-empty-message">
-              Completa una repetición para
-              empezar a generar el historial.
-            </p>
-
-          ) : (
-
-            <div className="analysis-history">
-
-              {historial.map(
-                function (
-                  repeticion
-                ) {
-                  return (
-                    <div
-                      key={
-                        repeticion.numero
-                      }
-
-                      className="analysis-history-item"
-                    >
-
-                      <span className="analysis-history-number">
-                        Rep{" "}
-                        {
-                          repeticion.numero
-                        }
+                      <span>
+                        Repeticiones
                       </span>
 
 
                       <strong>
-                        {
-                          repeticion.resultado
-                        }
+                        {repeticiones}
                       </strong>
 
                     </div>
-                  );
-                }
+
+                  </div>
+
+
+                  <div className="analysis-metrics-grid">
+
+                    <div className="analysis-metric">
+
+                      <span>
+                        Fase
+                      </span>
+
+
+                      <strong>
+                        {faseActual}
+                      </strong>
+
+                    </div>
+
+
+                    <div className="analysis-metric">
+
+                      <span>
+                        Ángulo del codo
+                      </span>
+
+
+                      <strong>
+                        {anguloActual}°
+                      </strong>
+
+                    </div>
+
+                  </div>
+
+
+                  <div className="analysis-feedback-main">
+
+                    <span>
+                      Movimiento
+                    </span>
+
+
+                    <strong>
+                      {feedback}
+                    </strong>
+
+                  </div>
+
+
+                  <div className="analysis-technique">
+
+                    <h3>
+                      Técnica
+                    </h3>
+
+
+                    <div className="analysis-technique-item">
+
+                      <div>
+
+                        <strong>
+                          Codo
+                        </strong>
+
+
+                        <p>
+                          {feedbackCodo}
+                        </p>
+
+                      </div>
+
+
+                      <span>
+                        {desplazamientoCodo ===
+                        null
+                          ? "--"
+                          : desplazamientoCodo +
+                            " %"}
+                      </span>
+
+                    </div>
+
+
+                    <div className="analysis-technique-item">
+
+                      <div>
+
+                        <strong>
+                          Tronco
+                        </strong>
+
+
+                        <p>
+                          {feedbackHombro}
+                        </p>
+
+                      </div>
+
+
+                      <span>
+                        {desplazamientoHombro ===
+                        null
+                          ? "--"
+                          : desplazamientoHombro +
+                            " %"}
+                      </span>
+
+                    </div>
+
+
+                    <div className="analysis-limits">
+
+                      <small>
+                        Límite codo:{" "}
+                        {Math.round(
+                          DESPLAZAMIENTO_MAXIMO_CODO *
+                            100
+                        )}
+                        %
+                      </small>
+
+
+                      <small>
+                        Límite tronco:{" "}
+                        {Math.round(
+                          DESPLAZAMIENTO_MAXIMO_HOMBRO *
+                            100
+                        )}
+                        %
+                      </small>
+
+                    </div>
+
+                  </div>
+
+
+                  <button
+                    type="button"
+                    className="analysis-finish-button"
+                    onClick={
+                      finalizarAnalisisCurl
+                    }
+                  >
+                    Finalizar análisis
+                  </button>
+
+                </section>
+
+              </>
+
+            )}
+
+
+            {/* ==========================================
+                RESUMEN
+                ========================================== */}
+
+            <section className="analysis-section">
+
+              <span className="analysis-section-label">
+                Sesión
+              </span>
+
+
+              <h2>
+                Resumen
+              </h2>
+
+
+              <div className="analysis-summary-grid">
+
+                <div className="analysis-summary-item">
+
+                  <span>
+                    Analizadas
+                  </span>
+
+
+                  <strong>
+                    {resumenSesion.total}
+                  </strong>
+
+                </div>
+
+
+                <div className="analysis-summary-item">
+
+                  <span>
+                    Correctas
+                  </span>
+
+
+                  <strong>
+                    {resumenSesion.correctas}
+                  </strong>
+
+                </div>
+
+
+                <div className="analysis-summary-item">
+
+                  <span>
+                    Técnica correcta
+                  </span>
+
+
+                  <strong>
+                    {
+                      resumenSesion
+                        .porcentajeCorrectas
+                    }
+                    %
+                  </strong>
+
+                </div>
+
+
+                <div className="analysis-summary-item">
+
+                  <span>
+                    Errores de codo
+                  </span>
+
+
+                  <strong>
+                    {resumenSesion.erroresCodo}
+                  </strong>
+
+                </div>
+
+
+                <div className="analysis-summary-item">
+
+                  <span>
+                    Balanceo tronco
+                  </span>
+
+
+                  <strong>
+                    {resumenSesion.erroresTronco}
+                  </strong>
+
+                </div>
+
+              </div>
+
+
+              <div className="analysis-most-common-error">
+
+                <span>
+                  Error más frecuente
+                </span>
+
+
+                <strong>
+                  {
+                    resumenSesion
+                      .errorMasFrecuente
+                  }
+                </strong>
+
+              </div>
+
+            </section>
+
+
+            {/* ==========================================
+                HISTORIAL
+                ========================================== */}
+
+            <section className="analysis-section">
+
+              <span className="analysis-section-label">
+                Detalle
+              </span>
+
+
+              <h2>
+                Historial
+              </h2>
+
+
+              {historial.length ===
+              0 ? (
+
+                <p className="analysis-empty-message">
+                  Completa una repetición para
+                  empezar a generar el historial.
+                </p>
+
+              ) : (
+
+                <div className="analysis-history">
+
+                  {historial.map(
+                    function (
+                      repeticion
+                    ) {
+                      return (
+                        <div
+                          key={
+                            repeticion.numero
+                          }
+
+                          className="analysis-history-item"
+                        >
+
+                          <span className="analysis-history-number">
+                            Rep{" "}
+                            {
+                              repeticion.numero
+                            }
+                          </span>
+
+
+                          <strong>
+                            {
+                              repeticion.resultado
+                            }
+                          </strong>
+
+                        </div>
+                      );
+                    }
+                  )}
+
+                </div>
+
               )}
 
-            </div>
-
-          )}
-
-        </section>
+            </section>
 
           </>
 
@@ -2746,6 +2841,42 @@ function SentadillaCameraPreview(
 
 
   // ==================================================
+  // FINALIZAR ANÁLISIS DE LA SENTADILLA
+  // ==================================================
+
+  function finalizarAnalisisSentadilla() {
+    // Solo finalizamos si la sesión
+    // está realmente en marcha.
+    if (
+      estadoPreparacion !==
+      "analizando"
+    ) {
+      return;
+    }
+
+
+    // Bloqueamos inmediatamente el conteo
+    // y la evaluación de nuevas repeticiones.
+    // MediaPipe continúa dibujando los landmarks.
+    analisisActivoRef.current =
+      false;
+
+
+    // Quitamos cualquier feedback verde
+    // que pudiera seguir activo.
+    verdeHastaRef.current =
+      0;
+
+
+    // Conservamos historial y resumen
+    // y pasamos a la vista final.
+    setEstadoPreparacion(
+      "finalizado"
+    );
+  }
+
+
+  // ==================================================
   // CÁMARA Y MEDIAPIPE
   // ==================================================
 
@@ -3029,8 +3160,10 @@ function SentadillaCameraPreview(
 
       <div className="vision-fit-data-column">
 
-        {estadoPreparacion !==
-        "analizando" ? (
+        {estadoPreparacion ===
+        "preparacion" ||
+        estadoPreparacion ===
+        "cuenta-atras" ? (
 
           <section className="analysis-section analysis-current analysis-preparation">
 
@@ -3138,6 +3271,45 @@ function SentadillaCameraPreview(
         ) : (
 
           <>
+
+            {estadoPreparacion ===
+            "finalizado" ? (
+
+              <section className="analysis-section analysis-current analysis-session-finished">
+
+                <span className="analysis-section-label">
+                  Sesión completada
+                </span>
+
+
+                <h2>
+                  Análisis finalizado
+                </h2>
+
+
+                <p>
+                  El análisis está detenido. Puedes revisar los resultados de la sesión o pulsar Reiniciar análisis para comenzar una nueva.
+                </p>
+
+
+                <div className="analysis-finished-total">
+
+                  <span>
+                    Repeticiones analizadas
+                  </span>
+
+
+                  <strong>
+                    {resumen.total}
+                  </strong>
+
+                </div>
+
+              </section>
+
+            ) : (
+
+              <>
 
         {/* ==========================================
             FEEDBACK ACTUAL
@@ -3324,7 +3496,21 @@ function SentadillaCameraPreview(
 
           </div>
 
+          <button
+            type="button"
+            className="analysis-finish-button"
+            onClick={
+              finalizarAnalisisSentadilla
+            }
+          >
+            Finalizar análisis
+          </button>
+
         </section>
+
+              </>
+
+            )}
 
 
         {/* ==========================================
@@ -4432,6 +4618,42 @@ function PressHombroCameraPreview(
 
 
   // ==================================================
+  // FINALIZAR ANÁLISIS DEL PRESS DE HOMBRO
+  // ==================================================
+
+  function finalizarAnalisisPress() {
+    // Solo finalizamos si la sesión
+    // está realmente en marcha.
+    if (
+      estadoPreparacion !==
+      "analizando"
+    ) {
+      return;
+    }
+
+
+    // Bloqueamos inmediatamente el conteo
+    // y la evaluación de nuevas repeticiones.
+    // MediaPipe sigue detectando y dibujando.
+    analisisActivoRef.current =
+      false;
+
+
+    // Eliminamos cualquier feedback verde
+    // que pudiera seguir activo.
+    verdeHastaRef.current =
+      0;
+
+
+    // Conservamos todos los resultados
+    // y mostramos la vista final.
+    setEstadoPreparacion(
+      "finalizado"
+    );
+  }
+
+
+  // ==================================================
   // CÁMARA Y MEDIAPIPE
   // ==================================================
 
@@ -4715,8 +4937,10 @@ function PressHombroCameraPreview(
 
       <div className="vision-fit-data-column">
 
-        {estadoPreparacion !==
-        "analizando" ? (
+        {estadoPreparacion ===
+        "preparacion" ||
+        estadoPreparacion ===
+        "cuenta-atras" ? (
 
           <section className="analysis-section analysis-current analysis-preparation">
 
@@ -4821,6 +5045,45 @@ function PressHombroCameraPreview(
         ) : (
 
           <>
+
+            {estadoPreparacion ===
+            "finalizado" ? (
+
+              <section className="analysis-section analysis-current analysis-session-finished">
+
+                <span className="analysis-section-label">
+                  Sesión completada
+                </span>
+
+
+                <h2>
+                  Análisis finalizado
+                </h2>
+
+
+                <p>
+                  El análisis está detenido. Puedes revisar los resultados de la sesión o pulsar Reiniciar análisis para comenzar una nueva.
+                </p>
+
+
+                <div className="analysis-finished-total">
+
+                  <span>
+                    Repeticiones analizadas
+                  </span>
+
+
+                  <strong>
+                    {resumen.total}
+                  </strong>
+
+                </div>
+
+              </section>
+
+            ) : (
+
+              <>
 
         {/* ==========================================
             FEEDBACK ACTUAL
@@ -4995,7 +5258,21 @@ function PressHombroCameraPreview(
 
           </div>
 
+          <button
+            type="button"
+            className="analysis-finish-button"
+            onClick={
+              finalizarAnalisisPress
+            }
+          >
+            Finalizar análisis
+          </button>
+
         </section>
+
+              </>
+
+            )}
 
 
         {/* ==========================================

@@ -1262,3 +1262,65 @@ button:hover:not(:disabled) {
     font-size: 3.5rem;
   }
 }
+/* ==================================================
+   FINALIZAR ANÁLISIS - CURL
+   ================================================== */
+
+.analysis-finish-button {
+  width: 100%;
+  margin-top: 20px;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 12px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.analysis-finish-button:hover {
+  transform: translateY(-1px);
+}
+
+.analysis-finish-button:active {
+  transform: translateY(0);
+}
+
+.analysis-session-finished {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.analysis-session-finished h2,
+.analysis-session-finished p {
+  margin: 0;
+}
+
+.analysis-session-finished p {
+  line-height: 1.6;
+}
+
+.analysis-finished-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid #e2e5e9;
+  border-radius: 12px;
+  background: #f6f7f9;
+}
+
+.analysis-finished-total strong {
+  font-size: 1.8rem;
+}
+
+@media (max-width: 600px) {
+  .analysis-finished-total {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
