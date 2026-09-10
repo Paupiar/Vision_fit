@@ -429,61 +429,13 @@ function CurlVideoPreview(
 
 
   // ==================================================
-  // CAMBIO DE VÍDEO
-  // ==================================================
-
-  // Cada vez que App nos envía
-  // una URL diferente significa que
-  // el usuario ha seleccionado otro vídeo.
-  useEffect(
-    function () {
-      detenerAnalisisVideo();
-
-
-      reiniciarAnalisisCurlVideo();
-
-
-      reiniciarAlReproducirRef.current =
-        false;
-
-
-      seekAutomaticoRef.current =
-        false;
-
-
-      // Limpiamos también el canvas anterior.
-      if (
-        canvasVideoRef.current
-      ) {
-        const canvas =
-          canvasVideoRef.current;
-
-
-        const contexto =
-          canvas.getContext(
-            "2d"
-          );
-
-
-        if (
-          contexto
-        ) {
-          contexto.clearRect(
-            0,
-            0,
-            canvas.width,
-            canvas.height
-          );
-        }
-      }
-    },
-    [urlVideo]
-  );
-
-
-  // ==================================================
   // MOSTRAR / OCULTAR
   // ==================================================
+  //
+  // No necesitamos un useEffect para reiniciar
+  // cuando cambia el vídeo porque App.tsx ya cambia
+  // la key de VideoPreview. React desmonta el componente
+  // anterior y crea uno nuevo con el estado inicial.
 
   // Cuando el usuario enciende la cámara,
   // App mantiene VideoPreview montado
@@ -1438,16 +1390,25 @@ function CurlVideoPreview(
   // ==================================================
 
   useEffect(function () {
+    // Guardamos la referencia actual al montar
+    // el efecto. Así la función de limpieza
+    // utiliza exactamente el mismo elemento
+    // de vídeo y ESLint no avisa de que
+    // .current pueda haber cambiado.
+    const videoActual =
+      videoSubidoRef.current;
+
+
     return function limpiarVideoPreview() {
       detenerAnalisisVideo();
 
 
       // Pausamos el vídeo si seguía activo.
       if (
-        videoSubidoRef.current &&
-        !videoSubidoRef.current.paused
+        videoActual &&
+        !videoActual.paused
       ) {
-        videoSubidoRef.current.pause();
+        videoActual.pause();
       }
 
 
@@ -1522,6 +1483,13 @@ function CurlVideoPreview(
 
               controls
 
+              // Ocultamos la opción de pantalla completa
+              // en los navegadores compatibles.
+              controlsList="nofullscreen"
+
+              // Mantiene el vídeo integrado
+              // dentro de la página, especialmente
+              // en dispositivos móviles.
               playsInline
 
               // Cuando conocemos las dimensiones
@@ -2227,55 +2195,6 @@ function SentadillaVideoPreviewIntegrado(
 
 
   // ==================================================
-  // CAMBIO DE VÍDEO
-  // ==================================================
-
-  useEffect(
-    function () {
-      // Detenemos cualquier análisis anterior.
-      detenerAnalisisVideo();
-
-
-      // Reiniciamos la sesión.
-      reiniciarAnalisisSentadilla();
-
-
-      // El nuevo vídeo todavía
-      // no necesita reinicio por replay.
-      reiniciarAlReproducirRef.current =
-        false;
-
-
-      // Limpiamos el canvas anterior.
-      if (
-        canvasRef.current
-      ) {
-        const contexto =
-          canvasRef.current.getContext(
-            "2d"
-          );
-
-
-        if (
-          contexto
-        ) {
-          contexto.clearRect(
-            0,
-            0,
-            canvasRef.current.width,
-            canvasRef.current.height
-          );
-        }
-      }
-
-    },
-    [
-      props.urlVideo
-    ]
-  );
-
-
-  // ==================================================
   // VISIBILIDAD
   // ==================================================
 
@@ -2308,14 +2227,20 @@ function SentadillaVideoPreviewIntegrado(
   // ==================================================
 
   useEffect(function () {
+    // Guardamos el elemento de vídeo
+    // asociado a este montaje.
+    const videoActual =
+      videoRef.current;
+
+
     return function limpiar() {
       detenerAnalisisVideo();
 
 
       if (
-        videoRef.current
+        videoActual
       ) {
-        videoRef.current.pause();
+        videoActual.pause();
       }
     };
   }, []);
@@ -2953,6 +2878,13 @@ function SentadillaVideoPreviewIntegrado(
 
             controls
 
+            // Ocultamos la opción de pantalla completa
+            // en los navegadores compatibles.
+            controlsList="nofullscreen"
+
+            // Mantiene el vídeo integrado
+            // dentro de la página, especialmente
+            // en dispositivos móviles.
             playsInline
 
             onPlaying={
@@ -3625,54 +3557,6 @@ function PressHombroVideoPreviewIntegrado(
 
 
   // ==================================================
-  // CAMBIO DE VÍDEO
-  // ==================================================
-
-  useEffect(
-    function () {
-      // Detenemos cualquier análisis anterior.
-      detenerAnalisisVideo();
-
-
-      // Cada vídeo representa
-      // una sesión nueva.
-      reiniciarAnalisisPress();
-
-
-      reiniciarAlReproducirRef.current =
-        false;
-
-
-      // Limpiamos el canvas.
-      if (
-        canvasRef.current
-      ) {
-        const contexto =
-          canvasRef.current.getContext(
-            "2d"
-          );
-
-
-        if (
-          contexto
-        ) {
-          contexto.clearRect(
-            0,
-            0,
-            canvasRef.current.width,
-            canvasRef.current.height
-          );
-        }
-      }
-
-    },
-    [
-      props.urlVideo
-    ]
-  );
-
-
-  // ==================================================
   // CAMBIO DE VISIBILIDAD
   // ==================================================
 
@@ -3706,14 +3590,20 @@ function PressHombroVideoPreviewIntegrado(
   // ==================================================
 
   useEffect(function () {
+    // Guardamos el elemento de vídeo
+    // asociado a este montaje.
+    const videoActual =
+      videoRef.current;
+
+
     return function limpiarComponente() {
       detenerAnalisisVideo();
 
 
       if (
-        videoRef.current
+        videoActual
       ) {
-        videoRef.current.pause();
+        videoActual.pause();
       }
     };
   }, []);
@@ -4377,6 +4267,13 @@ function PressHombroVideoPreviewIntegrado(
 
             controls
 
+            // Ocultamos la opción de pantalla completa
+            // en los navegadores compatibles.
+            controlsList="nofullscreen"
+
+            // Mantiene el vídeo integrado
+            // dentro de la página, especialmente
+            // en dispositivos móviles.
             playsInline
 
             onPlaying={
