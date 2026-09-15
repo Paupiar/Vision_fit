@@ -2,6 +2,7 @@
 import {
   useCallback,
   useEffect,
+  useReducer,
   useRef,
   useState
 } from "react";
@@ -120,6 +121,22 @@ import type {
 } from "../ejercicios/tipos";
 
 
+// --------------------------------------------------
+// MÁQUINA DE ESTADOS DE LA SESIÓN
+// --------------------------------------------------
+
+import {
+  ESTADO_SESION_INICIAL,
+  obtenerSiguienteEstadoSesion,
+  reducerEstadoSesion
+} from "../sesion/estadoSesion";
+
+import type {
+  EventoSesion,
+  EstadoSesion
+} from "../sesion/estadoSesion";
+
+
 // ==================================================
 // MENSAJE DE ERROR DEL SISTEMA
 // ==================================================
@@ -167,13 +184,6 @@ interface CurlCameraPreviewProps {
 
   reinicioId: number;
 }
-
-
-type EstadoPreparacionAnalisis =
-  "preparacion" |
-  "cuenta-atras" |
-  "analizando" |
-  "finalizado";
 
 
 function CurlCameraPreview(
@@ -231,14 +241,16 @@ function CurlCameraPreview(
     );
 
 
-  // Indica si la lógica del curl puede
-  // modificar repeticiones, fase e historial.
+  // El bucle de requestAnimationFrame necesita
+  // consultar el estado actual sin depender de un
+  // cierre antiguo de React.
   //
-  // MediaPipe seguirá detectando y dibujando
-  // landmarks aunque este valor sea false.
-  const analisisActivoRef =
-    useRef<boolean>(
-      false
+  // Este ref NO define las transiciones: solo refleja
+  // el estado calculado por la máquina para que el
+  // análisis por frames pueda consultarlo al instante.
+  const estadoSesionRef =
+    useRef<EstadoSesion>(
+      ESTADO_SESION_INICIAL
     );
 
 
@@ -346,12 +358,47 @@ function CurlCameraPreview(
     );
 
 
+  // Estado único de la sesión del Curl.
+  //
+  // Ya no utilizamos booleanos separados para saber
+  // si estamos preparando, contando, analizando o
+  // mostrando el resultado final.
   const [
-    estadoPreparacion,
-    setEstadoPreparacion
+    estadoSesion,
+    enviarEventoSesion
   ] =
-    useState<EstadoPreparacionAnalisis>(
-      "preparacion"
+    useReducer(
+      reducerEstadoSesion,
+      ESTADO_SESION_INICIAL
+    );
+
+
+  // Aplica un evento tanto al reducer de React como
+  // al ref que consulta el bucle de análisis.
+  //
+  // Las reglas de transición siguen estando
+  // centralizadas en estadoSesion.ts.
+  const aplicarEventoSesion =
+    useCallback(
+      function aplicarEventoSesionCallback(
+        evento: EventoSesion
+      ) {
+        const siguienteEstado =
+          obtenerSiguienteEstadoSesion(
+            estadoSesionRef.current,
+            evento
+          );
+
+
+        estadoSesionRef.current =
+          siguienteEstado;
+
+
+        enviarEventoSesion(
+          evento
+        );
+      },
+      []
     );
 
 
@@ -395,10 +442,11 @@ function CurlCameraPreview(
         0;
 
 
-      // Al reiniciar una sesión, la lógica
-      // de conteo vuelve a quedar bloqueada.
-      analisisActivoRef.current =
-        false;
+      // El estado operativo vuelve inmediatamente
+      // a preparación para que el bucle de frames
+      // deje de analizar nuevas repeticiones.
+      estadoSesionRef.current =
+        "preparacion";
 
 
       // Si el usuario reinicia mientras está
@@ -472,11 +520,11 @@ function CurlCameraPreview(
             );
 
 
-            // La interfaz vuelve a la pantalla
-            // de preparación sin apagar la cámara.
-            setEstadoPreparacion(
-              "preparacion"
-            );
+            // La máquina vuelve al estado inicial
+            // sin apagar la cámara.
+            aplicarEventoSesion({
+              type: "REINICIAR"
+            });
 
 
             setCuentaAtras(
@@ -495,6 +543,7 @@ function CurlCameraPreview(
 
     },
     [
+      aplicarEventoSesion,
       props.reinicioId
     ]
   );
@@ -760,7 +809,8 @@ function CurlCameraPreview(
           // y dibujando el brazo, pero NO dejamos que
           // analizarFrameCurl modifique la sesión.
           if (
-            analisisActivoRef.current
+            estadoSesionRef.current ===
+            "analizando"
           ) {
             const analisis =
               analizarFrameCurl(
@@ -977,7 +1027,7 @@ function CurlCameraPreview(
     // Evitamos lanzar dos cuentas atrás
     // si el usuario pulsa varias veces.
     if (
-      estadoPreparacion !==
+      estadoSesion !==
       "preparacion"
     ) {
       return;
@@ -1000,13 +1050,9 @@ function CurlCameraPreview(
     }
 
 
-    analisisActivoRef.current =
-      false;
-
-
-    setEstadoPreparacion(
-      "cuenta-atras"
-    );
+    aplicarEventoSesion({
+      type: "INICIAR_CUENTA_ATRAS"
+    });
 
 
     setCuentaAtras(
@@ -1067,18 +1113,14 @@ function CurlCameraPreview(
             0;
 
 
-          analisisActivoRef.current =
-            true;
-
-
           setCuentaAtras(
             null
           );
 
 
-          setEstadoPreparacion(
-            "analizando"
-          );
+          aplicarEventoSesion({
+            type: "COMENZAR_ANALISIS"
+          });
         },
         1000
       );
@@ -1093,21 +1135,20 @@ function CurlCameraPreview(
     // Solo permitimos finalizar una sesión
     // que esté realmente en marcha.
     if (
-      estadoPreparacion !==
+      estadoSesion !==
       "analizando"
     ) {
       return;
     }
 
 
-    // Bloqueamos inmediatamente la lógica
-    // de conteo y evaluación del curl.
-    //
-    // MediaPipe sigue funcionando para que
-    // la cámara y los landmarks permanezcan
-    // visibles en pantalla.
-    analisisActivoRef.current =
-      false;
+    // La transición a "finalizado" hace que el
+    // bucle de frames deje de ejecutar la lógica
+    // del ejercicio, pero MediaPipe continúa
+    // detectando y dibujando los landmarks.
+    aplicarEventoSesion({
+      type: "FINALIZAR_ANALISIS"
+    });
 
 
     // Eliminamos cualquier feedback verde
@@ -1116,11 +1157,7 @@ function CurlCameraPreview(
       0;
 
 
-    // Mostramos la vista final de la sesión.
     // El historial y el resumen NO se borran.
-    setEstadoPreparacion(
-      "finalizado"
-    );
   }
 
 
@@ -1409,7 +1446,7 @@ function CurlCameraPreview(
 
       <div className="vision-fit-data-column">
 
-        {estadoPreparacion ===
+        {estadoSesion ===
         "preparacion" ? (
 
           <section className="analysis-section analysis-current analysis-preparation">
@@ -1486,7 +1523,7 @@ function CurlCameraPreview(
 
           </section>
 
-        ) : estadoPreparacion ===
+        ) : estadoSesion ===
         "cuenta-atras" ? (
 
           <section className="analysis-section analysis-current analysis-preparation">
@@ -1520,7 +1557,7 @@ function CurlCameraPreview(
 
           <>
 
-            {estadoPreparacion ===
+            {estadoSesion ===
             "finalizado" ? (
 
               <section className="analysis-section analysis-current analysis-session-finished">
@@ -1997,14 +2034,15 @@ function SentadillaCameraPreview(
     );
 
 
-  // Indica si la lógica de la sentadilla
-  // puede modificar la sesión.
+  // El bucle de requestAnimationFrame necesita
+  // conocer inmediatamente el estado actual
+  // de la sesión.
   //
-  // MediaPipe sigue detectando y dibujando
-  // landmarks mientras este valor sea false.
-  const analisisActivoRef =
-    useRef<boolean>(
-      false
+  // Este ref refleja el estado calculado por
+  // la máquina de estados compartida.
+  const estadoSesionRef =
+    useRef<EstadoSesion>(
+      ESTADO_SESION_INICIAL
     );
 
 
@@ -2112,12 +2150,43 @@ function SentadillaCameraPreview(
     );
 
 
+  // Estado único de la sesión de Sentadilla.
+  //
+  // La misma máquina controla preparación,
+  // cuenta atrás, análisis y finalización.
   const [
-    estadoPreparacion,
-    setEstadoPreparacion
+    estadoSesion,
+    enviarEventoSesion
   ] =
-    useState<EstadoPreparacionAnalisis>(
-      "preparacion"
+    useReducer(
+      reducerEstadoSesion,
+      ESTADO_SESION_INICIAL
+    );
+
+
+  // Aplica el evento al reducer de React
+  // y al ref que consulta el bucle de frames.
+  const aplicarEventoSesion =
+    useCallback(
+      function aplicarEventoSesionCallback(
+        evento: EventoSesion
+      ) {
+        const siguienteEstado =
+          obtenerSiguienteEstadoSesion(
+            estadoSesionRef.current,
+            evento
+          );
+
+
+        estadoSesionRef.current =
+          siguienteEstado;
+
+
+        enviarEventoSesion(
+          evento
+        );
+      },
+      []
     );
 
 
@@ -2156,10 +2225,10 @@ function SentadillaCameraPreview(
         0;
 
 
-      // Al reiniciar bloqueamos de nuevo
-      // el conteo de repeticiones.
-      analisisActivoRef.current =
-        false;
+      // El estado operativo vuelve
+      // inmediatamente a preparación.
+      estadoSesionRef.current =
+        "preparacion";
 
 
       // Si el usuario reinicia durante
@@ -2229,11 +2298,11 @@ function SentadillaCameraPreview(
             );
 
 
-            // Volvemos a la pantalla
-            // de preparación sin apagar la cámara.
-            setEstadoPreparacion(
-              "preparacion"
-            );
+            // La máquina vuelve al estado inicial
+            // sin apagar la cámara.
+            aplicarEventoSesion({
+              type: "REINICIAR"
+            });
 
 
             setCuentaAtras(
@@ -2252,6 +2321,7 @@ function SentadillaCameraPreview(
 
     },
     [
+      aplicarEventoSesion,
       props.reinicioId
     ]
   );
@@ -2518,7 +2588,8 @@ function SentadillaCameraPreview(
           // pero no dejamos que la lógica
           // de la sentadilla modifique la sesión.
           if (
-            analisisActivoRef.current
+            estadoSesionRef.current ===
+            "analizando"
           ) {
             if (
               hombro !==
@@ -2665,7 +2736,8 @@ function SentadillaCameraPreview(
           }
 
         } else if (
-          analisisActivoRef.current
+          estadoSesionRef.current ===
+          "analizando"
         ) {
           setMensaje(
             "Asegúrate de que se vea la pierna completa"
@@ -2739,7 +2811,7 @@ function SentadillaCameraPreview(
     // Evitamos iniciar varias cuentas atrás
     // si el usuario pulsa repetidamente.
     if (
-      estadoPreparacion !==
+      estadoSesion !==
       "preparacion"
     ) {
       return;
@@ -2760,13 +2832,9 @@ function SentadillaCameraPreview(
     }
 
 
-    analisisActivoRef.current =
-      false;
-
-
-    setEstadoPreparacion(
-      "cuenta-atras"
-    );
+    aplicarEventoSesion({
+      type: "INICIAR_CUENTA_ATRAS"
+    });
 
 
     setCuentaAtras(
@@ -2822,18 +2890,14 @@ function SentadillaCameraPreview(
             0;
 
 
-          analisisActivoRef.current =
-            true;
-
-
           setCuentaAtras(
             null
           );
 
 
-          setEstadoPreparacion(
-            "analizando"
-          );
+          aplicarEventoSesion({
+            type: "COMENZAR_ANALISIS"
+          });
         },
         1000
       );
@@ -2848,18 +2912,19 @@ function SentadillaCameraPreview(
     // Solo finalizamos si la sesión
     // está realmente en marcha.
     if (
-      estadoPreparacion !==
+      estadoSesion !==
       "analizando"
     ) {
       return;
     }
 
 
-    // Bloqueamos inmediatamente el conteo
-    // y la evaluación de nuevas repeticiones.
+    // La transición a "finalizado" bloquea
+    // inmediatamente nuevas repeticiones.
     // MediaPipe continúa dibujando los landmarks.
-    analisisActivoRef.current =
-      false;
+    aplicarEventoSesion({
+      type: "FINALIZAR_ANALISIS"
+    });
 
 
     // Quitamos cualquier feedback verde
@@ -2868,11 +2933,7 @@ function SentadillaCameraPreview(
       0;
 
 
-    // Conservamos historial y resumen
-    // y pasamos a la vista final.
-    setEstadoPreparacion(
-      "finalizado"
-    );
+    // El historial y el resumen se conservan.
   }
 
 
@@ -3160,14 +3221,14 @@ function SentadillaCameraPreview(
 
       <div className="vision-fit-data-column">
 
-        {estadoPreparacion ===
+        {estadoSesion ===
         "preparacion" ||
-        estadoPreparacion ===
+        estadoSesion ===
         "cuenta-atras" ? (
 
           <section className="analysis-section analysis-current analysis-preparation">
 
-            {estadoPreparacion ===
+            {estadoSesion ===
             "preparacion" ? (
 
               <>
@@ -3272,7 +3333,7 @@ function SentadillaCameraPreview(
 
           <>
 
-            {estadoPreparacion ===
+            {estadoSesion ===
             "finalizado" ? (
 
               <section className="analysis-section analysis-current analysis-session-finished">
@@ -3775,14 +3836,15 @@ function PressHombroCameraPreview(
     );
 
 
-  // Indica si la lógica del press puede
-  // modificar la sesión.
+  // El bucle de requestAnimationFrame necesita
+  // conocer inmediatamente el estado actual
+  // de la sesión.
   //
-  // MediaPipe continúa detectando y dibujando
-  // los dos brazos durante la preparación.
-  const analisisActivoRef =
-    useRef<boolean>(
-      false
+  // Este ref refleja el estado calculado por
+  // la máquina de estados compartida.
+  const estadoSesionRef =
+    useRef<EstadoSesion>(
+      ESTADO_SESION_INICIAL
     );
 
 
@@ -3890,12 +3952,43 @@ function PressHombroCameraPreview(
     );
 
 
+  // Estado único de la sesión del Press.
+  //
+  // La misma máquina controla preparación,
+  // cuenta atrás, análisis y finalización.
   const [
-    estadoPreparacion,
-    setEstadoPreparacion
+    estadoSesion,
+    enviarEventoSesion
   ] =
-    useState<EstadoPreparacionAnalisis>(
-      "preparacion"
+    useReducer(
+      reducerEstadoSesion,
+      ESTADO_SESION_INICIAL
+    );
+
+
+  // Aplica el evento al reducer de React
+  // y al ref que consulta el bucle de frames.
+  const aplicarEventoSesion =
+    useCallback(
+      function aplicarEventoSesionCallback(
+        evento: EventoSesion
+      ) {
+        const siguienteEstado =
+          obtenerSiguienteEstadoSesion(
+            estadoSesionRef.current,
+            evento
+          );
+
+
+        estadoSesionRef.current =
+          siguienteEstado;
+
+
+        enviarEventoSesion(
+          evento
+        );
+      },
+      []
     );
 
 
@@ -3934,10 +4027,10 @@ function PressHombroCameraPreview(
         0;
 
 
-      // Al reiniciar volvemos a bloquear
-      // el análisis del ejercicio.
-      analisisActivoRef.current =
-        false;
+      // El estado operativo vuelve
+      // inmediatamente a preparación.
+      estadoSesionRef.current =
+        "preparacion";
 
 
       if (
@@ -4005,11 +4098,11 @@ function PressHombroCameraPreview(
             );
 
 
-            // Volvemos a preparación sin
-            // reiniciar ni apagar la webcam.
-            setEstadoPreparacion(
-              "preparacion"
-            );
+            // La máquina vuelve al estado inicial
+            // sin reiniciar ni apagar la webcam.
+            aplicarEventoSesion({
+              type: "REINICIAR"
+            });
 
 
             setCuentaAtras(
@@ -4028,6 +4121,7 @@ function PressHombroCameraPreview(
 
     },
     [
+      aplicarEventoSesion,
       props.reinicioId
     ]
   );
@@ -4319,7 +4413,8 @@ function PressHombroCameraPreview(
             // ambos brazos, pero la lógica del press
             // no modifica repeticiones ni historial.
             if (
-              analisisActivoRef.current
+              estadoSesionRef.current ===
+              "analizando"
             ) {
               const analisis =
                 analizarPressHombro(
@@ -4444,7 +4539,8 @@ function PressHombroCameraPreview(
             }
 
           } else if (
-            analisisActivoRef.current
+            estadoSesionRef.current ===
+            "analizando"
           ) {
             setMensaje(
               "Asegúrate de que se vean completamente los dos brazos"
@@ -4516,7 +4612,7 @@ function PressHombroCameraPreview(
 
   function empezarAnalisisPress() {
     if (
-      estadoPreparacion !==
+      estadoSesion !==
       "preparacion"
     ) {
       return;
@@ -4537,13 +4633,9 @@ function PressHombroCameraPreview(
     }
 
 
-    analisisActivoRef.current =
-      false;
-
-
-    setEstadoPreparacion(
-      "cuenta-atras"
-    );
+    aplicarEventoSesion({
+      type: "INICIAR_CUENTA_ATRAS"
+    });
 
 
     setCuentaAtras(
@@ -4599,18 +4691,14 @@ function PressHombroCameraPreview(
             0;
 
 
-          analisisActivoRef.current =
-            true;
-
-
           setCuentaAtras(
             null
           );
 
 
-          setEstadoPreparacion(
-            "analizando"
-          );
+          aplicarEventoSesion({
+            type: "COMENZAR_ANALISIS"
+          });
         },
         1000
       );
@@ -4625,18 +4713,19 @@ function PressHombroCameraPreview(
     // Solo finalizamos si la sesión
     // está realmente en marcha.
     if (
-      estadoPreparacion !==
+      estadoSesion !==
       "analizando"
     ) {
       return;
     }
 
 
-    // Bloqueamos inmediatamente el conteo
-    // y la evaluación de nuevas repeticiones.
+    // La transición a "finalizado" bloquea
+    // inmediatamente nuevas repeticiones.
     // MediaPipe sigue detectando y dibujando.
-    analisisActivoRef.current =
-      false;
+    aplicarEventoSesion({
+      type: "FINALIZAR_ANALISIS"
+    });
 
 
     // Eliminamos cualquier feedback verde
@@ -4645,11 +4734,7 @@ function PressHombroCameraPreview(
       0;
 
 
-    // Conservamos todos los resultados
-    // y mostramos la vista final.
-    setEstadoPreparacion(
-      "finalizado"
-    );
+    // Conservamos todos los resultados.
   }
 
 
@@ -4937,14 +5022,14 @@ function PressHombroCameraPreview(
 
       <div className="vision-fit-data-column">
 
-        {estadoPreparacion ===
+        {estadoSesion ===
         "preparacion" ||
-        estadoPreparacion ===
+        estadoSesion ===
         "cuenta-atras" ? (
 
           <section className="analysis-section analysis-current analysis-preparation">
 
-            {estadoPreparacion ===
+            {estadoSesion ===
             "preparacion" ? (
 
               <>
@@ -5046,7 +5131,7 @@ function PressHombroCameraPreview(
 
           <>
 
-            {estadoPreparacion ===
+            {estadoSesion ===
             "finalizado" ? (
 
               <section className="analysis-section analysis-current analysis-session-finished">
