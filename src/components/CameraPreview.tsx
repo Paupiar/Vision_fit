@@ -2,7 +2,6 @@
 import {
   useCallback,
   useEffect,
-  useReducer,
   useRef,
   useState
 } from "react";
@@ -13,23 +12,6 @@ import type {
 } from "@mediapipe/tasks-vision";
 
 
-// --------------------------------------------------
-// MEDIAPIPE
-// --------------------------------------------------
-
-import {
-  crearPoseLandmarker
-} from "../mediapipe/pose";
-
-
-// --------------------------------------------------
-// GESTIÓN DE ERRORES
-// --------------------------------------------------
-
-import {
-  obtenerMensajeErrorCamara,
-  obtenerMensajeErrorMediaPipe
-} from "../mediapipe/errores";
 
 
 // --------------------------------------------------
@@ -126,15 +108,24 @@ import type {
 // --------------------------------------------------
 
 import {
-  ESTADO_SESION_INICIAL,
-  obtenerSiguienteEstadoSesion,
-  reducerEstadoSesion
-} from "../sesion/estadoSesion";
+  useControlSesion
+} from "../sesion/useControlSesion";
 
-import type {
-  EventoSesion,
-  EstadoSesion
-} from "../sesion/estadoSesion";
+
+// --------------------------------------------------
+// INTERFAZ COMPARTIDA DE LA SESIÓN
+// --------------------------------------------------
+
+import ControlSesion from "./ControlSesion";
+
+
+// --------------------------------------------------
+// CÁMARA + MEDIAPIPE COMPARTIDOS
+// --------------------------------------------------
+
+import {
+  useCamaraPose
+} from "../mediapipe/useCamaraPose";
 
 
 // ==================================================
@@ -241,26 +232,6 @@ function CurlCameraPreview(
     );
 
 
-  // El bucle de requestAnimationFrame necesita
-  // consultar el estado actual sin depender de un
-  // cierre antiguo de React.
-  //
-  // Este ref NO define las transiciones: solo refleja
-  // el estado calculado por la máquina para que el
-  // análisis por frames pueda consultarlo al instante.
-  const estadoSesionRef =
-    useRef<EstadoSesion>(
-      ESTADO_SESION_INICIAL
-    );
-
-
-  // Guardamos aquí el intervalo utilizado
-  // para la cuenta atrás 3 - 2 - 1.
-  const intervaloCuentaAtrasRef =
-    useRef<number | null>(
-      null
-    );
-
 
   // ==================================================
   // ESTADOS
@@ -358,57 +329,17 @@ function CurlCameraPreview(
     );
 
 
-  // Estado único de la sesión del Curl.
-  //
-  // Ya no utilizamos booleanos separados para saber
-  // si estamos preparando, contando, analizando o
-  // mostrando el resultado final.
-  const [
+  // Control compartido del flujo de la sesión.
+  const {
     estadoSesion,
-    enviarEventoSesion
-  ] =
-    useReducer(
-      reducerEstadoSesion,
-      ESTADO_SESION_INICIAL
-    );
-
-
-  // Aplica un evento tanto al reducer de React como
-  // al ref que consulta el bucle de análisis.
-  //
-  // Las reglas de transición siguen estando
-  // centralizadas en estadoSesion.ts.
-  const aplicarEventoSesion =
-    useCallback(
-      function aplicarEventoSesionCallback(
-        evento: EventoSesion
-      ) {
-        const siguienteEstado =
-          obtenerSiguienteEstadoSesion(
-            estadoSesionRef.current,
-            evento
-          );
-
-
-        estadoSesionRef.current =
-          siguienteEstado;
-
-
-        enviarEventoSesion(
-          evento
-        );
-      },
-      []
-    );
-
-
-  const [
+    estadoSesionRef,
     cuentaAtras,
-    setCuentaAtras
-  ] =
-    useState<number | null>(
-      null
-    );
+    empezarAnalisis,
+    finalizarAnalisis,
+    prepararReinicioSesion,
+    reiniciarSesion
+  } =
+    useControlSesion();
 
 
   // ==================================================
@@ -442,27 +373,9 @@ function CurlCameraPreview(
         0;
 
 
-      // El estado operativo vuelve inmediatamente
-      // a preparación para que el bucle de frames
-      // deje de analizar nuevas repeticiones.
-      estadoSesionRef.current =
-        "preparacion";
-
-
-      // Si el usuario reinicia mientras está
-      // en la cuenta atrás, la cancelamos.
-      if (
-        intervaloCuentaAtrasRef.current !==
-        null
-      ) {
-        window.clearInterval(
-          intervaloCuentaAtrasRef.current
-        );
-
-
-        intervaloCuentaAtrasRef.current =
-          null;
-      }
+      // Bloqueamos inmediatamente el análisis
+      // y cancelamos una posible cuenta atrás.
+      prepararReinicioSesion();
 
 
       // Los estados de React se reinician
@@ -522,14 +435,7 @@ function CurlCameraPreview(
 
             // La máquina vuelve al estado inicial
             // sin apagar la cámara.
-            aplicarEventoSesion({
-              type: "REINICIAR"
-            });
-
-
-            setCuentaAtras(
-              null
-            );
+            reiniciarSesion();
           },
           0
         );
@@ -543,7 +449,8 @@ function CurlCameraPreview(
 
     },
     [
-      aplicarEventoSesion,
+      prepararReinicioSesion,
+      reiniciarSesion,
       props.reinicioId
     ]
   );
@@ -976,6 +883,7 @@ function CurlCameraPreview(
       [
         activarFeedbackVerde,
         dibujarBrazo,
+        estadoSesionRef,
         landmarksCurl
       ]
     );
@@ -1024,106 +932,22 @@ function CurlCameraPreview(
   // ==================================================
 
   function empezarAnalisisCurl() {
-    // Evitamos lanzar dos cuentas atrás
-    // si el usuario pulsa varias veces.
-    if (
-      estadoSesion !==
-      "preparacion"
-    ) {
-      return;
-    }
+    empezarAnalisis(
+      function prepararCurlParaAnalisis() {
+        // El ejercicio empieza desde un estado
+        // interno completamente limpio.
+        estadoCurlRef.current =
+          crearEstadoCurl();
 
 
-    // Por seguridad, cancelamos cualquier
-    // intervalo anterior que pudiera quedar vivo.
-    if (
-      intervaloCuentaAtrasRef.current !==
-      null
-    ) {
-      window.clearInterval(
-        intervaloCuentaAtrasRef.current
-      );
+        verdeHastaRef.current =
+          0;
 
 
-      intervaloCuentaAtrasRef.current =
-        null;
-    }
-
-
-    aplicarEventoSesion({
-      type: "INICIAR_CUENTA_ATRAS"
-    });
-
-
-    setCuentaAtras(
-      3
+        ultimaActualizacionUIRef.current =
+          0;
+      }
     );
-
-
-    let valorCuentaAtras =
-      3;
-
-
-    intervaloCuentaAtrasRef.current =
-      window.setInterval(
-        function () {
-          valorCuentaAtras -=
-            1;
-
-
-          if (
-            valorCuentaAtras >
-            0
-          ) {
-            setCuentaAtras(
-              valorCuentaAtras
-            );
-
-
-            return;
-          }
-
-
-          // La cuenta atrás ha terminado.
-          if (
-            intervaloCuentaAtrasRef.current !==
-            null
-          ) {
-            window.clearInterval(
-              intervaloCuentaAtrasRef.current
-            );
-
-
-            intervaloCuentaAtrasRef.current =
-              null;
-          }
-
-
-          // Empezamos la sesión desde un estado
-          // limpio justo cuando termina el 3 - 2 - 1.
-          estadoCurlRef.current =
-            crearEstadoCurl();
-
-
-          verdeHastaRef.current =
-            0;
-
-
-          ultimaActualizacionUIRef.current =
-            0;
-
-
-          setCuentaAtras(
-            null
-          );
-
-
-          aplicarEventoSesion({
-            type: "COMENZAR_ANALISIS"
-          });
-        },
-        1000
-      );
   }
 
 
@@ -1132,261 +956,42 @@ function CurlCameraPreview(
   // ==================================================
 
   function finalizarAnalisisCurl() {
-    // Solo permitimos finalizar una sesión
-    // que esté realmente en marcha.
-    if (
-      estadoSesion !==
-      "analizando"
-    ) {
-      return;
-    }
-
-
-    // La transición a "finalizado" hace que el
-    // bucle de frames deje de ejecutar la lógica
-    // del ejercicio, pero MediaPipe continúa
-    // detectando y dibujando los landmarks.
-    aplicarEventoSesion({
-      type: "FINALIZAR_ANALISIS"
-    });
-
-
-    // Eliminamos cualquier feedback verde
-    // que pudiera seguir activo unos milisegundos.
-    verdeHastaRef.current =
-      0;
-
-
-    // El historial y el resumen NO se borran.
+    finalizarAnalisis(
+      function limpiarCurlAlFinalizar() {
+        // Eliminamos cualquier feedback verde
+        // que pudiera seguir activo.
+        verdeHastaRef.current =
+          0;
+      }
+    );
   }
-
 
 
   // ==================================================
   // CÁMARA Y MEDIAPIPE
   // ==================================================
 
-  useEffect(function () {
-    let stream:
-      MediaStream | null =
-      null;
-
-
-    let componenteActivo =
-      true;
-
-
-    // Guardamos la referencia actual
-    // del elemento de vídeo.
-    //
-    // La utilizaremos también en el cleanup
-    // para evitar el aviso de ESLint
-    // sobre el uso de ref.current.
-    const videoActual =
-      videoRef.current;
-
-
-    async function iniciarSistema() {
-      // El estado de error ya comienza en null.
-      // No hacemos setState síncrono al arrancar
-      // el efecto para evitar renders innecesarios.
-      let nuevoStream:
-        MediaStream;
-
-
-      try {
-        nuevoStream =
-          await navigator.mediaDevices.getUserMedia({
-            video:
-              true,
-
-            audio:
-              false
-          });
-
-      } catch (error) {
-        console.error(
-          "Error al iniciar la cámara del curl:",
-          error
-        );
-
-
-        if (
-          componenteActivo
-        ) {
-          setErrorSistema(
-            obtenerMensajeErrorCamara(
-              error
-            )
-          );
-        }
-
-
-        return;
-      }
-
-
-      if (
-        !componenteActivo
-      ) {
-        nuevoStream
-          .getTracks()
-          .forEach(
-            function (track) {
-              track.stop();
-            }
-          );
-
-
-        return;
-      }
-
-
-      stream =
-        nuevoStream;
-
-
-      if (
-        videoRef.current
-      ) {
-        videoRef.current.srcObject =
-          stream;
-      }
-
-
-      try {
-        const poseLandmarker =
-          await crearPoseLandmarker();
-
-
-        if (
-          !componenteActivo
-        ) {
-          return;
-        }
-
-
-        poseLandmarkerRef.current =
-          poseLandmarker;
-
-
-        setErrorSistema(
-          null
-        );
-
-
-        if (
-          videoRef.current &&
-          videoRef.current.readyState >=
-            2
-        ) {
-          iniciarAnalisis();
-        }
-
-      } catch (error) {
-        if (
-          stream
-        ) {
-          stream
-            .getTracks()
-            .forEach(
-              function (track) {
-                track.stop();
-              }
-            );
-
-
-          stream =
-            null;
-        }
-
-
-        if (
-          videoRef.current
-        ) {
-          videoRef.current.srcObject =
-            null;
-        }
-
-
-        if (
-          componenteActivo
-        ) {
-          setErrorSistema(
-            obtenerMensajeErrorMediaPipe(
-              error
-            )
-          );
-        }
-      }
-    }
-
-
-    iniciarSistema();
-
-
-    return function detenerSistema() {
-      componenteActivo =
-        false;
-
-
-      if (
-        animationFrameRef.current !==
-        null
-      ) {
-        cancelAnimationFrame(
-          animationFrameRef.current
-        );
-
-
-        animationFrameRef.current =
-          null;
-      }
-
-
-      // Si el componente se desmonta durante
-      // la cuenta atrás, cancelamos el intervalo.
-      if (
-        intervaloCuentaAtrasRef.current !==
-        null
-      ) {
-        window.clearInterval(
-          intervaloCuentaAtrasRef.current
-        );
-
-
-        intervaloCuentaAtrasRef.current =
-          null;
-      }
-
-
-      if (
-        stream
-      ) {
-        stream
-          .getTracks()
-          .forEach(
-            function (track) {
-              track.stop();
-            }
-          );
-      }
-
-
-      // Utilizamos la referencia guardada
-      // al crear el efecto.
-      //
-      // Así el cleanup no depende de
-      // un posible valor diferente de
-      // videoRef.current.
-      if (
-        videoActual
-      ) {
-        videoActual.srcObject =
-          null;
-      }
-    };
-  }, [iniciarAnalisis]);
+  // La inicialización y la limpieza de la webcam
+  // y de MediaPipe ya no viven dentro del Curl.
+  //
+  // El hook compartido se encarga de:
+  // - pedir permisos de cámara;
+  // - conectar el stream al <video>;
+  // - crear PoseLandmarker;
+  // - iniciar el bucle cuando todo está preparado;
+  // - detener tracks y requestAnimationFrame al salir;
+  // - traducir los errores a mensajes visibles.
+  //
+  // La lógica específica del Curl sigue estando
+  // completamente dentro de este componente.
+  useCamaraPose({
+    videoRef,
+    poseLandmarkerRef,
+    animationFrameRef,
+    iniciarAnalisis,
+    setErrorSistema,
+    nombreEjercicio: "curl"
+  });
 
 
   if (
@@ -1446,162 +1051,30 @@ function CurlCameraPreview(
 
       <div className="vision-fit-data-column">
 
-        {estadoSesion ===
-        "preparacion" ? (
-
-          <section className="analysis-section analysis-current analysis-preparation">
-
-            <span className="analysis-section-label">
-              Preparación
-            </span>
-
-
-            <h2>
-              Antes de empezar
-            </h2>
-
-
-            <p className="analysis-preparation-intro">
-              Colócate correctamente antes de iniciar el análisis del curl.
-            </p>
-
-
-            <div className="analysis-preparation-list">
-
-              <p>
-                <strong>1.</strong>{" "}
-                Colócate de lado a la cámara.
-              </p>
-
-
-              <p>
-                <strong>2.</strong>{" "}
-                Mantén visibles hombro, codo y muñeca del brazo {props.lado}.
-              </p>
-
-
-              <p>
-                <strong>3.</strong>{" "}
-                Intenta que la cadera también sea visible para analizar el tronco.
-              </p>
-
-
-              <p>
-                <strong>4.</strong>{" "}
-                Empieza con el brazo completamente extendido.
-              </p>
-
-            </div>
-
-
-            <div className="analysis-preparation-side">
-
-              <span>
-                Lado seleccionado
-              </span>
-
-
-              <strong>
-                {props.lado ===
-                "derecho"
-                  ? "Derecho"
-                  : "Izquierdo"}
-              </strong>
-
-            </div>
-
-
-            <button
-              type="button"
-              className="analysis-start-button"
-              onClick={
-                empezarAnalisisCurl
-              }
-            >
-              Empezar análisis
-            </button>
-
-          </section>
-
-        ) : estadoSesion ===
-        "cuenta-atras" ? (
-
-          <section className="analysis-section analysis-current analysis-preparation">
-
-            <span className="analysis-section-label">
-              Preparación
-            </span>
-
-
-            <div className="analysis-countdown">
-
-              <h2>
-                Prepárate
-              </h2>
-
-
-              <div className="analysis-countdown-number">
-                {cuentaAtras}
-              </div>
-
-
-              <p>
-                Mantén el brazo extendido. El análisis comenzará al terminar la cuenta atrás.
-              </p>
-
-            </div>
-
-          </section>
-
-        ) : (
-
-          <>
-
-            {estadoSesion ===
-            "finalizado" ? (
-
-              <section className="analysis-section analysis-current analysis-session-finished">
-
-                <span className="analysis-section-label">
-                  Sesión completada
-                </span>
-
-
-                <h2>
-                  Análisis finalizado
-                </h2>
-
-
-                <p>
-                  El análisis está detenido. Puedes revisar los resultados de la sesión o pulsar Reiniciar análisis para comenzar una nueva.
-                </p>
-
-
-                <div className="analysis-finished-total">
-
-                  <span>
-                    Repeticiones analizadas
-                  </span>
-
-
-                  <strong>
-                    {resumenSesion.total}
-                  </strong>
-
-                </div>
-
-              </section>
-
-            ) : (
-
-              <>
-
-                {/* ==========================================
-                    FEEDBACK ACTUAL
-                    ========================================== */}
-
-                <section className="analysis-section analysis-current">
-
+        <ControlSesion
+          estadoSesion={estadoSesion}
+          cuentaAtras={cuentaAtras}
+          etiquetaPreparacion="Preparación"
+          tituloPreparacion="Antes de empezar"
+          introduccion="Colócate correctamente antes de iniciar el análisis del curl."
+          instrucciones={[
+            "Colócate de lado a la cámara.",
+            `Mantén visibles hombro, codo y muñeca del brazo ${props.lado}.`,
+            "Intenta que la cadera también sea visible para analizar el tronco.",
+            "Empieza con el brazo completamente extendido."
+          ]}
+          etiquetaDetalle="Lado seleccionado"
+          valorDetalle={
+            props.lado ===
+            "derecho"
+              ? "Derecho"
+              : "Izquierdo"
+          }
+          mensajeCuentaAtras="Mantén el brazo extendido. El análisis comenzará al terminar la cuenta atrás."
+          totalRepeticiones={resumenSesion.total}
+          onEmpezar={empezarAnalisisCurl}
+          onFinalizar={finalizarAnalisisCurl}
+        >
                   <div className="analysis-section-header">
 
                     <div>
@@ -1767,24 +1240,20 @@ function CurlCameraPreview(
                   </div>
 
 
-                  <button
-                    type="button"
-                    className="analysis-finish-button"
-                    onClick={
-                      finalizarAnalisisCurl
-                    }
-                  >
-                    Finalizar análisis
-                  </button>
+                  
 
-                </section>
-
-              </>
-
-            )}
+                
+        </ControlSesion>
 
 
-            {/* ==========================================
+        {(estadoSesion ===
+          "analizando" ||
+          estadoSesion ===
+          "finalizado") && (
+
+          <>
+
+{/* ==========================================
                 RESUMEN
                 ========================================== */}
 
@@ -2034,25 +1503,6 @@ function SentadillaCameraPreview(
     );
 
 
-  // El bucle de requestAnimationFrame necesita
-  // conocer inmediatamente el estado actual
-  // de la sesión.
-  //
-  // Este ref refleja el estado calculado por
-  // la máquina de estados compartida.
-  const estadoSesionRef =
-    useRef<EstadoSesion>(
-      ESTADO_SESION_INICIAL
-    );
-
-
-  // Intervalo utilizado para la
-  // cuenta atrás 3 - 2 - 1.
-  const intervaloCuentaAtrasRef =
-    useRef<number | null>(
-      null
-    );
-
 
   // ==================================================
   // ESTADOS
@@ -2150,53 +1600,17 @@ function SentadillaCameraPreview(
     );
 
 
-  // Estado único de la sesión de Sentadilla.
-  //
-  // La misma máquina controla preparación,
-  // cuenta atrás, análisis y finalización.
-  const [
+  // Control compartido del flujo de la sesión.
+  const {
     estadoSesion,
-    enviarEventoSesion
-  ] =
-    useReducer(
-      reducerEstadoSesion,
-      ESTADO_SESION_INICIAL
-    );
-
-
-  // Aplica el evento al reducer de React
-  // y al ref que consulta el bucle de frames.
-  const aplicarEventoSesion =
-    useCallback(
-      function aplicarEventoSesionCallback(
-        evento: EventoSesion
-      ) {
-        const siguienteEstado =
-          obtenerSiguienteEstadoSesion(
-            estadoSesionRef.current,
-            evento
-          );
-
-
-        estadoSesionRef.current =
-          siguienteEstado;
-
-
-        enviarEventoSesion(
-          evento
-        );
-      },
-      []
-    );
-
-
-  const [
+    estadoSesionRef,
     cuentaAtras,
-    setCuentaAtras
-  ] =
-    useState<number | null>(
-      null
-    );
+    empezarAnalisis,
+    finalizarAnalisis,
+    prepararReinicioSesion,
+    reiniciarSesion
+  } =
+    useControlSesion();
 
 
   // ==================================================
@@ -2225,26 +1639,9 @@ function SentadillaCameraPreview(
         0;
 
 
-      // El estado operativo vuelve
-      // inmediatamente a preparación.
-      estadoSesionRef.current =
-        "preparacion";
-
-
-      // Si el usuario reinicia durante
-      // la cuenta atrás, la cancelamos.
-      if (
-        intervaloCuentaAtrasRef.current !==
-        null
-      ) {
-        window.clearInterval(
-          intervaloCuentaAtrasRef.current
-        );
-
-
-        intervaloCuentaAtrasRef.current =
-          null;
-      }
+      // Bloqueamos inmediatamente el análisis
+      // y cancelamos una posible cuenta atrás.
+      prepararReinicioSesion();
 
 
       // Posponemos los setState()
@@ -2300,14 +1697,7 @@ function SentadillaCameraPreview(
 
             // La máquina vuelve al estado inicial
             // sin apagar la cámara.
-            aplicarEventoSesion({
-              type: "REINICIAR"
-            });
-
-
-            setCuentaAtras(
-              null
-            );
+            reiniciarSesion();
           },
           0
         );
@@ -2321,7 +1711,8 @@ function SentadillaCameraPreview(
 
     },
     [
-      aplicarEventoSesion,
+      prepararReinicioSesion,
+      reiniciarSesion,
       props.reinicioId
     ]
   );
@@ -2760,6 +2151,7 @@ function SentadillaCameraPreview(
       },
       [
         dibujarCuerpo,
+        estadoSesionRef,
         landmarksSentadilla
       ]
     );
@@ -2808,99 +2200,18 @@ function SentadillaCameraPreview(
   // ==================================================
 
   function empezarAnalisisSentadilla() {
-    // Evitamos iniciar varias cuentas atrás
-    // si el usuario pulsa repetidamente.
-    if (
-      estadoSesion !==
-      "preparacion"
-    ) {
-      return;
-    }
+    empezarAnalisis(
+      function prepararSentadillaParaAnalisis() {
+        // La sentadilla comienza desde un estado
+        // interno completamente limpio.
+        estadoSentadillaRef.current =
+          crearEstadoSentadilla();
 
 
-    if (
-      intervaloCuentaAtrasRef.current !==
-      null
-    ) {
-      window.clearInterval(
-        intervaloCuentaAtrasRef.current
-      );
-
-
-      intervaloCuentaAtrasRef.current =
-        null;
-    }
-
-
-    aplicarEventoSesion({
-      type: "INICIAR_CUENTA_ATRAS"
-    });
-
-
-    setCuentaAtras(
-      3
+        verdeHastaRef.current =
+          0;
+      }
     );
-
-
-    let valorCuentaAtras =
-      3;
-
-
-    intervaloCuentaAtrasRef.current =
-      window.setInterval(
-        function () {
-          valorCuentaAtras -=
-            1;
-
-
-          if (
-            valorCuentaAtras >
-            0
-          ) {
-            setCuentaAtras(
-              valorCuentaAtras
-            );
-
-
-            return;
-          }
-
-
-          if (
-            intervaloCuentaAtrasRef.current !==
-            null
-          ) {
-            window.clearInterval(
-              intervaloCuentaAtrasRef.current
-            );
-
-
-            intervaloCuentaAtrasRef.current =
-              null;
-          }
-
-
-          // Empezamos con un estado limpio
-          // cuando termina la cuenta atrás.
-          estadoSentadillaRef.current =
-            crearEstadoSentadilla();
-
-
-          verdeHastaRef.current =
-            0;
-
-
-          setCuentaAtras(
-            null
-          );
-
-
-          aplicarEventoSesion({
-            type: "COMENZAR_ANALISIS"
-          });
-        },
-        1000
-      );
   }
 
 
@@ -2909,31 +2220,14 @@ function SentadillaCameraPreview(
   // ==================================================
 
   function finalizarAnalisisSentadilla() {
-    // Solo finalizamos si la sesión
-    // está realmente en marcha.
-    if (
-      estadoSesion !==
-      "analizando"
-    ) {
-      return;
-    }
-
-
-    // La transición a "finalizado" bloquea
-    // inmediatamente nuevas repeticiones.
-    // MediaPipe continúa dibujando los landmarks.
-    aplicarEventoSesion({
-      type: "FINALIZAR_ANALISIS"
-    });
-
-
-    // Quitamos cualquier feedback verde
-    // que pudiera seguir activo.
-    verdeHastaRef.current =
-      0;
-
-
-    // El historial y el resumen se conservan.
+    finalizarAnalisis(
+      function limpiarSentadillaAlFinalizar() {
+        // Quitamos cualquier feedback verde
+        // que pudiera seguir activo.
+        verdeHastaRef.current =
+          0;
+      }
+    );
   }
 
 
@@ -2941,227 +2235,19 @@ function SentadillaCameraPreview(
   // CÁMARA Y MEDIAPIPE
   // ==================================================
 
-  useEffect(function () {
-    let stream:
-      MediaStream | null =
-      null;
-
-
-    let componenteActivo =
-      true;
-
-
-    // Guardamos la referencia actual
-    // del elemento de vídeo.
-    //
-    // La utilizaremos también en el cleanup
-    // para evitar el aviso de ESLint
-    // sobre el uso de ref.current.
-    const videoActual =
-      videoRef.current;
-
-
-    async function iniciarSistema() {
-      // El estado de error ya comienza en null.
-      // No hacemos setState síncrono al arrancar
-      // el efecto para evitar renders innecesarios.
-      let nuevoStream:
-        MediaStream;
-
-
-      try {
-        nuevoStream =
-          await navigator.mediaDevices.getUserMedia({
-            video:
-              true,
-
-            audio:
-              false
-          });
-
-      } catch (error) {
-        console.error(
-          "Error al iniciar cámara de sentadilla:",
-          error
-        );
-
-
-        if (
-          componenteActivo
-        ) {
-          setErrorSistema(
-            obtenerMensajeErrorCamara(
-              error
-            )
-          );
-        }
-
-
-        return;
-      }
-
-
-      if (
-        !componenteActivo
-      ) {
-        nuevoStream
-          .getTracks()
-          .forEach(
-            function (track) {
-              track.stop();
-            }
-          );
-
-
-        return;
-      }
-
-
-      stream =
-        nuevoStream;
-
-
-      if (
-        videoRef.current
-      ) {
-        videoRef.current.srcObject =
-          stream;
-      }
-
-
-      try {
-        const poseLandmarker =
-          await crearPoseLandmarker();
-
-
-        if (
-          !componenteActivo
-        ) {
-          return;
-        }
-
-
-        poseLandmarkerRef.current =
-          poseLandmarker;
-
-
-        setErrorSistema(
-          null
-        );
-
-
-        if (
-          videoRef.current &&
-          videoRef.current.readyState >=
-            2
-        ) {
-          iniciarAnalisis();
-        }
-
-      } catch (error) {
-        if (
-          stream
-        ) {
-          stream
-            .getTracks()
-            .forEach(
-              function (track) {
-                track.stop();
-              }
-            );
-
-
-          stream =
-            null;
-        }
-
-
-        if (
-          videoRef.current
-        ) {
-          videoRef.current.srcObject =
-            null;
-        }
-
-
-        if (
-          componenteActivo
-        ) {
-          setErrorSistema(
-            obtenerMensajeErrorMediaPipe(
-              error
-            )
-          );
-        }
-      }
-    }
-
-
-    iniciarSistema();
-
-
-    return function detenerSistema() {
-      componenteActivo =
-        false;
-
-
-      if (
-        animationFrameRef.current !==
-        null
-      ) {
-        cancelAnimationFrame(
-          animationFrameRef.current
-        );
-
-
-        animationFrameRef.current =
-          null;
-      }
-
-
-      // Cancelamos también una posible
-      // cuenta atrás pendiente.
-      if (
-        intervaloCuentaAtrasRef.current !==
-        null
-      ) {
-        window.clearInterval(
-          intervaloCuentaAtrasRef.current
-        );
-
-
-        intervaloCuentaAtrasRef.current =
-          null;
-      }
-
-
-      if (
-        stream
-      ) {
-        stream
-          .getTracks()
-          .forEach(
-            function (track) {
-              track.stop();
-            }
-          );
-      }
-
-
-      // Utilizamos la referencia guardada
-      // al crear el efecto.
-      //
-      // Así el cleanup no depende de
-      // un posible valor diferente de
-      // videoRef.current.
-      if (
-        videoActual
-      ) {
-        videoActual.srcObject =
-          null;
-      }
-    };
-  }, [iniciarAnalisis]);
+  // Reutilizamos el mismo hook de cámara y MediaPipe
+  // que ya se validó previamente con el Curl.
+  //
+  // Sentadilla mantiene aquí únicamente su lógica
+  // específica de landmarks, ángulos y repeticiones.
+  useCamaraPose({
+    videoRef,
+    poseLandmarkerRef,
+    animationFrameRef,
+    iniciarAnalisis,
+    setErrorSistema,
+    nombreEjercicio: "sentadilla"
+  });
 
 
   if (
@@ -3221,163 +2307,30 @@ function SentadillaCameraPreview(
 
       <div className="vision-fit-data-column">
 
-        {estadoSesion ===
-        "preparacion" ||
-        estadoSesion ===
-        "cuenta-atras" ? (
-
-          <section className="analysis-section analysis-current analysis-preparation">
-
-            {estadoSesion ===
-            "preparacion" ? (
-
-              <>
-
-                <span className="analysis-section-label">
-                  Antes de empezar
-                </span>
-
-
-                <h2>
-                  Preparación
-                </h2>
-
-
-                <p className="analysis-preparation-intro">
-                  Colócate correctamente antes de iniciar el análisis de la sentadilla.
-                </p>
-
-
-                <div className="analysis-preparation-list">
-
-                  <p>
-                    <strong>1.</strong>{" "}
-                    Colócate de lado a la cámara.
-                  </p>
-
-
-                  <p>
-                    <strong>2.</strong>{" "}
-                    Mantén visibles hombro, cadera, rodilla y tobillo del lado {props.lado}.
-                  </p>
-
-
-                  <p>
-                    <strong>3.</strong>{" "}
-                    Deja suficiente espacio para que la cámara vea el movimiento completo.
-                  </p>
-
-
-                  <p>
-                    <strong>4.</strong>{" "}
-                    Empieza de pie, con la pierna extendida.
-                  </p>
-
-                </div>
-
-
-                <div className="analysis-preparation-side">
-
-                  <span>
-                    Lado seleccionado
-                  </span>
-
-
-                  <strong>
-                    {props.lado ===
-                    "derecho"
-                      ? "Derecho"
-                      : "Izquierdo"}
-                  </strong>
-
-                </div>
-
-
-                <button
-                  type="button"
-                  className="analysis-start-button"
-                  onClick={
-                    empezarAnalisisSentadilla
-                  }
-                >
-                  Empezar análisis
-                </button>
-
-              </>
-
-            ) : (
-
-              <div className="analysis-countdown">
-
-                <h2>
-                  Prepárate
-                </h2>
-
-
-                <div className="analysis-countdown-number">
-                  {cuentaAtras}
-                </div>
-
-
-                <p>
-                  Mantente de pie y completamente visible. El análisis comenzará al terminar la cuenta atrás.
-                </p>
-
-              </div>
-
-            )}
-
-          </section>
-
-        ) : (
-
-          <>
-
-            {estadoSesion ===
-            "finalizado" ? (
-
-              <section className="analysis-section analysis-current analysis-session-finished">
-
-                <span className="analysis-section-label">
-                  Sesión completada
-                </span>
-
-
-                <h2>
-                  Análisis finalizado
-                </h2>
-
-
-                <p>
-                  El análisis está detenido. Puedes revisar los resultados de la sesión o pulsar Reiniciar análisis para comenzar una nueva.
-                </p>
-
-
-                <div className="analysis-finished-total">
-
-                  <span>
-                    Repeticiones analizadas
-                  </span>
-
-
-                  <strong>
-                    {resumen.total}
-                  </strong>
-
-                </div>
-
-              </section>
-
-            ) : (
-
-              <>
-
-        {/* ==========================================
-            FEEDBACK ACTUAL
-            ========================================== */}
-
-        <section className="analysis-section analysis-current">
-
+        <ControlSesion
+          estadoSesion={estadoSesion}
+          cuentaAtras={cuentaAtras}
+          etiquetaPreparacion="Antes de empezar"
+          tituloPreparacion="Preparación"
+          introduccion="Colócate correctamente antes de iniciar el análisis de la sentadilla."
+          instrucciones={[
+            "Colócate de lado a la cámara.",
+            `Mantén visibles hombro, cadera, rodilla y tobillo del lado ${props.lado}.`,
+            "Deja suficiente espacio para que la cámara vea el movimiento completo.",
+            "Empieza de pie, con la pierna extendida."
+          ]}
+          etiquetaDetalle="Lado seleccionado"
+          valorDetalle={
+            props.lado ===
+            "derecho"
+              ? "Derecho"
+              : "Izquierdo"
+          }
+          mensajeCuentaAtras="Mantente de pie y completamente visible. El análisis comenzará al terminar la cuenta atrás."
+          totalRepeticiones={resumen.total}
+          onEmpezar={empezarAnalisisSentadilla}
+          onFinalizar={finalizarAnalisisSentadilla}
+        >
           <div className="analysis-section-header">
 
             <div>
@@ -3557,24 +2510,20 @@ function SentadillaCameraPreview(
 
           </div>
 
-          <button
-            type="button"
-            className="analysis-finish-button"
-            onClick={
-              finalizarAnalisisSentadilla
-            }
-          >
-            Finalizar análisis
-          </button>
+          
 
-        </section>
-
-              </>
-
-            )}
+        
+        </ControlSesion>
 
 
-        {/* ==========================================
+        {(estadoSesion ===
+          "analizando" ||
+          estadoSesion ===
+          "finalizado") && (
+
+          <>
+
+{/* ==========================================
             RESUMEN
             ========================================== */}
 
@@ -3836,25 +2785,6 @@ function PressHombroCameraPreview(
     );
 
 
-  // El bucle de requestAnimationFrame necesita
-  // conocer inmediatamente el estado actual
-  // de la sesión.
-  //
-  // Este ref refleja el estado calculado por
-  // la máquina de estados compartida.
-  const estadoSesionRef =
-    useRef<EstadoSesion>(
-      ESTADO_SESION_INICIAL
-    );
-
-
-  // Intervalo utilizado para la
-  // cuenta atrás 3 - 2 - 1.
-  const intervaloCuentaAtrasRef =
-    useRef<number | null>(
-      null
-    );
-
 
   // ==================================================
   // ESTADOS
@@ -3952,53 +2882,17 @@ function PressHombroCameraPreview(
     );
 
 
-  // Estado único de la sesión del Press.
-  //
-  // La misma máquina controla preparación,
-  // cuenta atrás, análisis y finalización.
-  const [
+  // Control compartido del flujo de la sesión.
+  const {
     estadoSesion,
-    enviarEventoSesion
-  ] =
-    useReducer(
-      reducerEstadoSesion,
-      ESTADO_SESION_INICIAL
-    );
-
-
-  // Aplica el evento al reducer de React
-  // y al ref que consulta el bucle de frames.
-  const aplicarEventoSesion =
-    useCallback(
-      function aplicarEventoSesionCallback(
-        evento: EventoSesion
-      ) {
-        const siguienteEstado =
-          obtenerSiguienteEstadoSesion(
-            estadoSesionRef.current,
-            evento
-          );
-
-
-        estadoSesionRef.current =
-          siguienteEstado;
-
-
-        enviarEventoSesion(
-          evento
-        );
-      },
-      []
-    );
-
-
-  const [
+    estadoSesionRef,
     cuentaAtras,
-    setCuentaAtras
-  ] =
-    useState<number | null>(
-      null
-    );
+    empezarAnalisis,
+    finalizarAnalisis,
+    prepararReinicioSesion,
+    reiniciarSesion
+  } =
+    useControlSesion();
 
 
   // ==================================================
@@ -4027,24 +2921,9 @@ function PressHombroCameraPreview(
         0;
 
 
-      // El estado operativo vuelve
-      // inmediatamente a preparación.
-      estadoSesionRef.current =
-        "preparacion";
-
-
-      if (
-        intervaloCuentaAtrasRef.current !==
-        null
-      ) {
-        window.clearInterval(
-          intervaloCuentaAtrasRef.current
-        );
-
-
-        intervaloCuentaAtrasRef.current =
-          null;
-      }
+      // Bloqueamos inmediatamente el análisis
+      // y cancelamos una posible cuenta atrás.
+      prepararReinicioSesion();
 
 
       // Posponemos los setState()
@@ -4100,14 +2979,7 @@ function PressHombroCameraPreview(
 
             // La máquina vuelve al estado inicial
             // sin reiniciar ni apagar la webcam.
-            aplicarEventoSesion({
-              type: "REINICIAR"
-            });
-
-
-            setCuentaAtras(
-              null
-            );
+            reiniciarSesion();
           },
           0
         );
@@ -4121,7 +2993,8 @@ function PressHombroCameraPreview(
 
     },
     [
-      aplicarEventoSesion,
+      prepararReinicioSesion,
+      reiniciarSesion,
       props.reinicioId
     ]
   );
@@ -4563,7 +3436,8 @@ function PressHombroCameraPreview(
       );
       },
       [
-        dibujarBrazo
+        dibujarBrazo,
+        estadoSesionRef
       ]
     );
 
@@ -4611,97 +3485,18 @@ function PressHombroCameraPreview(
   // ==================================================
 
   function empezarAnalisisPress() {
-    if (
-      estadoSesion !==
-      "preparacion"
-    ) {
-      return;
-    }
+    empezarAnalisis(
+      function prepararPressParaAnalisis() {
+        // El press comienza desde un estado
+        // interno completamente limpio.
+        estadoPressRef.current =
+          crearEstadoPressHombro();
 
 
-    if (
-      intervaloCuentaAtrasRef.current !==
-      null
-    ) {
-      window.clearInterval(
-        intervaloCuentaAtrasRef.current
-      );
-
-
-      intervaloCuentaAtrasRef.current =
-        null;
-    }
-
-
-    aplicarEventoSesion({
-      type: "INICIAR_CUENTA_ATRAS"
-    });
-
-
-    setCuentaAtras(
-      3
+        verdeHastaRef.current =
+          0;
+      }
     );
-
-
-    let valorCuentaAtras =
-      3;
-
-
-    intervaloCuentaAtrasRef.current =
-      window.setInterval(
-        function () {
-          valorCuentaAtras -=
-            1;
-
-
-          if (
-            valorCuentaAtras >
-            0
-          ) {
-            setCuentaAtras(
-              valorCuentaAtras
-            );
-
-
-            return;
-          }
-
-
-          if (
-            intervaloCuentaAtrasRef.current !==
-            null
-          ) {
-            window.clearInterval(
-              intervaloCuentaAtrasRef.current
-            );
-
-
-            intervaloCuentaAtrasRef.current =
-              null;
-          }
-
-
-          // Reiniciamos el estado del press
-          // justo antes de activar el análisis.
-          estadoPressRef.current =
-            crearEstadoPressHombro();
-
-
-          verdeHastaRef.current =
-            0;
-
-
-          setCuentaAtras(
-            null
-          );
-
-
-          aplicarEventoSesion({
-            type: "COMENZAR_ANALISIS"
-          });
-        },
-        1000
-      );
   }
 
 
@@ -4710,31 +3505,14 @@ function PressHombroCameraPreview(
   // ==================================================
 
   function finalizarAnalisisPress() {
-    // Solo finalizamos si la sesión
-    // está realmente en marcha.
-    if (
-      estadoSesion !==
-      "analizando"
-    ) {
-      return;
-    }
-
-
-    // La transición a "finalizado" bloquea
-    // inmediatamente nuevas repeticiones.
-    // MediaPipe sigue detectando y dibujando.
-    aplicarEventoSesion({
-      type: "FINALIZAR_ANALISIS"
-    });
-
-
-    // Eliminamos cualquier feedback verde
-    // que pudiera seguir activo.
-    verdeHastaRef.current =
-      0;
-
-
-    // Conservamos todos los resultados.
+    finalizarAnalisis(
+      function limpiarPressAlFinalizar() {
+        // Eliminamos cualquier feedback verde
+        // que pudiera seguir activo.
+        verdeHastaRef.current =
+          0;
+      }
+    );
   }
 
 
@@ -4742,227 +3520,19 @@ function PressHombroCameraPreview(
   // CÁMARA Y MEDIAPIPE
   // ==================================================
 
-  useEffect(function () {
-    let stream:
-      MediaStream | null =
-      null;
-
-
-    let componenteActivo =
-      true;
-
-
-    // Guardamos la referencia actual
-    // del elemento de vídeo.
-    //
-    // La utilizaremos también en el cleanup
-    // para evitar el aviso de ESLint
-    // sobre el uso de ref.current.
-    const videoActual =
-      videoRef.current;
-
-
-    async function iniciarSistema() {
-      // El estado de error ya comienza en null.
-      // No hacemos setState síncrono al arrancar
-      // el efecto para evitar renders innecesarios.
-      let nuevoStream:
-        MediaStream;
-
-
-      try {
-        nuevoStream =
-          await navigator.mediaDevices.getUserMedia({
-            video:
-              true,
-
-            audio:
-              false
-          });
-
-      } catch (error) {
-        console.error(
-          "Error al iniciar cámara del press:",
-          error
-        );
-
-
-        if (
-          componenteActivo
-        ) {
-          setErrorSistema(
-            obtenerMensajeErrorCamara(
-              error
-            )
-          );
-        }
-
-
-        return;
-      }
-
-
-      if (
-        !componenteActivo
-      ) {
-        nuevoStream
-          .getTracks()
-          .forEach(
-            function (track) {
-              track.stop();
-            }
-          );
-
-
-        return;
-      }
-
-
-      stream =
-        nuevoStream;
-
-
-      if (
-        videoRef.current
-      ) {
-        videoRef.current.srcObject =
-          stream;
-      }
-
-
-      try {
-        const poseLandmarker =
-          await crearPoseLandmarker();
-
-
-        if (
-          !componenteActivo
-        ) {
-          return;
-        }
-
-
-        poseLandmarkerRef.current =
-          poseLandmarker;
-
-
-        setErrorSistema(
-          null
-        );
-
-
-        if (
-          videoRef.current &&
-          videoRef.current.readyState >=
-            2
-        ) {
-          iniciarAnalisis();
-        }
-
-      } catch (error) {
-        if (
-          stream
-        ) {
-          stream
-            .getTracks()
-            .forEach(
-              function (track) {
-                track.stop();
-              }
-            );
-
-
-          stream =
-            null;
-        }
-
-
-        if (
-          videoRef.current
-        ) {
-          videoRef.current.srcObject =
-            null;
-        }
-
-
-        if (
-          componenteActivo
-        ) {
-          setErrorSistema(
-            obtenerMensajeErrorMediaPipe(
-              error
-            )
-          );
-        }
-      }
-    }
-
-
-    iniciarSistema();
-
-
-    return function detenerSistema() {
-      componenteActivo =
-        false;
-
-
-      if (
-        animationFrameRef.current !==
-        null
-      ) {
-        cancelAnimationFrame(
-          animationFrameRef.current
-        );
-
-
-        animationFrameRef.current =
-          null;
-      }
-
-
-      // Cancelamos una cuenta atrás
-      // pendiente si se desmonta el componente.
-      if (
-        intervaloCuentaAtrasRef.current !==
-        null
-      ) {
-        window.clearInterval(
-          intervaloCuentaAtrasRef.current
-        );
-
-
-        intervaloCuentaAtrasRef.current =
-          null;
-      }
-
-
-      if (
-        stream
-      ) {
-        stream
-          .getTracks()
-          .forEach(
-            function (track) {
-              track.stop();
-            }
-          );
-      }
-
-
-      // Utilizamos la referencia guardada
-      // al crear el efecto.
-      //
-      // Así el cleanup no depende de
-      // un posible valor diferente de
-      // videoRef.current.
-      if (
-        videoActual
-      ) {
-        videoActual.srcObject =
-          null;
-      }
-    };
-  }, [iniciarAnalisis]);
+  // Reutilizamos el hook común para gestionar
+  // permisos, stream, MediaPipe y limpieza.
+  //
+  // El Press conserva únicamente su análisis
+  // bilateral y la lógica de simetría.
+  useCamaraPose({
+    videoRef,
+    poseLandmarkerRef,
+    animationFrameRef,
+    iniciarAnalisis,
+    setErrorSistema,
+    nombreEjercicio: "press de hombro"
+  });
 
 
   if (
@@ -5022,160 +3592,25 @@ function PressHombroCameraPreview(
 
       <div className="vision-fit-data-column">
 
-        {estadoSesion ===
-        "preparacion" ||
-        estadoSesion ===
-        "cuenta-atras" ? (
-
-          <section className="analysis-section analysis-current analysis-preparation">
-
-            {estadoSesion ===
-            "preparacion" ? (
-
-              <>
-
-                <span className="analysis-section-label">
-                  Antes de empezar
-                </span>
-
-
-                <h2>
-                  Preparación
-                </h2>
-
-
-                <p className="analysis-preparation-intro">
-                  Colócate correctamente antes de iniciar el análisis del press de hombro.
-                </p>
-
-
-                <div className="analysis-preparation-list">
-
-                  <p>
-                    <strong>1.</strong>{" "}
-                    Colócate de frente a la cámara.
-                  </p>
-
-
-                  <p>
-                    <strong>2.</strong>{" "}
-                    Mantén completamente visibles los dos hombros, codos y muñecas.
-                  </p>
-
-
-                  <p>
-                    <strong>3.</strong>{" "}
-                    Deja espacio por encima de la cabeza para poder extender ambos brazos.
-                  </p>
-
-
-                  <p>
-                    <strong>4.</strong>{" "}
-                    Empieza con ambos brazos en la posición baja del press.
-                  </p>
-
-                </div>
-
-
-                <div className="analysis-preparation-side">
-
-                  <span>
-                    Análisis
-                  </span>
-
-
-                  <strong>
-                    Bilateral
-                  </strong>
-
-                </div>
-
-
-                <button
-                  type="button"
-                  className="analysis-start-button"
-                  onClick={
-                    empezarAnalisisPress
-                  }
-                >
-                  Empezar análisis
-                </button>
-
-              </>
-
-            ) : (
-
-              <div className="analysis-countdown">
-
-                <h2>
-                  Prepárate
-                </h2>
-
-
-                <div className="analysis-countdown-number">
-                  {cuentaAtras}
-                </div>
-
-
-                <p>
-                  Mantén ambos brazos en posición baja. El análisis comenzará al terminar la cuenta atrás.
-                </p>
-
-              </div>
-
-            )}
-
-          </section>
-
-        ) : (
-
-          <>
-
-            {estadoSesion ===
-            "finalizado" ? (
-
-              <section className="analysis-section analysis-current analysis-session-finished">
-
-                <span className="analysis-section-label">
-                  Sesión completada
-                </span>
-
-
-                <h2>
-                  Análisis finalizado
-                </h2>
-
-
-                <p>
-                  El análisis está detenido. Puedes revisar los resultados de la sesión o pulsar Reiniciar análisis para comenzar una nueva.
-                </p>
-
-
-                <div className="analysis-finished-total">
-
-                  <span>
-                    Repeticiones analizadas
-                  </span>
-
-
-                  <strong>
-                    {resumen.total}
-                  </strong>
-
-                </div>
-
-              </section>
-
-            ) : (
-
-              <>
-
-        {/* ==========================================
-            FEEDBACK ACTUAL
-            ========================================== */}
-
-        <section className="analysis-section analysis-current">
-
+        <ControlSesion
+          estadoSesion={estadoSesion}
+          cuentaAtras={cuentaAtras}
+          etiquetaPreparacion="Antes de empezar"
+          tituloPreparacion="Preparación"
+          introduccion="Colócate correctamente antes de iniciar el análisis del press de hombro."
+          instrucciones={[
+            "Colócate de frente a la cámara.",
+            "Mantén completamente visibles los dos hombros, codos y muñecas.",
+            "Deja espacio por encima de la cabeza para poder extender ambos brazos.",
+            "Empieza con ambos brazos en la posición baja del press."
+          ]}
+          etiquetaDetalle="Análisis"
+          valorDetalle="Bilateral"
+          mensajeCuentaAtras="Mantén ambos brazos en posición baja. El análisis comenzará al terminar la cuenta atrás."
+          totalRepeticiones={resumen.total}
+          onEmpezar={empezarAnalisisPress}
+          onFinalizar={finalizarAnalisisPress}
+        >
           <div className="analysis-section-header">
 
             <div>
@@ -5343,24 +3778,20 @@ function PressHombroCameraPreview(
 
           </div>
 
-          <button
-            type="button"
-            className="analysis-finish-button"
-            onClick={
-              finalizarAnalisisPress
-            }
-          >
-            Finalizar análisis
-          </button>
+          
 
-        </section>
-
-              </>
-
-            )}
+        
+        </ControlSesion>
 
 
-        {/* ==========================================
+        {(estadoSesion ===
+          "analizando" ||
+          estadoSesion ===
+          "finalizado") && (
+
+          <>
+
+{/* ==========================================
             RESUMEN
             ========================================== */}
 
