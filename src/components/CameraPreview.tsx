@@ -118,6 +118,8 @@ import {
 
 import ControlSesion from "./ControlSesion";
 
+import ResultadoSesion from "./ResultadoSesion";
+
 
 // --------------------------------------------------
 // CÁMARA + MEDIAPIPE COMPARTIDOS
@@ -1251,188 +1253,61 @@ function CurlCameraPreview(
           estadoSesion ===
           "finalizado") && (
 
-          <>
-
-{/* ==========================================
-                RESUMEN
-                ========================================== */}
-
-            <section className="analysis-section">
-
-              <span className="analysis-section-label">
-                Sesión
-              </span>
-
-
-              <h2>
-                Resumen
-              </h2>
-
-
-              <div className="analysis-summary-grid">
-
-                <div className="analysis-summary-item">
-
-                  <span>
-                    Analizadas
-                  </span>
-
-
-                  <strong>
-                    {resumenSesion.total}
-                  </strong>
-
-                </div>
-
-
-                <div className="analysis-summary-item">
-
-                  <span>
-                    Correctas
-                  </span>
-
-
-                  <strong>
-                    {resumenSesion.correctas}
-                  </strong>
-
-                </div>
-
-
-                <div className="analysis-summary-item">
-
-                  <span>
-                    Técnica correcta
-                  </span>
-
-
-                  <strong>
-                    {
-                      resumenSesion
-                        .porcentajeCorrectas
-                    }
-                    %
-                  </strong>
-
-                </div>
-
-
-                <div className="analysis-summary-item">
-
-                  <span>
-                    Errores de codo
-                  </span>
-
-
-                  <strong>
-                    {resumenSesion.erroresCodo}
-                  </strong>
-
-                </div>
-
-
-                <div className="analysis-summary-item">
-
-                  <span>
-                    Balanceo tronco
-                  </span>
-
-
-                  <strong>
-                    {resumenSesion.erroresTronco}
-                  </strong>
-
-                </div>
-
-              </div>
-
-
-              <div className="analysis-most-common-error">
-
-                <span>
-                  Error más frecuente
-                </span>
-
-
-                <strong>
-                  {
-                    resumenSesion
-                      .errorMasFrecuente
-                  }
-                </strong>
-
-              </div>
-
-            </section>
-
-
-            {/* ==========================================
-                HISTORIAL
-                ========================================== */}
-
-            <section className="analysis-section">
-
-              <span className="analysis-section-label">
-                Detalle
-              </span>
-
-
-              <h2>
-                Historial
-              </h2>
-
-
-              {historial.length ===
-              0 ? (
-
-                <p className="analysis-empty-message">
-                  Completa una repetición para
-                  empezar a generar el historial.
-                </p>
-
-              ) : (
-
-                <div className="analysis-history">
-
-                  {historial.map(
-                    function (
-                      repeticion
-                    ) {
-                      return (
-                        <div
-                          key={
-                            repeticion.numero
-                          }
-
-                          className="analysis-history-item"
-                        >
-
-                          <span className="analysis-history-number">
-                            Rep{" "}
-                            {
-                              repeticion.numero
-                            }
-                          </span>
-
-
-                          <strong>
-                            {
-                              repeticion.resultado
-                            }
-                          </strong>
-
-                        </div>
-                      );
-                    }
-                  )}
-
-                </div>
-
-              )}
-
-            </section>
-
-          </>
+          <ResultadoSesion
+            finalizado={
+              estadoSesion ===
+              "finalizado"
+            }
+            total={resumenSesion.total}
+            correctas={resumenSesion.correctas}
+            porcentajeCorrectas={
+              resumenSesion.porcentajeCorrectas
+            }
+            metricas={[
+              {
+                etiqueta: "Errores de codo",
+                valor: resumenSesion.erroresCodo
+              },
+              {
+                etiqueta: "Balanceo tronco",
+                valor: resumenSesion.erroresTronco
+              }
+            ]}
+            errorPrincipal={
+              resumenSesion.total === 0
+                ? "Sin datos"
+                : resumenSesion.errorMasFrecuente
+            }
+            hayHistorial={
+              historial.length > 0
+            }
+          >
+
+            {historial.map(
+              function (
+                repeticion
+              ) {
+                return (
+                  <div
+                    key={repeticion.numero}
+                    className="analysis-history-item"
+                  >
+
+                    <span className="analysis-history-number">
+                      Rep {repeticion.numero}
+                    </span>
+
+
+                    <strong>
+                      {repeticion.resultado}
+                    </strong>
+
+                  </div>
+                );
+              }
+            )}
+
+          </ResultadoSesion>
 
         )}
 
@@ -2521,207 +2396,94 @@ function SentadillaCameraPreview(
           estadoSesion ===
           "finalizado") && (
 
-          <>
+          <ResultadoSesion
+            finalizado={
+              estadoSesion ===
+              "finalizado"
+            }
+            total={resumen.total}
+            correctas={resumen.correctas}
+            porcentajeCorrectas={
+              resumen.porcentajeCorrectas
+            }
+            metricas={[
+              {
+                etiqueta: "Profundidad insuficiente",
+                valor: resumen.profundidadInsuficiente
+              },
+              {
+                etiqueta: "Exceso de inclinación",
+                valor: resumen.excesoInclinacionTronco
+              }
+            ]}
+            errorPrincipal={
+              resumen.total === 0
+                ? "Sin datos"
+                : resumen.profundidadInsuficiente === 0 &&
+                  resumen.excesoInclinacionTronco === 0
+                  ? "Ninguno destacado"
+                  : resumen.profundidadInsuficiente >
+                    resumen.excesoInclinacionTronco
+                    ? "Profundidad insuficiente"
+                    : resumen.excesoInclinacionTronco >
+                      resumen.profundidadInsuficiente
+                      ? "Exceso de inclinación del tronco"
+                      : "Profundidad e inclinación"
+            }
+            hayHistorial={
+              historial.length > 0
+            }
+          >
 
-{/* ==========================================
-            RESUMEN
-            ========================================== */}
+            {historial.map(
+              function (
+                repeticion
+              ) {
+                return (
+                  <div
+                    key={repeticion.numero}
+                    className="analysis-history-item"
+                  >
 
-        <section className="analysis-section">
-
-          <span className="analysis-section-label">
-            Sesión
-          </span>
-
-
-          <h2>
-            Resumen
-          </h2>
-
-
-          <div className="analysis-summary-grid">
-
-            <div className="analysis-summary-item">
-
-              <span>
-                Analizadas
-              </span>
-
-
-              <strong>
-                {resumen.total}
-              </strong>
-
-            </div>
-
-
-            <div className="analysis-summary-item">
-
-              <span>
-                Correctas
-              </span>
-
-
-              <strong>
-                {resumen.correctas}
-              </strong>
-
-            </div>
-
-
-            <div className="analysis-summary-item">
-
-              <span>
-                Técnica correcta
-              </span>
-
-
-              <strong>
-                {Math.round(
-                  resumen
-                    .porcentajeCorrectas
-                )}
-                %
-              </strong>
-
-            </div>
+                    <span className="analysis-history-number">
+                      Rep {repeticion.numero}
+                    </span>
 
 
-            <div className="analysis-summary-item">
+                    <div>
 
-              <span>
-                Profundidad insuficiente
-              </span>
-
-
-              <strong>
-                {
-                  resumen
-                    .profundidadInsuficiente
-                }
-              </strong>
-
-            </div>
+                      <strong>
+                        {repeticion.resultado}
+                      </strong>
 
 
-            <div className="analysis-summary-item">
-
-              <span>
-                Exceso de inclinación
-              </span>
-
-
-              <strong>
-                {
-                  resumen
-                    .excesoInclinacionTronco
-                }
-              </strong>
-
-            </div>
-
-          </div>
-
-        </section>
+                      <p>
+                        Rodilla mín.:{" "}
+                        {Math.round(
+                          repeticion.anguloMinimo
+                        )}
+                        °
+                      </p>
 
 
-        {/* ==========================================
-            HISTORIAL
-            ========================================== */}
-
-        <section className="analysis-section">
-
-          <span className="analysis-section-label">
-            Detalle
-          </span>
-
-
-          <h2>
-            Historial
-          </h2>
-
-
-          {historial.length ===
-          0 ? (
-
-            <p className="analysis-empty-message">
-              Completa una repetición para
-              empezar a generar el historial.
-            </p>
-
-          ) : (
-
-            <div className="analysis-history">
-
-              {historial.map(
-                function (
-                  repeticion
-                ) {
-                  return (
-                    <div
-                      key={
-                        repeticion.numero
-                      }
-
-                      className="analysis-history-item"
-                    >
-
-                      <span className="analysis-history-number">
-
-                        Rep{" "}
-                        {
-                          repeticion.numero
-                        }
-
-                      </span>
-
-
-                      <div>
-
-                        <strong>
-                          {
-                            repeticion.resultado
-                          }
-                        </strong>
-
-
-                        <p>
-                          Rodilla mín.:{" "}
-                          {Math.round(
-                            repeticion
-                              .anguloMinimo
-                          )}
-                          °
-                        </p>
-
-
-                        <p>
-                          Tronco máx.:{" "}
-                          {repeticion
-                            .inclinacionTroncoMaxima !==
-                          null
-                            ? Math.round(
-                                repeticion
-                                  .inclinacionTroncoMaxima
-                              ) +
-                              "°"
-                            : "N/D"}
-                        </p>
-
-                      </div>
+                      <p>
+                        Tronco máx.:{" "}
+                        {repeticion.inclinacionTroncoMaxima !==
+                        null
+                          ? Math.round(
+                              repeticion.inclinacionTroncoMaxima
+                            ) + "°"
+                          : "N/D"}
+                      </p>
 
                     </div>
-                  );
-                }
-              )}
 
-            </div>
+                  </div>
+                );
+              }
+            )}
 
-          )}
-
-        </section>
-
-          </>
+          </ResultadoSesion>
 
         )}
 
@@ -3789,196 +3551,90 @@ function PressHombroCameraPreview(
           estadoSesion ===
           "finalizado") && (
 
-          <>
+          <ResultadoSesion
+            finalizado={
+              estadoSesion ===
+              "finalizado"
+            }
+            total={resumen.total}
+            correctas={resumen.correctas}
+            porcentajeCorrectas={
+              resumen.porcentajeCorrectas
+            }
+            metricas={[
+              {
+                etiqueta: "Descompensadas",
+                valor: resumen.descompensadas
+              }
+            ]}
+            errorPrincipal={
+              resumen.total === 0
+                ? "Sin datos"
+                : resumen.descompensadas > 0
+                  ? "Descompensación entre brazos"
+                  : "Ninguno destacado"
+            }
+            hayHistorial={
+              historial.length > 0
+            }
+          >
 
-{/* ==========================================
-            RESUMEN
-            ========================================== */}
+            {historial.map(
+              function (
+                repeticion
+              ) {
+                return (
+                  <div
+                    key={repeticion.numero}
+                    className="analysis-history-item"
+                  >
 
-        <section className="analysis-section">
-
-          <span className="analysis-section-label">
-            Sesión
-          </span>
-
-
-          <h2>
-            Resumen
-          </h2>
-
-
-          <div className="analysis-summary-grid">
-
-            <div className="analysis-summary-item">
-
-              <span>
-                Analizadas
-              </span>
-
-
-              <strong>
-                {resumen.total}
-              </strong>
-
-            </div>
-
-
-            <div className="analysis-summary-item">
-
-              <span>
-                Correctas
-              </span>
-
-
-              <strong>
-                {resumen.correctas}
-              </strong>
-
-            </div>
+                    <span className="analysis-history-number">
+                      Rep {repeticion.numero}
+                    </span>
 
 
-            <div className="analysis-summary-item">
+                    <div>
 
-              <span>
-                Técnica correcta
-              </span>
-
-
-              <strong>
-                {Math.round(
-                  resumen
-                    .porcentajeCorrectas
-                )}
-                %
-              </strong>
-
-            </div>
+                      <strong>
+                        {repeticion.resultado}
+                      </strong>
 
 
-            <div className="analysis-summary-item">
-
-              <span>
-                Descompensadas
-              </span>
-
-
-              <strong>
-                {
-                  resumen
-                    .descompensadas
-                }
-              </strong>
-
-            </div>
-
-          </div>
-
-        </section>
+                      <p>
+                        Diferencia media:{" "}
+                        {Math.round(
+                          repeticion.diferenciaMedia
+                        )}
+                        °
+                      </p>
 
 
-        {/* ==========================================
-            HISTORIAL
-            ========================================== */}
-
-        <section className="analysis-section">
-
-          <span className="analysis-section-label">
-            Detalle
-          </span>
+                      <p>
+                        Diferencia máxima:{" "}
+                        {Math.round(
+                          repeticion.diferenciaMaxima
+                        )}
+                        °
+                      </p>
 
 
-          <h2>
-            Historial
-          </h2>
-
-
-          {historial.length ===
-          0 ? (
-
-            <p className="analysis-empty-message">
-              Completa una repetición para
-              empezar a generar el historial.
-            </p>
-
-          ) : (
-
-            <div className="analysis-history">
-
-              {historial.map(
-                function (
-                  repeticion
-                ) {
-                  return (
-                    <div
-                      key={
-                        repeticion.numero
-                      }
-
-                      className="analysis-history-item"
-                    >
-
-                      <span className="analysis-history-number">
-
-                        Rep{" "}
-                        {
-                          repeticion.numero
-                        }
-
-                      </span>
-
-
-                      <div>
-
-                        <strong>
-                          {
-                            repeticion.resultado
-                          }
-                        </strong>
-
-
-                        <p>
-                          Diferencia media:{" "}
-                          {Math.round(
-                            repeticion
-                              .diferenciaMedia
-                          )}
-                          °
-                        </p>
-
-
-                        <p>
-                          Diferencia máxima:{" "}
-                          {Math.round(
-                            repeticion
-                              .diferenciaMaxima
-                          )}
-                          °
-                        </p>
-
-
-                        <p>
-                          Descompensado:{" "}
-                          {Math.round(
-                            repeticion
-                              .porcentajeDescompensado
-                          )}
-                          %
-                        </p>
-
-                      </div>
+                      <p>
+                        Descompensado:{" "}
+                        {Math.round(
+                          repeticion.porcentajeDescompensado
+                        )}
+                        %
+                      </p>
 
                     </div>
-                  );
-                }
-              )}
 
-            </div>
+                  </div>
+                );
+              }
+            )}
 
-          )}
-
-        </section>
-
-          </>
+          </ResultadoSesion>
 
         )}
 
