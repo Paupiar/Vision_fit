@@ -1,5 +1,6 @@
 // Importamos los hooks necesarios de React.
 import {
+  useCallback,
   useEffect,
   useRef,
   useState
@@ -107,6 +108,10 @@ import type {
 // Resultado común de cámara y vídeo.
 import ResultadoSesion from "./ResultadoSesion";
 
+// Hook común para medir FPS, latencia
+// y número de frames analizados.
+import useMetricasRendimiento from "./useMetricasRendimiento";
+
 
 // ==================================================
 // PROPS COMUNES DE VÍDEO
@@ -128,6 +133,10 @@ interface VideoComunProps {
 interface CurlVideoPreviewProps
   extends VideoComunProps {
   lado: Lado;
+
+  // Controla si la herramienta temporal
+  // de rendimiento debe mostrarse.
+  mostrarMetricasRendimiento: boolean;
 }
 
 
@@ -241,6 +250,38 @@ function CurlVideoPreview(
     useRef<boolean>(
       false
     );
+
+
+  // ==================================================
+  // MÉTRICAS DE RENDIMIENTO
+  // ==================================================
+
+  // La medición queda centralizada en un hook.
+  // Conservamos los nombres utilizados por el Curl
+  // para no modificar su interfaz ni su análisis.
+  const {
+    fpsAnalisis:
+      fpsAnalisisVideo,
+
+    latenciaMedia:
+      latenciaMediaVideo,
+
+    framesAnalizados:
+      framesAnalizadosVideo,
+
+    registrarInferencia:
+      registrarMetricasRendimientoVideo,
+
+    publicarMetricas:
+      publicarMetricasRendimientoVideo,
+
+    cerrarVentanaFps:
+      cerrarVentanaFpsVideo,
+
+    reiniciarMetricas:
+      reiniciarMetricasRendimientoVideo
+  } =
+    useMetricasRendimiento();
 
 
   // ==================================================
@@ -421,6 +462,9 @@ function CurlVideoPreview(
     );
 
 
+    reiniciarMetricasRendimientoVideo();
+
+
     console.log(
       "Análisis del curl del vídeo reiniciado"
     );
@@ -431,19 +475,41 @@ function CurlVideoPreview(
   // DETENER ANÁLISIS
   // ==================================================
 
-  function detenerAnalisisVideo() {
-    if (
-      animationFrameVideoRef.current !==
-      null
-    ) {
-      cancelAnimationFrame(
-        animationFrameVideoRef.current
-      );
+  const detenerAnalisisVideo =
+    useCallback(
+      function detenerAnalisisVideo() {
+        if (
+          animationFrameVideoRef.current !==
+          null
+        ) {
+          cancelAnimationFrame(
+            animationFrameVideoRef.current
+          );
 
 
-      animationFrameVideoRef.current =
-        null;
-    }
+          animationFrameVideoRef.current =
+            null;
+        }
+
+
+        // Cerramos la ventana actual para que
+        // una pausa no reduzca artificialmente los FPS.
+        // Los acumulados de la sesión se conservan.
+        cerrarVentanaFpsVideo();
+      },
+      [
+        cerrarVentanaFpsVideo
+      ]
+    );
+
+
+  // Una pausa conserva la sesión y publica
+  // los acumulados obtenidos hasta ese instante.
+  function pausarAnalisisVideo() {
+    detenerAnalisisVideo();
+
+
+    publicarMetricasRendimientoVideo();
   }
 
 
@@ -481,7 +547,10 @@ function CurlVideoPreview(
         videoSubidoRef.current.pause();
       }
     },
-    [visible]
+    [
+      visible,
+      detenerAnalisisVideo
+    ]
   );
 
 
@@ -940,11 +1009,27 @@ function CurlVideoPreview(
       // MEDIAPIPE
       // ------------------------------------------------
 
+      // Medimos únicamente el tiempo empleado
+      // por la inferencia de MediaPipe.
+      const inicioInferencia =
+        performance.now();
+
+
       const resultado =
         poseLandmarker.detectForVideo(
           video,
           timestamp
         );
+
+
+      const finInferencia =
+        performance.now();
+
+
+      registrarMetricasRendimientoVideo(
+        inicioInferencia,
+        finInferencia
+      );
 
 
       // No detectamos ninguna persona.
@@ -1282,6 +1367,11 @@ function CurlVideoPreview(
     detenerAnalisisVideo();
 
 
+    // Publicamos los acumulados finales
+    // antes de conservar el resultado.
+    publicarMetricasRendimientoVideo();
+
+
     setAnalisisFinalizadoVideo(
       true
     );
@@ -1437,7 +1527,9 @@ function CurlVideoPreview(
         "VideoPreview detenido"
       );
     };
-  }, []);
+  }, [
+    detenerAnalisisVideo
+  ]);
 
 
   // ==================================================
@@ -1529,7 +1621,7 @@ function CurlVideoPreview(
               // Una pausa normal conserva
               // todos los resultados.
               onPause={
-                detenerAnalisisVideo
+                pausarAnalisisVideo
               }
 
               // Al terminar conservamos
@@ -1783,6 +1875,82 @@ function CurlVideoPreview(
           </section>
 
 
+          {/* ==========================================
+              MÉTRICAS DE RENDIMIENTO
+              ========================================== */}
+
+          {props.mostrarMetricasRendimiento ? (
+
+            <section className="analysis-section">
+
+              <div className="analysis-section-header">
+
+                <div>
+
+                  <span className="analysis-section-label">
+                    Rendimiento
+                  </span>
+
+
+                  <h2>
+                    Métricas técnicas
+                  </h2>
+
+                </div>
+
+              </div>
+
+
+              <div className="analysis-metrics-grid">
+
+                <div className="analysis-metric">
+
+                  <span>
+                    FPS de análisis
+                  </span>
+
+
+                  <strong>
+                    {fpsAnalisisVideo.toFixed(1)}
+                  </strong>
+
+                </div>
+
+
+                <div className="analysis-metric">
+
+                  <span>
+                    Latencia MediaPipe
+                  </span>
+
+
+                  <strong>
+                    {latenciaMediaVideo.toFixed(1)} ms
+                  </strong>
+
+                </div>
+
+
+                <div className="analysis-metric">
+
+                  <span>
+                    Frames analizados
+                  </span>
+
+
+                  <strong>
+                    {framesAnalizadosVideo}
+                  </strong>
+
+                </div>
+
+              </div>
+
+            </section>
+
+          ) : null}
+
+
           <ResultadoSesion
             finalizado={analisisFinalizadoVideo}
             total={resumenVideo.total}
@@ -1853,6 +2021,10 @@ function CurlVideoPreview(
 interface SentadillaVideoPreviewProps
   extends VideoComunProps {
   lado: Lado;
+
+  // Controla si la herramienta temporal
+  // de rendimiento debe mostrarse.
+  mostrarMetricasRendimiento: boolean;
 }
 
 
@@ -1921,6 +2093,24 @@ function SentadillaVideoPreviewIntegrado(
     useRef<boolean>(
       false
     );
+
+
+  // ==================================================
+  // MÉTRICAS DE RENDIMIENTO
+  // ==================================================
+
+  // Cada ejercicio utiliza su propia instancia
+  // para no mezclar los datos entre sesiones.
+  const {
+    fpsAnalisis,
+    latenciaMedia,
+    framesAnalizados,
+    registrarInferencia,
+    publicarMetricas,
+    cerrarVentanaFps,
+    reiniciarMetricas
+  } =
+    useMetricasRendimiento();
 
 
   // ==================================================
@@ -2025,20 +2215,31 @@ function SentadillaVideoPreviewIntegrado(
   // DETENER ANÁLISIS
   // ==================================================
 
-  function detenerAnalisisVideo() {
-    if (
-      animationFrameRef.current !==
-      null
-    ) {
-      cancelAnimationFrame(
-        animationFrameRef.current
-      );
+  const detenerAnalisisVideo =
+    useCallback(
+      function detenerAnalisisVideo() {
+        if (
+          animationFrameRef.current !==
+          null
+        ) {
+          cancelAnimationFrame(
+            animationFrameRef.current
+          );
 
 
-      animationFrameRef.current =
-        null;
-    }
-  }
+          animationFrameRef.current =
+            null;
+        }
+
+
+        // Una pausa no debe reducir artificialmente
+        // los FPS de la siguiente ventana.
+        cerrarVentanaFps();
+      },
+      [
+        cerrarVentanaFps
+      ]
+    );
 
 
   // ==================================================
@@ -2100,6 +2301,9 @@ function SentadillaVideoPreviewIntegrado(
     setAnalisisFinalizado(
       false
     );
+
+
+    reiniciarMetricas();
   }
 
 
@@ -2126,7 +2330,8 @@ function SentadillaVideoPreviewIntegrado(
 
     },
     [
-      props.visible
+      props.visible,
+      detenerAnalisisVideo
     ]
   );
 
@@ -2154,7 +2359,8 @@ function SentadillaVideoPreviewIntegrado(
       }
     };
   }, [
-    props.visible
+    props.visible,
+    detenerAnalisisVideo
   ]);
 
 
@@ -2379,11 +2585,26 @@ function SentadillaVideoPreviewIntegrado(
       // MEDIAPIPE
       // ------------------------------------------
 
+      // Medimos únicamente el tiempo empleado
+      // por la inferencia de MediaPipe.
+      const inicioInferencia =
+        performance.now();
+
       const resultado =
         poseLandmarker.detectForVideo(
           video,
           timestamp
         );
+
+
+      const finInferencia =
+        performance.now();
+
+
+      registrarInferencia(
+        inicioInferencia,
+        finInferencia
+      );
 
 
       if (
@@ -2709,6 +2930,80 @@ function SentadillaVideoPreviewIntegrado(
 
   function pausarAnalisisVideo() {
     detenerAnalisisVideo();
+
+
+    // Mostramos los acumulados obtenidos
+    // hasta el instante de la pausa.
+    publicarMetricas();
+  }
+
+
+  // ==================================================
+  // SALTO MANUAL EN EL VÍDEO
+  // ==================================================
+
+  function manejarSeekSentadilla() {
+    const video =
+      videoRef.current;
+
+
+    if (
+      !video
+    ) {
+      return;
+    }
+
+
+    // Saltar a otro instante rompe la continuidad
+    // necesaria para contar una repetición completa.
+    detenerAnalisisVideo();
+
+
+    reiniciarAnalisisSentadilla();
+
+
+    // El reinicio ya se ha realizado por el seek.
+    reiniciarAlReproducirRef.current =
+      false;
+
+
+    // Eliminamos del canvas los landmarks
+    // correspondientes al instante anterior.
+    const canvas =
+      canvasRef.current;
+
+
+    if (
+      canvas
+    ) {
+      const contexto =
+        canvas.getContext(
+          "2d"
+        );
+
+
+      contexto?.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+    }
+
+
+    // Si el vídeo seguía reproduciéndose,
+    // continuamos desde la nueva posición.
+    if (
+      !video.paused &&
+      !video.ended
+    ) {
+      iniciarAnalisisVideo();
+    }
+
+
+    console.log(
+      "Salto temporal en Sentadilla. Sesión reiniciada."
+    );
   }
 
 
@@ -2718,6 +3013,11 @@ function SentadillaVideoPreviewIntegrado(
 
   function videoTerminado() {
     detenerAnalisisVideo();
+
+
+    // Conservamos también las métricas finales
+    // de esta reproducción.
+    publicarMetricas();
 
 
     setAnalisisFinalizado(
@@ -2810,6 +3110,14 @@ function SentadillaVideoPreviewIntegrado(
 
             onPause={
               pausarAnalisisVideo
+            }
+
+            onSeeking={
+              detenerAnalisisVideo
+            }
+
+            onSeeked={
+              manejarSeekSentadilla
             }
 
             onEnded={
@@ -3027,6 +3335,82 @@ function SentadillaVideoPreviewIntegrado(
         </section>
 
 
+        {/* ==========================================
+            MÉTRICAS DE RENDIMIENTO
+            ========================================== */}
+
+        {props.mostrarMetricasRendimiento ? (
+
+          <section className="analysis-section">
+
+            <div className="analysis-section-header">
+
+              <div>
+
+                <span className="analysis-section-label">
+                  Rendimiento
+                </span>
+
+
+                <h2>
+                  Métricas técnicas
+                </h2>
+
+              </div>
+
+            </div>
+
+
+            <div className="analysis-metrics-grid">
+
+              <div className="analysis-metric">
+
+                <span>
+                  FPS de análisis
+                </span>
+
+
+                <strong>
+                  {fpsAnalisis.toFixed(1)}
+                </strong>
+
+              </div>
+
+
+              <div className="analysis-metric">
+
+                <span>
+                  Latencia MediaPipe
+                </span>
+
+
+                <strong>
+                  {latenciaMedia.toFixed(1)} ms
+                </strong>
+
+              </div>
+
+
+              <div className="analysis-metric">
+
+                <span>
+                  Frames analizados
+                </span>
+
+
+                <strong>
+                  {framesAnalizados}
+                </strong>
+
+              </div>
+
+            </div>
+
+          </section>
+
+        ) : null}
+
+
         <ResultadoSesion
           finalizado={analisisFinalizado}
           total={resumen.total}
@@ -3117,8 +3501,16 @@ function SentadillaVideoPreviewIntegrado(
 // VÍDEO DEL PRESS DE HOMBRO
 // ==================================================
 
+interface PressHombroVideoPreviewProps
+  extends VideoComunProps {
+  // Controla si la herramienta temporal
+  // de rendimiento debe mostrarse.
+  mostrarMetricasRendimiento: boolean;
+}
+
+
 function PressHombroVideoPreviewIntegrado(
-  props: VideoComunProps
+  props: PressHombroVideoPreviewProps
 ) {
   // ==================================================
   // REFERENCIAS
@@ -3176,6 +3568,25 @@ function PressHombroVideoPreviewIntegrado(
     useRef<boolean>(
       false
     );
+
+
+  // ==================================================
+  // MÉTRICAS DE RENDIMIENTO
+  // ==================================================
+
+  // El Press utiliza una instancia independiente
+  // para no mezclar sus datos con los de Curl
+  // o Sentadilla.
+  const {
+    fpsAnalisis,
+    latenciaMedia,
+    framesAnalizados,
+    registrarInferencia,
+    publicarMetricas,
+    cerrarVentanaFps,
+    reiniciarMetricas
+  } =
+    useMetricasRendimiento();
 
 
   // ==================================================
@@ -3289,20 +3700,31 @@ function PressHombroVideoPreviewIntegrado(
   // DETENER ANÁLISIS
   // ==================================================
 
-  function detenerAnalisisVideo() {
-    if (
-      animationFrameRef.current !==
-      null
-    ) {
-      cancelAnimationFrame(
-        animationFrameRef.current
-      );
+  const detenerAnalisisVideo =
+    useCallback(
+      function detenerAnalisisVideo() {
+        if (
+          animationFrameRef.current !==
+          null
+        ) {
+          cancelAnimationFrame(
+            animationFrameRef.current
+          );
 
 
-      animationFrameRef.current =
-        null;
-    }
-  }
+          animationFrameRef.current =
+            null;
+        }
+
+
+        // Una pausa no debe reducir artificialmente
+        // los FPS de la siguiente ventana.
+        cerrarVentanaFps();
+      },
+      [
+        cerrarVentanaFps
+      ]
+    );
 
 
   // ==================================================
@@ -3370,6 +3792,11 @@ function PressHombroVideoPreviewIntegrado(
     setAnalisisFinalizado(
       false
     );
+
+
+    // Las métricas pertenecen únicamente
+    // a la reproducción actual.
+    reiniciarMetricas();
   }
 
 
@@ -3397,7 +3824,8 @@ function PressHombroVideoPreviewIntegrado(
 
     },
     [
-      props.visible
+      props.visible,
+      detenerAnalisisVideo
     ]
   );
 
@@ -3425,7 +3853,8 @@ function PressHombroVideoPreviewIntegrado(
       }
     };
   }, [
-    props.visible
+    props.visible,
+    detenerAnalisisVideo
   ]);
 
 
@@ -3635,11 +4064,27 @@ function PressHombroVideoPreviewIntegrado(
       // MEDIAPIPE
       // ------------------------------------------
 
+      // Medimos únicamente el tiempo empleado
+      // por la inferencia de MediaPipe.
+      const inicioInferencia =
+        performance.now();
+
+
       const resultado =
         poseLandmarker.detectForVideo(
           video,
           timestamp
         );
+
+
+      const finInferencia =
+        performance.now();
+
+
+      registrarInferencia(
+        inicioInferencia,
+        finInferencia
+      );
 
 
       if (
@@ -4006,6 +4451,82 @@ function PressHombroVideoPreviewIntegrado(
 
   function pausarAnalisisVideo() {
     detenerAnalisisVideo();
+
+
+    // Publicamos los acumulados obtenidos
+    // hasta el instante de la pausa.
+    publicarMetricas();
+  }
+
+
+  // ==================================================
+  // SALTO MANUAL EN EL VÍDEO
+  // ==================================================
+
+  function manejarSeekVideo() {
+    const video =
+      videoRef.current;
+
+
+    if (
+      !video
+    ) {
+      return;
+    }
+
+
+    // Saltar a otro instante rompe la continuidad
+    // necesaria para contar una repetición completa.
+    detenerAnalisisVideo();
+
+
+    reiniciarAnalisisPress();
+
+
+    // Este reinicio ya se ha realizado por el seek,
+    // por lo que no debe repetirse al pulsar reproducir.
+    reiniciarAlReproducirRef.current =
+      false;
+
+
+    // Eliminamos del canvas los landmarks
+    // correspondientes al instante anterior.
+    const canvas =
+      canvasRef.current;
+
+
+    if (
+      canvas
+    ) {
+      const contexto =
+        canvas.getContext(
+          "2d"
+        );
+
+
+      contexto?.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+    }
+
+
+    // Si el usuario movió la barra mientras
+    // el vídeo seguía reproduciéndose,
+    // iniciamos una sesión desde la nueva posición.
+    if (
+      !video.paused &&
+      !video.ended
+    ) {
+      iniciarAnalisisVideo();
+    }
+
+
+    console.log(
+      "Salto temporal en Press. Sesión reiniciada."
+    );
   }
 
 
@@ -4015,6 +4536,11 @@ function PressHombroVideoPreviewIntegrado(
 
   function videoTerminado() {
     detenerAnalisisVideo();
+
+
+    // Conservamos las métricas finales
+    // de esta reproducción.
+    publicarMetricas();
 
 
     setAnalisisFinalizado(
@@ -4107,6 +4633,14 @@ function PressHombroVideoPreviewIntegrado(
 
             onPause={
               pausarAnalisisVideo
+            }
+
+            onSeeking={
+              detenerAnalisisVideo
+            }
+
+            onSeeked={
+              manejarSeekVideo
             }
 
             onEnded={
@@ -4330,6 +4864,82 @@ function PressHombroVideoPreviewIntegrado(
         </section>
 
 
+        {/* ==========================================
+            MÉTRICAS DE RENDIMIENTO
+            ========================================== */}
+
+        {props.mostrarMetricasRendimiento ? (
+
+          <section className="analysis-section">
+
+            <div className="analysis-section-header">
+
+              <div>
+
+                <span className="analysis-section-label">
+                  Rendimiento
+                </span>
+
+
+                <h2>
+                  Métricas técnicas
+                </h2>
+
+              </div>
+
+            </div>
+
+
+            <div className="analysis-metrics-grid">
+
+              <div className="analysis-metric">
+
+                <span>
+                  FPS de análisis
+                </span>
+
+
+                <strong>
+                  {fpsAnalisis.toFixed(1)}
+                </strong>
+
+              </div>
+
+
+              <div className="analysis-metric">
+
+                <span>
+                  Latencia MediaPipe
+                </span>
+
+
+                <strong>
+                  {latenciaMedia.toFixed(1)} ms
+                </strong>
+
+              </div>
+
+
+              <div className="analysis-metric">
+
+                <span>
+                  Frames analizados
+                </span>
+
+
+                <strong>
+                  {framesAnalizados}
+                </strong>
+
+              </div>
+
+            </div>
+
+          </section>
+
+        ) : null}
+
+
         <ResultadoSesion
           finalizado={analisisFinalizado}
           total={resumen.total}
@@ -4420,6 +5030,10 @@ interface VideoPreviewProps
   extends VideoComunProps {
   ejercicio: EjercicioId;
 
+  // App controla si el panel temporal
+  // de rendimiento está abierto o cerrado.
+  mostrarMetricasRendimiento: boolean;
+
   // Temporalmente es opcional.
   // Mientras App.tsx todavía no tenga
   // selector visual, utilizamos
@@ -4478,6 +5092,10 @@ function VideoPreview(
         lado={
           lado
         }
+
+        mostrarMetricasRendimiento={
+          props.mostrarMetricasRendimiento
+        }
       />
     );
   }
@@ -4508,6 +5126,10 @@ function VideoPreview(
         lado={
           lado
         }
+
+        mostrarMetricasRendimiento={
+          props.mostrarMetricasRendimiento
+        }
       />
     );
   }
@@ -4529,6 +5151,10 @@ function VideoPreview(
 
       visible={
         props.visible
+      }
+
+      mostrarMetricasRendimiento={
+        props.mostrarMetricasRendimiento
       }
     />
   );

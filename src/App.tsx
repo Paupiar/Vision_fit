@@ -48,6 +48,21 @@ import type {
 } from "./ejercicios/landmarks";
 
 
+// ==================================================
+// HERRAMIENTAS TEMPORALES DE PRUEBA
+// ==================================================
+//
+// Cuando terminemos las pruebas de rendimiento,
+// cambiaremos este valor a false.
+//
+// El botón y el panel dejarán de mostrarse,
+// pero todo el código seguirá disponible.
+// ==================================================
+
+const MOSTRAR_BOTON_METRICAS_RENDIMIENTO =
+  false;
+
+
 function App() {
   // ==================================================
   // EJERCICIO
@@ -103,6 +118,22 @@ function App() {
   ] =
     useState<number>(
       0
+    );
+
+
+  // ==================================================
+  // MÉTRICAS DE RENDIMIENTO
+  // ==================================================
+
+  // El panel está oculto al abrir la aplicación.
+  // El usuario puede mostrarlo desde el botón
+  // situado junto a Reiniciar análisis.
+  const [
+    mostrarMetricasRendimiento,
+    setMostrarMetricasRendimiento
+  ] =
+    useState<boolean>(
+      false
     );
 
 
@@ -166,6 +197,31 @@ function App() {
       null;
 
 
+  // Las métricas ya están conectadas
+  // a los vídeos de los tres ejercicios.
+  const ejercicioConMetricas =
+    ejercicioSeleccionado ===
+      "curl" ||
+    ejercicioSeleccionado ===
+      "sentadilla" ||
+    ejercicioSeleccionado ===
+      "press-hombro";
+
+
+  // El botón solo aparece cuando:
+  //
+  // - la herramienta temporal está activada;
+  // - el ejercicio tiene métricas;
+  // - existe un vídeo cargado;
+  // - la cámara no está activa.
+  const mostrarBotonMetricas =
+    MOSTRAR_BOTON_METRICAS_RENDIMIENTO &&
+    ejercicioConMetricas &&
+    urlVideo !==
+      null &&
+    !mostrarCamara;
+
+
   // ==================================================
   // LIMPIAR VÍDEO
   // ==================================================
@@ -194,6 +250,13 @@ function App() {
 
     setNombreVideo(
       ""
+    );
+
+
+    // Cada vídeo nuevo comienza con
+    // el panel de pruebas oculto.
+    setMostrarMetricasRendimiento(
+      false
     );
 
 
@@ -354,6 +417,23 @@ function App() {
 
 
   // ==================================================
+  // MOSTRAR / OCULTAR MÉTRICAS
+  // ==================================================
+
+  function alternarMetricasRendimiento() {
+    setMostrarMetricasRendimiento(
+      function (
+        valorAnterior
+      ) {
+        return (
+          !valorAnterior
+        );
+      }
+    );
+  }
+
+
+  // ==================================================
   // ENCENDER / APAGAR CÁMARA
   // ==================================================
 
@@ -464,6 +544,13 @@ function App() {
 
     setNombreVideo(
       archivo.name
+    );
+
+
+    // Un vídeo recién seleccionado empieza
+    // con las métricas ocultas.
+    setMostrarMetricasRendimiento(
+      false
     );
 
 
@@ -734,6 +821,31 @@ function App() {
 
               ) : null}
 
+
+              {/* ======================================
+                  MÉTRICAS DE PRUEBA
+                  ====================================== */}
+
+              {mostrarBotonMetricas ? (
+
+                <button
+                  type="button"
+
+                  onClick={
+                    alternarMetricasRendimiento
+                  }
+
+                  aria-pressed={
+                    mostrarMetricasRendimiento
+                  }
+                >
+                  {mostrarMetricasRendimiento
+                    ? "Ocultar métricas"
+                    : "Mostrar métricas"}
+                </button>
+
+              ) : null}
+
             </div>
 
           </section>
@@ -853,6 +965,11 @@ function App() {
 
           visible={
             !mostrarCamara
+          }
+
+          mostrarMetricasRendimiento={
+            MOSTRAR_BOTON_METRICAS_RENDIMIENTO &&
+            mostrarMetricasRendimiento
           }
         />
 

@@ -639,8 +639,8 @@ export function analizarFrameCurl(
   // ANÁLISIS DEL CODO
   // --------------------------------------------------
 
-  let feedbackCodo =
-    "Codo estable";
+  let feedbackCodo:
+    string;
 
 
   let desplazamientoCodo:
@@ -733,8 +733,8 @@ export function analizarFrameCurl(
   // ANÁLISIS DEL TRONCO
   // --------------------------------------------------
 
-  let feedbackHombro =
-    "Tronco estable";
+  let feedbackHombro:
+    string;
 
 
   let desplazamientoHombro:
