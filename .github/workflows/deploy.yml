@@ -1,0 +1,68 @@
+# Nombre del proceso que aparecerá en GitHub Actions.
+name: Desplegar Visión Fit
+
+# Ejecuta el despliegue cada vez que se haga push sobre main.
+on:
+  push:
+    branches:
+      - main
+
+  # Permite iniciar el despliegue manualmente.
+  workflow_dispatch:
+
+# Permisos necesarios para publicar en GitHub Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Evita que se acumulen despliegues antiguos.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  desplegar:
+
+    # GitHub utilizará una máquina virtual con Ubuntu.
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+
+    steps:
+
+      # Descarga el código del repositorio.
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      # Configura Node.js.
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Instala las dependencias del proyecto.
+      - name: Instalar dependencias
+        run: npm ci
+
+      # Genera la carpeta dist.
+      - name: Construir aplicación
+        run: npm run build
+
+      # Configura GitHub Pages.
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      # Sube la carpeta dist para publicarla.
+      - name: Subir aplicación
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+      # Publica la aplicación.
+      - name: Desplegar aplicación
+        id: despliegue
+        uses: actions/deploy-pages@v4
