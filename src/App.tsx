@@ -138,6 +138,16 @@ function obtenerDescripcionEjercicio(
 
 function App() {
 
+  // Tutorial que está abierto. Ambos usan el mismo vídeo de prueba por ahora.
+
+  const [
+
+    tutorialAbierto,
+
+    setTutorialAbierto
+
+  ] = useState<"ordenador" | "movil" | null>(null);
+
   // ==================================================
 
   // EJERCICIO
@@ -1022,6 +1032,72 @@ function App() {
 
         </div>
 
+        {/* Los tutoriales están siempre visibles, antes de elegir un ejercicio. */}
+
+        <section className="exercise-selector tutorial-selector" aria-labelledby="tutoriales-heading">
+
+          <div className="selector-heading">
+
+            <div>
+
+              <h2 id="tutoriales-heading">Tutoriales de uso</h2>
+
+              <p>Aprende a usar Visión Fit en tu ordenador o móvil.</p>
+
+            </div>
+
+          </div>
+
+          <div className="tutorial-actions">
+
+            <button
+
+              type="button"
+
+              className="tutorial-button"
+
+              aria-haspopup="dialog"
+
+              onClick={function () {
+
+                setTutorialAbierto("ordenador");
+
+              }}
+
+            >
+
+              <span className="tutorial-button-icon" aria-hidden="true">▷</span>
+
+              Tutorial para ordenador
+
+            </button>
+
+            <button
+
+              type="button"
+
+              className="tutorial-button"
+
+              aria-haspopup="dialog"
+
+              onClick={function () {
+
+                setTutorialAbierto("movil");
+
+              }}
+
+            >
+
+              <span className="tutorial-button-icon" aria-hidden="true">▷</span>
+
+              Tutorial para móvil
+
+            </button>
+
+          </div>
+
+        </section>
+
         {/* ============================================
 
             SELECTOR DE EJERCICIO
@@ -1673,6 +1749,80 @@ function App() {
         </div>
 
       </div>
+
+      {tutorialAbierto !== null ? (
+
+        <div className="tutorial-overlay">
+
+          <div
+
+            className="tutorial-modal"
+
+            role="dialog"
+
+            aria-modal="true"
+
+            aria-labelledby="tutorial-title"
+
+          >
+
+            <div className="tutorial-modal-header">
+
+              <h2 id="tutorial-title">
+
+                Tutorial para {tutorialAbierto === "ordenador" ? "ordenador" : "móvil"}
+
+              </h2>
+
+              <button
+
+                type="button"
+
+                className="tutorial-close"
+
+                aria-label="Cerrar tutorial"
+
+                onClick={function () {
+
+                  setTutorialAbierto(null);
+
+                }}
+
+              >
+
+                ×
+
+              </button>
+
+            </div>
+
+            <video
+
+              className="tutorial-video"
+
+              controls
+
+              autoPlay
+
+              playsInline
+
+              src={
+                import.meta.env.BASE_URL +
+                "tutoriales/" +
+                (tutorialAbierto === "ordenador" ? "TO.mp4" : "TM.mp4")
+              }
+
+            >
+
+              Tu navegador no puede reproducir este vídeo.
+
+            </video>
+
+          </div>
+
+        </div>
+
+      ) : null}
 
     </main>
 
