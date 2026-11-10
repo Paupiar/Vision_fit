@@ -1,5 +1,5 @@
 import { PARAMETROS_SENTADILLA as P } from './parametros';
-import { angulo, depurarIntento, puntoValido } from './registro';
+import { angulo, depurarIntento, distancia, errorPrincipal, puntoValido } from './registro';
 import type { RegistroIntento } from './registro';
 
 // --------------------------------------------------
@@ -132,14 +132,8 @@ export interface ResultadoRepeticionSentadilla extends RegistroIntento {
   // de inclinación del tronco.
   errorTronco: boolean;
 
-  // Texto final
-  // de clasificación.
-  resultado:
-    "Sin errores observados; tronco no evaluado" |
-    "Correcta" |
-    "Profundidad insuficiente" |
-    "Exceso de inclinación del tronco" |
-    "Profundidad insuficiente + exceso de inclinación del tronco";
+  errorTalon: boolean;
+  resultado: string;
 }
 
 
@@ -151,6 +145,11 @@ export interface EstadoSentadilla {
   ultimoMensaje: string;
   preparado: boolean;
   troncoNoEvaluado: boolean;
+  anguloPieDePie: number | null;
+  elevacionTalonMaxima: number | null;
+  framesTalonElevado: number;
+  errorTalon: boolean;
+  pieNoEvaluado: boolean;
   // Fase actual.
   fase: FaseSentadilla;
 
@@ -210,6 +209,7 @@ export interface ResultadoSentadilla {
   // Feedback técnico
   // del tronco en tiempo real.
   feedbackTronco: string;
+  feedbackPie: string;
 
   // Historial completo.
   historial:
@@ -240,6 +240,8 @@ export interface ResumenSesionSentadilla {
   // Número de repeticiones
   // con demasiado tronco hacia delante.
   excesoInclinacionTronco: number;
+  talonElevado: number;
+  errorMasFrecuente: string;
 }
 
 
@@ -253,6 +255,11 @@ export function crearEstadoSentadilla():
     ultimoMensaje: '',
     preparado: false,
     troncoNoEvaluado: false,
+    anguloPieDePie: null,
+    elevacionTalonMaxima: null,
+    framesTalonElevado: 0,
+    errorTalon: false,
+    pieNoEvaluado: false,
     fase:
       "arriba",
 
@@ -460,46 +467,28 @@ export function obtenerFeedbackTronco(
 // Separamos la clasificación
 // del resto del análisis para
 // mantener el código más claro.
-export function clasificarRepeticionSentadilla(
-  errorProfundidad: boolean,
-  errorTronco: boolean
-):
-  ResultadoRepeticionSentadilla["resultado"] {
-  // Dos errores.
-  if (
-    errorProfundidad &&
-    errorTronco
-  ) {
-    return (
-      "Profundidad insuficiente + exceso de inclinación del tronco"
-    );
-  }
+const FALLO_TALON = 'Talón levantado';
+const FALLO_PROFUNDIDAD = 'Profundidad insuficiente';
+const FALLO_TRONCO = 'Exceso de inclinación del tronco';
 
+export function calcularAnguloPie(
+  talon: PuntoSentadilla | null,
+  punta: PuntoSentadilla | null,
+  rodilla: PuntoSentadilla,
+  tobillo: PuntoSentadilla
+): number | null {
+  if (!puntoValido(talon) || !puntoValido(punta)) return null;
+  const ancho = Math.abs(punta.x - talon.x);
+  // Un pie muy escorzado no da una medida lateral fiable.
+  if (ancho <= P.pie.longitudMinimaRespectoTibia * distancia(rodilla, tobillo)) return null;
+  return Math.atan2(punta.y - talon.y, ancho) * 180 / Math.PI;
+}
 
-  // Solo profundidad.
-  if (
-    errorProfundidad
-  ) {
-    return (
-      "Profundidad insuficiente"
-    );
-  }
-
-
-  // Solo tronco.
-  if (
-    errorTronco
-  ) {
-    return (
-      "Exceso de inclinación del tronco"
-    );
-  }
-
-
-  // Ningún error.
-  return (
-    "Correcta"
-  );
+function reiniciarMedicionTalon(estado: EstadoSentadilla) {
+  estado.elevacionTalonMaxima = null;
+  estado.framesTalonElevado = 0;
+  estado.errorTalon = false;
+  estado.pieNoEvaluado = false;
 }
 
 
@@ -512,7 +501,8 @@ export function analizarSentadilla(
   hombro: PuntoSentadilla | null,
   cadera: PuntoSentadilla,
   rodilla: PuntoSentadilla,
-  tobillo: PuntoSentadilla
+  tobillo: PuntoSentadilla,
+  anguloPie: number | null = null
 ): ResultadoSentadilla {
   // ------------------------------------------------
   // ÁNGULO DE RODILLA
@@ -554,9 +544,16 @@ export function analizarSentadilla(
     interrumpirSentadilla(estado);
     return { anguloRodilla, inclinacionTronco: null, fase: estado.fase, repeticiones: estado.repeticiones,
       cambioFase: false, repeticionSumada: false, feedbackMovimiento: 'Recupera la pierna y ponte de pie',
-      feedbackTronco: 'No evaluable', historial: estado.historial };
+      feedbackTronco: 'No evaluable', feedbackPie: 'No evaluable', historial: estado.historial };
   }
   if (anguloRodilla >= P.arriba) estado.preparado = true;
+  if (estado.fase === 'arriba' && anguloRodilla >= P.arriba && Number.isFinite(anguloPie)) {
+    estado.anguloPieDePie ??= anguloPie;
+  }
+  const elevacionTalon = anguloPie !== null && Number.isFinite(anguloPie) && estado.anguloPieDePie !== null
+    ? anguloPie - estado.anguloPieDePie
+    : null;
+  let avisoTalon = false;
   if (inclinacionTronco !== null && !Number.isFinite(inclinacionTronco)) inclinacionTronco = null;
   let cambioFase = false;
 
@@ -578,6 +575,7 @@ export function analizarSentadilla(
   ) {
     estado.ultimoMensaje = '';
     estado.troncoNoEvaluado = inclinacionTronco === null;
+    reiniciarMedicionTalon(estado);
     estado.fase =
       "abajo";
 
@@ -615,6 +613,15 @@ export function analizarSentadilla(
     "abajo"
   ) {
     estado.troncoNoEvaluado ||= inclinacionTronco === null;
+    estado.pieNoEvaluado ||= elevacionTalon === null;
+    if (elevacionTalon !== null) {
+      estado.elevacionTalonMaxima = Math.max(estado.elevacionTalonMaxima ?? 0, elevacionTalon);
+    }
+    estado.framesTalonElevado = elevacionTalon !== null && elevacionTalon >= P.pie.elevacionMinima
+      ? estado.framesTalonElevado + 1
+      : 0;
+    avisoTalon = estado.framesTalonElevado >= P.pie.framesConsecutivos;
+    estado.errorTalon ||= avisoTalon;
     // ----------------------------------------------
     // ÁNGULO MÍNIMO
     // ----------------------------------------------
@@ -713,11 +720,15 @@ export function analizarSentadilla(
       // CLASIFICACIÓN
       // --------------------------------------------
 
-      const resultado =
-        clasificarRepeticionSentadilla(
-          errorProfundidad,
-          errorTronco
-        );
+      const errores = [
+        errorProfundidad ? FALLO_PROFUNDIDAD : '',
+        errorTronco ? FALLO_TRONCO : '',
+        estado.errorTalon ? FALLO_TALON : '',
+      ].filter(Boolean);
+      const noEvaluados = [
+        estado.troncoNoEvaluado ? 'Tronco sin seguimiento suficiente' : '',
+        estado.pieNoEvaluado ? 'Talón sin referencia de pie o seguimiento suficiente' : '',
+      ].filter(Boolean);
 
 
       // --------------------------------------------
@@ -728,10 +739,12 @@ export function analizarSentadilla(
         ResultadoRepeticionSentadilla = {
         ejercicio: 'sentadilla', intento: estado.repeticiones,
         numeroRepeticion: estado.repeticiones, recorridoCompleto: !errorProfundidad,
-        evaluacionCompleta: !estado.troncoNoEvaluado,
-        noEvaluados: estado.troncoNoEvaluado ? ['Tronco sin seguimiento suficiente'] : [],
+        evaluacionCompleta: noEvaluados.length === 0,
+        noEvaluados,
         condiciones: { anguloMinimo: estado.anguloMinimo, inclinacionMaxima: estado.inclinacionTroncoMaxima,
-          limiteProfundidad: P.abajo, limiteTronco: P.inclinacionMaxima, pieEvaluado: false },
+          limiteProfundidad: P.abajo, limiteTronco: P.inclinacionMaxima,
+          anguloPieDePie: estado.anguloPieDePie, elevacionTalonMaxima: estado.elevacionTalonMaxima,
+          limiteTalon: P.pie.elevacionMinima, pieEvaluado: !estado.pieNoEvaluado },
         numero:
           estado.repeticiones,
 
@@ -750,8 +763,8 @@ export function analizarSentadilla(
         errorTronco:
           errorTronco,
 
-        resultado:
-          !errorProfundidad && !errorTronco && estado.troncoNoEvaluado ? "Sin errores observados; tronco no evaluado" : resultado
+        errorTalon: estado.errorTalon,
+        resultado: errores.join(' + ') || (noEvaluados.length ? 'Sin errores observados; evaluación parcial' : 'Correcta')
       };
 
 
@@ -840,6 +853,14 @@ export function analizarSentadilla(
     feedbackTronco:
       feedbackTronco,
 
+    feedbackPie: avisoTalon
+      ? 'Mantén el talón apoyado'
+      : anguloPie === null
+        ? 'Muestra el talón y la punta del pie de lado'
+        : elevacionTalon === null
+          ? 'Ponte de pie con el talón apoyado para fijar la referencia'
+          : 'Talón en seguimiento',
+
     historial:
       estado.historial
   };
@@ -872,7 +893,8 @@ export function calcularResumenSesionSentadilla(
         return (
           repeticion.evaluacionCompleta &&
           !repeticion.errorProfundidad &&
-          !repeticion.errorTronco
+          !repeticion.errorTronco &&
+          !repeticion.errorTalon
         );
       }
     ).length;
@@ -904,6 +926,7 @@ export function calcularResumenSesionSentadilla(
         );
       }
     ).length;
+  const talonElevado = historial.filter(repeticion => repeticion.errorTalon).length;
 
 
   // ----------------------------------------------
@@ -936,11 +959,19 @@ export function calcularResumenSesionSentadilla(
       profundidadInsuficiente,
 
     excesoInclinacionTronco:
-      excesoInclinacionTronco
+      excesoInclinacionTronco,
+    talonElevado,
+    errorMasFrecuente: errorPrincipal([
+      [FALLO_PROFUNDIDAD, profundidadInsuficiente],
+      [FALLO_TRONCO, excesoInclinacionTronco],
+      [FALLO_TALON, talonElevado],
+    ]),
   };
 }
 // Descarta un ciclo interrumpido: no permite completarlo con otro movimiento.
 export function interrumpirSentadilla(e: EstadoSentadilla) {
   e.ultimoMensaje = ''; e.fase = 'arriba'; e.preparado = false; e.profundidadAlcanzada = false;
   e.anguloMinimo = 180; e.inclinacionTroncoMaxima = null; e.troncoNoEvaluado = false;
+  e.anguloPieDePie = null;
+  reiniciarMedicionTalon(e);
 }

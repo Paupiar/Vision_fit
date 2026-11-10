@@ -1,4 +1,4 @@
-// Provisionales: se conservan los umbrales heredados, pendientes de validaciÃ³n fÃ­sica.
+// Umbrales de detección pendientes de calibración con grabaciones reales.
 export const CALIDAD = { visibilidadMinima: 0.7, segmentoMinimo: 1e-6 };
 export const PARAMETROS_CURL = {
   extension: 160, flexion: 50, inicio: 140, excursionMinima: 35, framesErrorConsecutivos: 3, framesMovimientoMinimos: 3,
@@ -7,14 +7,10 @@ export const PARAMETROS_CURL = {
 };
 export const PARAMETROS_SENTADILLA = {
   arriba: 160, inicio: 140, abajo: 100, inclinacionMaxima: 50,
-  pie: { habilitado: false }, // Faltan criterio acordado y referencia al suelo.
+  pie: { elevacionMinima: 12, framesConsecutivos: 3, longitudMinimaRespectoTibia: 0.18 },
 };
 export const PARAMETROS_PRESS = {
   abajo: 60, arriba: 140, extensionMinima: 140, excursionMinima: 25, framesMovimientoMinimos: 3,
   diferenciaMaxima: 15, porcentajeDescompensado: 20,
-  apertura: {
-    habilitada: false, anguloMaximoEvaluable: 90,
-    incrementoSobreReferencia: 0.20, // Distancia lateral / anchura entre hombros.
-    framesConsecutivos: 3, framesReferencia: 5,
-  },
+  apertura: { anguloMaximoCodo: 115, inclinacionMinimaAntebrazo: 20, framesConsecutivos: 3 },
 };

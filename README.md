@@ -1,7 +1,5 @@
 # Visión Fit — proyecto preparado para pruebas
 
-Los cambios de preparación para pruebas están aplicados en esta carpeta original, por petición del usuario. No se ha publicado ni subido nada a GitHub.
-
 - Ejecuta `INICIAR_VISION_FIT.cmd` para abrirla en el ordenador.
 - Lee [la guía de cámara](docs/GUIA_PRUEBAS_CAMARA.md).
 - Consulta [el informe, los nueve errores y las verificaciones](docs/INFORME_SESION_2026-11-06.md).
@@ -9,7 +7,7 @@ Los cambios de preparación para pruebas están aplicados en esta carpeta origin
 - Comprobaciones: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`.
 - Entorno probado: Node 24.21.0. Se utilizan las dependencias locales del proyecto.
 
-La apertura de codos del press es experimental y está desactivada por defecto. El fallo de pie/tobillo de sentadilla sigue pendiente de definición. Los resultados automáticos no validan la biomecánica ni sustituyen las pruebas reales.
+La sentadilla registra el talón levantado y el press registra la apertura excesiva de los codos en cámara y vídeo. Consulta la guía para preparar el encuadre y comprobar los umbrales con grabaciones reales.
 
 ---
 

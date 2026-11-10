@@ -70,6 +70,7 @@ import type {
 
 import {
   analizarSentadilla,
+  calcularAnguloPie,
   calcularResumenSesionSentadilla,
   crearEstadoSentadilla
 } from "../ejercicios/sentadilla";
@@ -1861,6 +1862,16 @@ function SentadillaCameraPreview(
             );
 
 
+          const puntoTalon = landmarks[landmarksSentadilla.talon];
+          const puntoPuntaPie = landmarks[landmarksSentadilla.puntaPie];
+          const talonParaDibujo = esLandmarkValido(puntoTalon)
+            ? convertirAPixeles(puntoTalon, canvas)
+            : null;
+          const puntaParaDibujo = esLandmarkValido(puntoPuntaPie)
+            ? convertirAPixeles(puntoPuntaPie, canvas)
+            : null;
+          const anguloPieActual = calcularAnguloPie(talonParaDibujo, puntaParaDibujo, rodilla, tobillo);
+
           let hombro:
             PuntoSentadilla | null =
             null;
@@ -1915,7 +1926,8 @@ function SentadillaCameraPreview(
                 hombro,
                 cadera,
                 rodilla,
-                tobillo
+                tobillo,
+                anguloPieActual
               );
 
 
@@ -1983,6 +1995,9 @@ function SentadillaCameraPreview(
             );
 
 
+            setAnguloPie(anguloPieActual === null ? null : Math.round(anguloPieActual));
+            setMensajePie(analisis.feedbackPie);
+
             setFeedbackTronco(
               analisis.feedbackTronco
             );
@@ -2032,37 +2047,8 @@ function SentadillaCameraPreview(
             );
           }
 
-          // Mostramos el pie también durante la preparación.
-          // La medida del panel solo se actualiza con el análisis activo.
-          const puntoTalon = landmarks[landmarksSentadilla.talon];
-          const puntoPuntaPie = landmarks[landmarksSentadilla.puntaPie];
-
-          if (
-            puntoTalon &&
-            puntoPuntaPie &&
-            esLandmarkValido(puntoTalon) &&
-            esLandmarkValido(puntoPuntaPie)
-          ) {
-            const talonParaDibujo = convertirAPixeles(puntoTalon, canvas);
-            const puntaParaDibujo = convertirAPixeles(puntoPuntaPie, canvas);
-
-            const diferenciaX = Math.abs(puntaParaDibujo.x - talonParaDibujo.x);
-            const diferenciaY = puntaParaDibujo.y - talonParaDibujo.y;
-            const medidaValida =
-              Number.isFinite(diferenciaX) &&
-              Number.isFinite(diferenciaY) &&
-              Math.hypot(diferenciaX, diferenciaY) > 0;
-
-            if (estadoSesionRef.current === "analizando") {
-              const anguloPieActual = Math.atan2(diferenciaY, diferenciaX) * (180 / Math.PI);
-              setAnguloPie(medidaValida ? Math.round(anguloPieActual) : null);
-              setMensajePie(
-                medidaValida
-                  ? "Medida respecto a la horizontal de la imagen"
-                  : "No se puede medir el pie: los puntos no son válidos"
-              );
-            }
-
+          // Dibujamos el pie también durante la preparación.
+          if (talonParaDibujo && puntaParaDibujo) {
             const verdePie =
               estadoSesionRef.current === "analizando" &&
               timestamp < verdeHastaRef.current;
@@ -2072,11 +2058,6 @@ function SentadillaCameraPreview(
             dibujarConexion(contexto, talonParaDibujo, puntaParaDibujo, verdePie);
             dibujarLandmark(contexto, talonParaDibujo, verdePie);
             dibujarLandmark(contexto, puntaParaDibujo, verdePie);
-          } else if (estadoSesionRef.current === "analizando") {
-            setAnguloPie(null);
-            setMensajePie(
-              "Pie no disponible: muestra el talón y la punta del lado seleccionado"
-            );
           }
 
         } else if (
@@ -2515,22 +2496,10 @@ function SentadillaCameraPreview(
                 etiqueta: "Exceso de inclinación",
                 valor: resumen.excesoInclinacionTronco
               },
+              { etiqueta: "Talón levantado", valor: resumen.talonElevado },
               { etiqueta: "Evaluación parcial", valor: resumen.noEvaluadas }
             ]}
-            errorPrincipal={
-              resumen.total === 0
-                ? "Sin datos"
-                : resumen.profundidadInsuficiente === 0 &&
-                  resumen.excesoInclinacionTronco === 0
-                  ? "Ninguno destacado"
-                  : resumen.profundidadInsuficiente >
-                    resumen.excesoInclinacionTronco
-                    ? "Profundidad insuficiente"
-                    : resumen.excesoInclinacionTronco >
-                      resumen.profundidadInsuficiente
-                      ? "Exceso de inclinación del tronco"
-                      : "Profundidad e inclinación"
-            }
+            errorPrincipal={resumen.total === 0 ? "Sin datos" : resumen.errorMasFrecuente}
             hayHistorial={
               historial.length > 0
             }
@@ -3676,7 +3645,7 @@ function PressHombroCameraPreview(
                 valor: resumen.descompensadas
               },
               { etiqueta: "Extensión incompleta", valor: resumen.extensionIncompleta },
-              { etiqueta: "Apertura (experimental)", valor: resumen.aperturaExcesiva },
+              { etiqueta: "Codos demasiado abiertos", valor: resumen.aperturaExcesiva },
               { etiqueta: "Recorridos completos", valor: resumen.completas },
               { etiqueta: "Intentos incompletos", valor: resumen.incompletas },
               { etiqueta: "Evaluación parcial", valor: resumen.noEvaluadas }

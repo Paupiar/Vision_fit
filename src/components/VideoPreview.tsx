@@ -72,6 +72,7 @@ import type {
 
 import {
   analizarSentadilla,
+  calcularAnguloPie,
   calcularResumenSesionSentadilla,
   crearEstadoSentadilla
 } from "../ejercicios/sentadilla";
@@ -2721,6 +2722,16 @@ function SentadillaVideoPreviewIntegrado(
             );
 
 
+          const puntoTalon = landmarks[landmarksSentadilla.talon];
+          const puntoPuntaPie = landmarks[landmarksSentadilla.puntaPie];
+          const talonParaDibujo = esLandmarkValido(puntoTalon)
+            ? convertirAPixeles(puntoTalon, canvas)
+            : null;
+          const puntaParaDibujo = esLandmarkValido(puntoPuntaPie)
+            ? convertirAPixeles(puntoPuntaPie, canvas)
+            : null;
+          const anguloPieActual = calcularAnguloPie(talonParaDibujo, puntaParaDibujo, rodilla, tobillo);
+
           // --------------------------------------
           // HOMBRO OPCIONAL
           // --------------------------------------
@@ -2763,7 +2774,8 @@ function SentadillaVideoPreviewIntegrado(
               hombro,
               cadera,
               rodilla,
-              tobillo
+              tobillo,
+              anguloPieActual
             );
 
 
@@ -2841,6 +2853,9 @@ function SentadillaVideoPreviewIntegrado(
           );
 
 
+          setAnguloPie(anguloPieActual === null ? null : Math.round(anguloPieActual));
+          setMensajePie(analisis.feedbackPie);
+
           setFeedbackTronco(
             analisis.feedbackTronco
           );
@@ -2892,53 +2907,8 @@ function SentadillaVideoPreviewIntegrado(
             mostrarVerde
           );
 
-          // Dibujamos el pie del lado seleccionado,
-          // uniendo tobillo, talón y punta.
-          const puntoTalon =
-            landmarks[landmarksSentadilla.talon];
-
-          const puntoPuntaPie =
-            landmarks[landmarksSentadilla.puntaPie];
-
-          if (
-            puntoTalon &&
-            puntoPuntaPie &&
-            esLandmarkValido(puntoTalon) &&
-            esLandmarkValido(puntoPuntaPie)
-          ) {
-            const talonParaDibujo =
-              convertirAPixeles(puntoTalon, canvas);
-
-            const puntaParaDibujo =
-              convertirAPixeles(puntoPuntaPie, canvas);
-
-            // Calculamos el ángulo talón-punta respecto
-            // a la horizontal de la imagen.
-            const diferenciaX =
-              Math.abs(puntaParaDibujo.x - talonParaDibujo.x);
-
-            const diferenciaY =
-              puntaParaDibujo.y - talonParaDibujo.y;
-
-            const anguloPieActual =
-              Math.atan2(diferenciaY, diferenciaX) *
-              (180 / Math.PI);
-
-            // Compartimos la medida con el panel lateral.
-            const medidaValida =
-              Number.isFinite(diferenciaX) &&
-              Number.isFinite(diferenciaY) &&
-              Math.hypot(diferenciaX, diferenciaY) > 0;
-
-            setAnguloPie(
-              medidaValida ? Math.round(anguloPieActual) : null
-            );
-            setMensajePie(
-              medidaValida
-                ? "Medida respecto a la horizontal de la imagen"
-                : "No se puede medir el pie: los puntos no son válidos"
-            );
-
+          // Dibujamos el pie del lado seleccionado.
+          if (talonParaDibujo && puntaParaDibujo) {
             // Adaptamos el texto al tamaño visible del vídeo.
             const escalaTexto =
               canvas.clientWidth > 0
@@ -2948,10 +2918,9 @@ function SentadillaVideoPreviewIntegrado(
             const tamanoTexto = 18 * escalaTexto;
             const margenTexto = 10 * escalaTexto;
 
-            const textoPie =
-              medidaValida
-                ? "Ángulo del pie: " + Math.round(anguloPieActual) + "°"
-                : "Ángulo del pie: --";
+            const textoPie = anguloPieActual === null
+              ? "Ángulo del pie: --"
+              : "Ángulo del pie: " + Math.round(anguloPieActual) + "°";
 
             contexto.save();
 
@@ -3003,11 +2972,6 @@ function SentadillaVideoPreviewIntegrado(
               contexto,
               puntaParaDibujo,
               mostrarVerde
-            );
-          } else {
-            setAnguloPie(null);
-            setMensajePie(
-              "Pie no disponible: muestra el talón y la punta del lado seleccionado"
             );
           }
 
@@ -3594,22 +3558,10 @@ function SentadillaVideoPreviewIntegrado(
               etiqueta: "Exceso de inclinación",
               valor: resumen.excesoInclinacionTronco
             },
+              { etiqueta: "Talón levantado", valor: resumen.talonElevado },
               { etiqueta: "Evaluación parcial", valor: resumen.noEvaluadas }
           ]}
-          errorPrincipal={
-            resumen.total === 0
-              ? "Sin datos"
-              : resumen.profundidadInsuficiente === 0 &&
-                resumen.excesoInclinacionTronco === 0
-                ? "Ninguno destacado"
-                : resumen.profundidadInsuficiente >
-                  resumen.excesoInclinacionTronco
-                  ? "Profundidad insuficiente"
-                  : resumen.excesoInclinacionTronco >
-                    resumen.profundidadInsuficiente
-                    ? "Exceso de inclinación del tronco"
-                    : "Profundidad e inclinación"
-          }
+          errorPrincipal={resumen.total === 0 ? "Sin datos" : resumen.errorMasFrecuente}
           hayHistorial={
             historial.length > 0
           }
@@ -5128,7 +5080,7 @@ function PressHombroVideoPreviewIntegrado(
               valor: resumen.descompensadas
             },
               { etiqueta: "Extensión incompleta", valor: resumen.extensionIncompleta },
-              { etiqueta: "Apertura (experimental)", valor: resumen.aperturaExcesiva },
+              { etiqueta: "Codos demasiado abiertos", valor: resumen.aperturaExcesiva },
               { etiqueta: "Recorridos completos", valor: resumen.completas },
               { etiqueta: "Intentos incompletos", valor: resumen.incompletas },
               { etiqueta: "Evaluación parcial", valor: resumen.noEvaluadas }

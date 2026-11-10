@@ -21,20 +21,26 @@ function frameCurl(e, a, { codoX = 0, troncoX = 0, hip = true } = {}) {
 function cicloCurl(e, angles = [170, 130, 90, 45, 90, 130, 170], options) {
   return angles.map(a => frameCurl(e, a, options)).at(-1);
 }
-function framePress(e, ai, ad = ai, { apertura = .4, escala = 1, config = PARAMETROS_PRESS } = {}) {
-  const hi = punto(100, 100), hd = punto(200, 100);
-  const ci = punto(100 - apertura * 100, 130), cd = punto(200 + apertura * 100, 130);
-  const mi = tercerPunto(hi, ci, ai), md = tercerPunto(hd, cd, -ad);
-  const ps = [hi, ci, mi, hd, cd, md].map(p => punto(p.x * escala, p.y * escala));
+function framePress(e, ai, ad = ai, { aperturaIzquierda = 0, aperturaDerecha = 0, escala = 1, espejo = false, config } = {}) {
+  function brazo(hombro, signo, anguloCodo, inclinacion) {
+    const anguloBrazo = rad(anguloCodo + inclinacion);
+    const codo = punto(hombro.x - signo * 45 * Math.sin(anguloBrazo), hombro.y + 45 * Math.cos(anguloBrazo));
+    const muneca = punto(codo.x + signo * 40 * Math.sin(rad(inclinacion)), codo.y - 40 * Math.cos(rad(inclinacion)));
+    return [hombro, codo, muneca];
+  }
+  const ps = [
+    ...brazo(punto(100, 100), 1, ai, aperturaIzquierda),
+    ...brazo(punto(200, 100), -1, ad, aperturaDerecha),
+  ].map(p => punto((espejo ? 300 - p.x : p.x) * escala, p.y * escala));
   return press.analizarPressHombro(e, ...ps, config);
 }
 function cicloPress(e, angles = [50, 80, 110, 145, 110, 80, 50], options) {
   return angles.map(a => framePress(e, a, a, options)).at(-1);
 }
-function frameSquat(e, a, inclinacion = 0, visible = true) {
+function frameSquat(e, a, inclinacion = 0, visible = true, anguloPie = 0) {
   const c = punto(0, 0), r = punto(0, 1), t = tercerPunto(c, r, a);
   const h = visible ? punto(Math.sin(rad(inclinacion)), -Math.cos(rad(inclinacion))) : null;
-  return squat.analizarSentadilla(e, h, c, r, t);
+  return squat.analizarSentadilla(e, h, c, r, t, anguloPie);
 }
 function cicloSquat(e, angles = [170, 135, 95, 135, 170], incl = 0, visible = true) {
   return angles.map(a => frameSquat(e, a, incl, visible)).at(-1);
@@ -109,10 +115,59 @@ test('sentadilla: límites heredados incluidos y feedback de poca profundidad',(
   const r=cicloSquat(e,[170,139,110,170]); assert.equal(r.feedbackMovimiento,'Profundidad insuficiente');
 });
 
+test('sentadilla: el talón levantado se cuenta por repetición y no se arrastra a la siguiente', () => {
+  const estado = squat.crearEstadoSentadilla();
+  frameSquat(estado, 170, 0, true, 8);
+  frameSquat(estado, 135, 60, true, 24);
+  frameSquat(estado, 95, 60, true, 24);
+  const aviso = frameSquat(estado, 135, 60, true, 24);
+  assert.equal(aviso.feedbackPie, 'Mantén el talón apoyado');
+  frameSquat(estado, 170, 0, true, 8);
+  for (const angulo of [135, 95, 135, 170]) frameSquat(estado, angulo, 0, true, 8);
+  const resumen = squat.calcularResumenSesionSentadilla(estado.historial);
+  assert.equal(estado.repeticiones, 2);
+  assert.equal(estado.historial[0].errorTronco, true);
+  assert.equal(estado.historial[0].errorTalon, true);
+  assert.match(estado.historial[0].resultado, /Talón levantado/);
+  assert.equal(estado.historial[1].resultado, 'Correcta');
+  assert.equal(resumen.talonElevado, 1);
+  assert.equal(resumen.correctas, 1);
+  assert.match(resumen.errorMasFrecuente, /Talón levantado/);
+});
+
+test('sentadilla: un pico, un pie oculto y una referencia ausente se distinguen', () => {
+  const estado = squat.crearEstadoSentadilla();
+  frameSquat(estado, 170, 0, true, null);
+  for (const angulo of [135, 95, 135, 170]) frameSquat(estado, angulo, 0, true, 30);
+  frameSquat(estado, 170);
+  frameSquat(estado, 135, 0, true, 30);
+  frameSquat(estado, 95);
+  frameSquat(estado, 135);
+  frameSquat(estado, 170);
+  frameSquat(estado, 135, 0, true, 25);
+  frameSquat(estado, 95, 0, true, null);
+  frameSquat(estado, 135, 0, true, 25);
+  frameSquat(estado, 170, 0, true, 25);
+  assert.deepEqual(estado.historial.map(r => r.errorTalon), [false, false, false]);
+  assert.deepEqual(estado.historial.map(r => r.evaluacionCompleta), [false, true, false]);
+});
+
+test('sentadilla: el ángulo del pie conserva el signo al cambiar de lado y exige un perfil visible', () => {
+  const rodilla = punto(0, 0), tobillo = punto(0, 10);
+  const talon = punto(0, 9);
+  const izquierda = squat.calcularAnguloPie(talon, punto(-4, 10), rodilla, tobillo);
+  const derecha = squat.calcularAnguloPie(talon, punto(4, 10), rodilla, tobillo);
+  assert.equal(izquierda, derecha);
+  assert.ok(derecha > 0);
+  assert.ok(squat.calcularAnguloPie(talon, punto(4, 8), rodilla, tobillo) < 0);
+  assert.equal(squat.calcularAnguloPie(talon, punto(0.1, 10), rodilla, tobillo), null);
+  assert.equal(squat.calcularAnguloPie(talon, punto(4, 10, 0.2), rodilla, tobillo), null);
+});
+
 test('press: ciclo normal conserva conteo al regresar abajo',()=>{
   const e=press.crearEstadoPressHombro(); const r=cicloPress(e);
   assert.equal(r.repeticionSumada,true); assert.equal(e.repeticiones,1); assert.equal(e.historial[0].resultado,'Correcta');
-  assert.equal(e.historial[0].condiciones.aperturaExperimental,false);
+  assert.equal(e.historial[0].errorApertura,false);
 });
 test('press: subida transitoria no se clasifica hasta el retorno; intento incompleto visible',()=>{
   const e=press.crearEstadoPressHombro(); framePress(e,50); framePress(e,80); framePress(e,100); assert.equal(e.historial.length,0);
@@ -140,27 +195,44 @@ test('press: pérdida de un brazo requiere volver abajo y no mezcla simetrías',
   framePress(e,145); framePress(e,50); assert.equal(e.historial.length,0); cicloPress(e);
   assert.equal(e.historial[0].errorSimetria,false);
 });
-test('press: apertura experimental normalizada, bilateral, con referencia y persistencia',()=>{
-  const config={...PARAMETROS_PRESS,apertura:{...PARAMETROS_PRESS.apertura,habilitada:true}};
-  for(const escala of [1,3]) {
-    const e=press.crearEstadoPressHombro();
-    for(let i=0;i<5;i++)framePress(e,50,50,{config,escala});
-    for(let i=0;i<4;i++)framePress(e,80,80,{config,escala,apertura:.7});
-    for(const a of [110,145,110,50])framePress(e,a,a,{config,escala});
-    assert.equal(e.historial[0].errorApertura,true); assert.equal(e.historial[0].errorSimetria,false); assert.equal(e.historial[0].errorExtension,false);
-    assert.match(e.historial[0].resultado,/experimental/); cicloPress(e,undefined,{config,escala}); assert.equal(e.historial[1].errorApertura,false);
+test('press: la apertura sostenida de un brazo se registra desde la primera repetición', () => {
+  for (const [escala, espejo, lado] of [[1, false, 'aperturaIzquierda'], [3, true, 'aperturaDerecha']]) {
+    const estado = press.crearEstadoPressHombro();
+    const opciones = { escala, espejo, [lado]: 28 };
+    framePress(estado, 50, 50, opciones);
+    for (const angulo of [75, 80]) framePress(estado, angulo, angulo, opciones);
+    assert.equal(framePress(estado, 85, 85, opciones).feedbackApertura, 'Alinea las muñecas sobre los codos');
+    for (const angulo of [110, 145, 110, 50]) framePress(estado, angulo, angulo, opciones);
+    assert.equal(estado.historial[0].resultado, 'Codos demasiado abiertos');
+    assert.equal(estado.historial[0].errorSimetria, false);
+    assert.equal(estado.historial[0].errorExtension, false);
+    cicloPress(estado, undefined, { escala, espejo });
+    assert.equal(estado.historial[1].resultado, 'Correcta');
+    assert.equal(press.calcularResumenSesionPress(estado.historial).aperturaExcesiva, 1);
   }
 });
-test('press: apertura sin calibrar se declara no evaluada',()=>{
-  const config={...PARAMETROS_PRESS,apertura:{...PARAMETROS_PRESS.apertura,habilitada:true}};
-  const e=press.crearEstadoPressHombro(); cicloPress(e,undefined,{config});
-  assert.equal(e.historial[0].errorApertura,false); assert.equal(e.historial[0].evaluacionCompleta,false);
+test('press: no mezcla brazos ni evalúa la apertura con los codos extendidos', () => {
+  const estado = press.crearEstadoPressHombro();
+  framePress(estado, 50);
+  for (const lado of ['aperturaIzquierda', 'aperturaDerecha', 'aperturaIzquierda']) {
+    framePress(estado, 80, 80, { [lado]: 30 });
+  }
+  for (const angulo of [125, 145, 125]) {
+    framePress(estado, angulo, angulo, { aperturaIzquierda: 30, aperturaDerecha: 30 });
+  }
+  framePress(estado, 50);
+  assert.equal(estado.historial[0].resultado, 'Correcta');
 });
-test('press: un frame de apertura no activa error',()=>{
-  const config={...PARAMETROS_PRESS,apertura:{...PARAMETROS_PRESS.apertura,habilitada:true}};
-  const e=press.crearEstadoPressHombro(); for(let i=0;i<5;i++)framePress(e,50,50,{config});
-  framePress(e,80,80,{config,apertura:.7}); for(const a of [110,145,110,50])framePress(e,a,a,{config});
-  assert.equal(e.historial[0].errorApertura,false);
+test('press: una vista sin seguimiento frontal se marca como parcial', () => {
+  const estado = press.crearEstadoPressHombro();
+  for (const angulo of [50, 80, 110, 145, 110, 80, 50]) {
+    const hombro = punto(100, 100);
+    const codo = punto(100, 150);
+    const muneca = tercerPunto(hombro, codo, angulo);
+    press.analizarPressHombro(estado, hombro, codo, muneca, hombro, codo, muneca);
+  }
+  assert.equal(estado.historial[0].errorApertura, false);
+  assert.equal(estado.historial[0].evaluacionCompleta, false);
 });
 test('calidad: rechaza NaN, infinito, puntos fuera de imagen y baja visibilidad',()=>{
   for(const p of [punto(NaN,.5),punto(.5,Infinity),punto(-.1,.5),punto(.5,1.1),punto(.5,.5,.69)])assert.equal(esLandmarkValido(p),false);
@@ -176,16 +248,6 @@ test('UI: la tarjeta diferencia intento no contado y cobertura parcial',()=>{
 test('los picos de un frame no generan intentos incompletos',()=>{
   const c=curl.crearEstadoCurl(); cicloCurl(c,[170,100,170]); assert.equal(c.historial.length,0);
   const p=press.crearEstadoPressHombro(); cicloPress(p,[50,110,50]); assert.equal(p.historial.length,0);
-});
-
-test('press: apertura solo se activa con petición explícita de depuración',()=>{
-  const anterior=global.window;
-  try {
-    for(const [search,habilitada] of [['',false],['?aperturaExperimental=1',false],['?debugVisionFit=1',false],['?debugVisionFit=1&aperturaExperimental=1',true]]) {
-      global.window={location:{search}};
-      assert.equal(press.obtenerConfiguracionPress().apertura.habilitada,habilitada);
-    }
-  } finally { if(anterior===undefined)delete global.window; else global.window=anterior; }
 });
 
 test('sentadilla: feedback del fallo permanece legible hasta el siguiente intento',()=>{
