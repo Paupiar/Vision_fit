@@ -7,7 +7,7 @@
 - Comprobaciones: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`.
 - Entorno probado: Node 24.21.0. Se utilizan las dependencias locales del proyecto.
 
-La sentadilla registra el talón levantado y el press registra la apertura excesiva de los codos en cámara y vídeo. Consulta la guía para preparar el encuadre y comprobar los umbrales con grabaciones reales.
+La sentadilla registra el talón levantado y el press registra la asimetría entre brazos y la extensión incompleta de los codos en cámara y vídeo. Consulta la guía para preparar el encuadre y comprobar los umbrales con grabaciones reales.
 
 ---
 

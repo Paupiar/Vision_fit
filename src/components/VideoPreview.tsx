@@ -4449,7 +4449,7 @@ function PressHombroVideoPreviewIntegrado(
 
 
             setFeedbackSimetria(
-              [analisis.feedbackSimetria, analisis.feedbackExtension, analisis.feedbackApertura].join(' · ')
+              [analisis.feedbackSimetria, analisis.feedbackExtension].join(' · ')
             );
 
 
@@ -5080,10 +5080,8 @@ function PressHombroVideoPreviewIntegrado(
               valor: resumen.descompensadas
             },
               { etiqueta: "Extensión incompleta", valor: resumen.extensionIncompleta },
-              { etiqueta: "Codos demasiado abiertos", valor: resumen.aperturaExcesiva },
               { etiqueta: "Recorridos completos", valor: resumen.completas },
               { etiqueta: "Intentos incompletos", valor: resumen.incompletas },
-              { etiqueta: "Evaluación parcial", valor: resumen.noEvaluadas }
           ]}
           errorPrincipal={resumen.total === 0 ? "Sin datos" : resumen.errorMasFrecuente}
           hayHistorial={

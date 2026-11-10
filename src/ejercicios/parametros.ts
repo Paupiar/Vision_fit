@@ -12,5 +12,4 @@ export const PARAMETROS_SENTADILLA = {
 export const PARAMETROS_PRESS = {
   abajo: 60, arriba: 140, extensionMinima: 140, excursionMinima: 25, framesMovimientoMinimos: 3,
   diferenciaMaxima: 15, porcentajeDescompensado: 20,
-  apertura: { anguloMaximoCodo: 115, inclinacionMinimaAntebrazo: 20, framesConsecutivos: 3 },
 };

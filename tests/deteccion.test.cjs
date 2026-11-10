@@ -21,7 +21,7 @@ function frameCurl(e, a, { codoX = 0, troncoX = 0, hip = true } = {}) {
 function cicloCurl(e, angles = [170, 130, 90, 45, 90, 130, 170], options) {
   return angles.map(a => frameCurl(e, a, options)).at(-1);
 }
-function framePress(e, ai, ad = ai, { aperturaIzquierda = 0, aperturaDerecha = 0, escala = 1, espejo = false, config } = {}) {
+function framePress(e, ai, ad = ai, { inclinacionIzquierda = 0, inclinacionDerecha = 0, config } = {}) {
   function brazo(hombro, signo, anguloCodo, inclinacion) {
     const anguloBrazo = rad(anguloCodo + inclinacion);
     const codo = punto(hombro.x - signo * 45 * Math.sin(anguloBrazo), hombro.y + 45 * Math.cos(anguloBrazo));
@@ -29,9 +29,9 @@ function framePress(e, ai, ad = ai, { aperturaIzquierda = 0, aperturaDerecha = 0
     return [hombro, codo, muneca];
   }
   const ps = [
-    ...brazo(punto(100, 100), 1, ai, aperturaIzquierda),
-    ...brazo(punto(200, 100), -1, ad, aperturaDerecha),
-  ].map(p => punto((espejo ? 300 - p.x : p.x) * escala, p.y * escala));
+    ...brazo(punto(100, 100), 1, ai, inclinacionIzquierda),
+    ...brazo(punto(200, 100), -1, ad, inclinacionDerecha),
+  ];
   return press.analizarPressHombro(e, ...ps, config);
 }
 function cicloPress(e, angles = [50, 80, 110, 145, 110, 80, 50], options) {
@@ -167,7 +167,7 @@ test('sentadilla: el ángulo del pie conserva el signo al cambiar de lado y exig
 test('press: ciclo normal conserva conteo al regresar abajo',()=>{
   const e=press.crearEstadoPressHombro(); const r=cicloPress(e);
   assert.equal(r.repeticionSumada,true); assert.equal(e.repeticiones,1); assert.equal(e.historial[0].resultado,'Correcta');
-  assert.equal(e.historial[0].errorApertura,false);
+  assert.equal(e.historial[0].evaluacionCompleta,true);
 });
 test('press: subida transitoria no se clasifica hasta el retorno; intento incompleto visible',()=>{
   const e=press.crearEstadoPressHombro(); framePress(e,50); framePress(e,80); framePress(e,100); assert.equal(e.historial.length,0);
@@ -184,7 +184,7 @@ test('press: asimetría no se diluye con el reposo entre repeticiones',()=>{
   const e=press.crearEstadoPressHombro(); for(let i=0;i<1000;i++)framePress(e,50);
   for(let i=0;i<5;i++)framePress(e,100,130);
   framePress(e,145); framePress(e,100); framePress(e,50);
-  assert.equal(e.historial[0].errorSimetria,true); assert.equal(e.historial[0].errorExtension,false); assert.equal(e.historial[0].errorApertura,false);
+  assert.equal(e.historial[0].errorSimetria,true); assert.equal(e.historial[0].errorExtension,false);
 });
 test('press: extensión configurable independiente del umbral histórico de conteo',()=>{
   const e=press.crearEstadoPressHombro(); const config={...PARAMETROS_PRESS,extensionMinima:155};
@@ -195,44 +195,14 @@ test('press: pérdida de un brazo requiere volver abajo y no mezcla simetrías',
   framePress(e,145); framePress(e,50); assert.equal(e.historial.length,0); cicloPress(e);
   assert.equal(e.historial[0].errorSimetria,false);
 });
-test('press: la apertura sostenida de un brazo se registra desde la primera repetición', () => {
-  for (const [escala, espejo, lado] of [[1, false, 'aperturaIzquierda'], [3, true, 'aperturaDerecha']]) {
-    const estado = press.crearEstadoPressHombro();
-    const opciones = { escala, espejo, [lado]: 28 };
-    framePress(estado, 50, 50, opciones);
-    for (const angulo of [75, 80]) framePress(estado, angulo, angulo, opciones);
-    assert.equal(framePress(estado, 85, 85, opciones).feedbackApertura, 'Alinea las muñecas sobre los codos');
-    for (const angulo of [110, 145, 110, 50]) framePress(estado, angulo, angulo, opciones);
-    assert.equal(estado.historial[0].resultado, 'Codos demasiado abiertos');
-    assert.equal(estado.historial[0].errorSimetria, false);
-    assert.equal(estado.historial[0].errorExtension, false);
-    cicloPress(estado, undefined, { escala, espejo });
-    assert.equal(estado.historial[1].resultado, 'Correcta');
-    assert.equal(press.calcularResumenSesionPress(estado.historial).aperturaExcesiva, 1);
-  }
-});
-test('press: no mezcla brazos ni evalúa la apertura con los codos extendidos', () => {
+test('press: una inclinación lateral del antebrazo no penaliza un ciclo completo y simétrico', () => {
   const estado = press.crearEstadoPressHombro();
-  framePress(estado, 50);
-  for (const lado of ['aperturaIzquierda', 'aperturaDerecha', 'aperturaIzquierda']) {
-    framePress(estado, 80, 80, { [lado]: 30 });
-  }
-  for (const angulo of [125, 145, 125]) {
-    framePress(estado, angulo, angulo, { aperturaIzquierda: 30, aperturaDerecha: 30 });
-  }
-  framePress(estado, 50);
+  const opciones = { inclinacionIzquierda: 28 };
+  cicloPress(estado, [50, 75, 80, 85, 110, 145, 110, 50], opciones);
+  assert.equal(estado.repeticiones, 1);
   assert.equal(estado.historial[0].resultado, 'Correcta');
-});
-test('press: una vista sin seguimiento frontal se marca como parcial', () => {
-  const estado = press.crearEstadoPressHombro();
-  for (const angulo of [50, 80, 110, 145, 110, 80, 50]) {
-    const hombro = punto(100, 100);
-    const codo = punto(100, 150);
-    const muneca = tercerPunto(hombro, codo, angulo);
-    press.analizarPressHombro(estado, hombro, codo, muneca, hombro, codo, muneca);
-  }
-  assert.equal(estado.historial[0].errorApertura, false);
-  assert.equal(estado.historial[0].evaluacionCompleta, false);
+  assert.equal(estado.historial[0].evaluacionCompleta, true);
+  assert.equal(press.calcularResumenSesionPress(estado.historial).correctas, 1);
 });
 test('calidad: rechaza NaN, infinito, puntos fuera de imagen y baja visibilidad',()=>{
   for(const p of [punto(NaN,.5),punto(.5,Infinity),punto(-.1,.5),punto(.5,1.1),punto(.5,.5,.69)])assert.equal(esLandmarkValido(p),false);
