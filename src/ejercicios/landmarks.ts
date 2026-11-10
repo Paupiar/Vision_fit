@@ -94,14 +94,18 @@ export const LANDMARKS_SENTADILLA = {
     hombro: 11,
     cadera: 23,
     rodilla: 25,
-    tobillo: 27
+    tobillo: 27,
+    talon: 29,
+    puntaPie: 31
   },
 
   derecho: {
     hombro: 12,
     cadera: 24,
     rodilla: 26,
-    tobillo: 28
+    tobillo: 28,
+    talon: 30,
+    puntaPie: 32
   }
 };
 

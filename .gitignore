@@ -28,3 +28,4 @@ data/
 *.mp4
 *.mov
 *.avi
+.test-build/

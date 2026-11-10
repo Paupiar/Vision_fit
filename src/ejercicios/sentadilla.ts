@@ -1,3 +1,7 @@
+import { PARAMETROS_SENTADILLA as P } from './parametros';
+import { angulo, depurarIntento, puntoValido } from './registro';
+import type { RegistroIntento } from './registro';
+
 // --------------------------------------------------
 // SENTADILLA
 // --------------------------------------------------
@@ -40,22 +44,19 @@
 
 // Consideramos que el usuario
 // está completamente arriba.
-export const ANGULO_SENTADILLA_ARRIBA =
-  160;
+export const ANGULO_SENTADILLA_ARRIBA = P.arriba;
 
 
 // A partir de este ángulo consideramos
 // que realmente ha empezado
 // una repetición.
-export const ANGULO_INICIO_SENTADILLA =
-  140;
+export const ANGULO_INICIO_SENTADILLA = P.inicio;
 
 
 // Profundidad mínima necesaria
 // para considerar correcta
 // la bajada.
-export const ANGULO_SENTADILLA_ABAJO =
-  100;
+export const ANGULO_SENTADILLA_ABAJO = P.abajo;
 
 
 // --------------------------------------------------
@@ -72,8 +73,7 @@ export const ANGULO_SENTADILLA_ABAJO =
 //
 // Por eso utilizamos 50°
 // como límite provisional.
-export const INCLINACION_MAXIMA_TRONCO =
-  50;
+export const INCLINACION_MAXIMA_TRONCO = P.inclinacionMaxima;
 
 
 // --------------------------------------------------
@@ -104,7 +104,7 @@ export type FaseSentadilla =
 // RESULTADO DE UNA REPETICIÓN
 // --------------------------------------------------
 
-export interface ResultadoRepeticionSentadilla {
+export interface ResultadoRepeticionSentadilla extends RegistroIntento {
   // Número de repetición.
   numero: number;
 
@@ -135,6 +135,7 @@ export interface ResultadoRepeticionSentadilla {
   // Texto final
   // de clasificación.
   resultado:
+    "Sin errores observados; tronco no evaluado" |
     "Correcta" |
     "Profundidad insuficiente" |
     "Exceso de inclinación del tronco" |
@@ -147,6 +148,9 @@ export interface ResultadoRepeticionSentadilla {
 // --------------------------------------------------
 
 export interface EstadoSentadilla {
+  ultimoMensaje: string;
+  preparado: boolean;
+  troncoNoEvaluado: boolean;
   // Fase actual.
   fase: FaseSentadilla;
 
@@ -219,6 +223,7 @@ export interface ResultadoSentadilla {
 
 export interface ResumenSesionSentadilla {
   // Repeticiones realizadas.
+  noEvaluadas: number;
   total: number;
 
   // Repeticiones sin ninguno
@@ -245,6 +250,9 @@ export interface ResumenSesionSentadilla {
 export function crearEstadoSentadilla():
   EstadoSentadilla {
   return {
+    ultimoMensaje: '',
+    preparado: false,
+    troncoNoEvaluado: false,
     fase:
       "arriba",
 
@@ -282,50 +290,7 @@ export function calcularAnguloRodilla(
 ): number {
   // Ángulo desde la rodilla
   // hacia la cadera.
-  const angulo1 =
-    Math.atan2(
-      cadera.y - rodilla.y,
-      cadera.x - rodilla.x
-    );
-
-
-  // Ángulo desde la rodilla
-  // hacia el tobillo.
-  const angulo2 =
-    Math.atan2(
-      tobillo.y - rodilla.y,
-      tobillo.x - rodilla.x
-    );
-
-
-  // Diferencia entre ambos.
-  let angulo =
-    Math.abs(
-      angulo2 -
-      angulo1
-    );
-
-
-  // Convertimos de radianes
-  // a grados.
-  angulo =
-    angulo *
-    (180 / Math.PI);
-
-
-  // Queremos siempre
-  // un valor entre 0° y 180°.
-  if (
-    angulo >
-    180
-  ) {
-    angulo =
-      360 -
-      angulo;
-  }
-
-
-  return angulo;
+  return angulo(cadera, rodilla, tobillo);
 }
 
 
@@ -368,6 +333,7 @@ export function calcularInclinacionTronco(
 
   // Ángulo respecto
   // a la vertical.
+  if (Math.hypot(diferenciaX, diferenciaY) <= 1e-6) return NaN;
   const inclinacion =
     Math.atan2(
       diferenciaX,
@@ -570,8 +536,7 @@ export function analizarSentadilla(
 
 
   if (
-    hombro !==
-    null
+    puntoValido(hombro)
   ) {
     inclinacionTronco =
       calcularInclinacionTronco(
@@ -585,8 +550,15 @@ export function analizarSentadilla(
   // VARIABLES DEL FRAME
   // ------------------------------------------------
 
-  let cambioFase =
-    false;
+  if (!Number.isFinite(anguloRodilla)) {
+    interrumpirSentadilla(estado);
+    return { anguloRodilla, inclinacionTronco: null, fase: estado.fase, repeticiones: estado.repeticiones,
+      cambioFase: false, repeticionSumada: false, feedbackMovimiento: 'Recupera la pierna y ponte de pie',
+      feedbackTronco: 'No evaluable', historial: estado.historial };
+  }
+  if (anguloRodilla >= P.arriba) estado.preparado = true;
+  if (inclinacionTronco !== null && !Number.isFinite(inclinacionTronco)) inclinacionTronco = null;
+  let cambioFase = false;
 
 
   let repeticionSumada =
@@ -598,11 +570,14 @@ export function analizarSentadilla(
   // ------------------------------------------------
 
   if (
+    estado.preparado &&
     estado.fase ===
       "arriba" &&
     anguloRodilla <=
       ANGULO_INICIO_SENTADILLA
   ) {
+    estado.ultimoMensaje = '';
+    estado.troncoNoEvaluado = inclinacionTronco === null;
     estado.fase =
       "abajo";
 
@@ -639,6 +614,7 @@ export function analizarSentadilla(
     estado.fase ===
     "abajo"
   ) {
+    estado.troncoNoEvaluado ||= inclinacionTronco === null;
     // ----------------------------------------------
     // ÁNGULO MÍNIMO
     // ----------------------------------------------
@@ -750,6 +726,12 @@ export function analizarSentadilla(
 
       const nuevaRepeticion:
         ResultadoRepeticionSentadilla = {
+        ejercicio: 'sentadilla', intento: estado.repeticiones,
+        numeroRepeticion: estado.repeticiones, recorridoCompleto: !errorProfundidad,
+        evaluacionCompleta: !estado.troncoNoEvaluado,
+        noEvaluados: estado.troncoNoEvaluado ? ['Tronco sin seguimiento suficiente'] : [],
+        condiciones: { anguloMinimo: estado.anguloMinimo, inclinacionMaxima: estado.inclinacionTroncoMaxima,
+          limiteProfundidad: P.abajo, limiteTronco: P.inclinacionMaxima, pieEvaluado: false },
         numero:
           estado.repeticiones,
 
@@ -769,13 +751,15 @@ export function analizarSentadilla(
           errorTronco,
 
         resultado:
-          resultado
+          !errorProfundidad && !errorTronco && estado.troncoNoEvaluado ? "Sin errores observados; tronco no evaluado" : resultado
       };
 
 
       estado.historial.push(
         nuevaRepeticion
       );
+      depurarIntento(nuevaRepeticion);
+      estado.ultimoMensaje = nuevaRepeticion.resultado === 'Correcta' ? 'Repetición completa' : nuevaRepeticion.resultado;
 
 
       // --------------------------------------------
@@ -851,7 +835,7 @@ export function analizarSentadilla(
       repeticionSumada,
 
     feedbackMovimiento:
-      feedbackMovimiento,
+      estado.ultimoMensaje || feedbackMovimiento,
 
     feedbackTronco:
       feedbackTronco,
@@ -886,6 +870,7 @@ export function calcularResumenSesionSentadilla(
     historial.filter(
       function (repeticion) {
         return (
+          repeticion.evaluacionCompleta &&
           !repeticion.errorProfundidad &&
           !repeticion.errorTronco
         );
@@ -937,6 +922,7 @@ export function calcularResumenSesionSentadilla(
 
 
   return {
+    noEvaluadas: historial.filter(r => !r.evaluacionCompleta).length,
     total:
       total,
 
@@ -952,4 +938,9 @@ export function calcularResumenSesionSentadilla(
     excesoInclinacionTronco:
       excesoInclinacionTronco
   };
+}
+// Descarta un ciclo interrumpido: no permite completarlo con otro movimiento.
+export function interrumpirSentadilla(e: EstadoSentadilla) {
+  e.ultimoMensaje = ''; e.fase = 'arriba'; e.preparado = false; e.profundidadAlcanzada = false;
+  e.anguloMinimo = 180; e.inclinacionTroncoMaxima = null; e.troncoNoEvaluado = false;
 }

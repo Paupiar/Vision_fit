@@ -1,0 +1,31 @@
+{
+  "modificados": [
+    ".gitignore",
+    "README.md",
+    "package.json",
+    "src/components/CameraPreview.tsx",
+    "src/components/ResultadoSesion.tsx",
+    "src/components/VideoPreview.tsx",
+    "src/ejercicios/curl.ts",
+    "src/ejercicios/pressHombro.ts",
+    "src/ejercicios/sentadilla.ts",
+    "src/mediapipe/dibujo.ts"
+  ],
+  "nuevos": [
+    "INICIAR_VISION_FIT.cmd",
+    "docs/GUIA_PRUEBAS_CAMARA.md",
+    "docs/INFORME_SESION_2026-11-06.md",
+    "docs/verificacion/archivos.json",
+    "docs/verificacion/build.txt",
+    "docs/verificacion/lint.txt",
+    "docs/verificacion/tests.txt",
+    "docs/verificacion/typescript.txt",
+    "scripts/test.cjs",
+    "src/components/DetalleIntento.tsx",
+    "src/ejercicios/parametros.ts",
+    "src/ejercicios/registro.ts",
+    "tests/deteccion.test.cjs",
+    "tsconfig.tests.json"
+  ],
+  "eliminados": []
+}

@@ -1,0 +1,40 @@
+
+> vision-fit@0.0.0 test
+> node scripts/test.cjs
+
+✔ curl: ciclo normal, contador en flexión y un solo cierre (5.8291ms)
+✔ curl: flexión incompleta clasificada sin sumar, siguiente intento aislado (2.1689ms)
+✔ curl: no cuenta ruido, reposo ni una pose flexionada al iniciar (0.4551ms)
+✔ curl: extensión incompleta al volver a flexionar, sin duplicados (0.4303ms)
+✔ curl: error codo aislado por intento y persistencia (0.6387ms)
+✔ curl: error tronco aislado por intento y persistencia (0.6347ms)
+✔ curl: error ambos aislado por intento y persistencia (0.6171ms)
+✔ curl: pico aislado no activa error técnico (0.623ms)
+✔ curl: cadera invisible no da una técnica completamente correcta (0.9148ms)
+✔ curl: pérdida de seguimiento descarta el ciclo y exige extensión (1.0489ms)
+✔ sentadilla: profundidad e inclinación son dos reglas independientes (2.0311ms)
+✔ sentadilla: hombro ausente y cobertura parcial no se consideran técnica correcta (0.2489ms)
+✔ sentadilla: postura inicial baja y pérdida de seguimiento no cierran ciclos falsos (0.2842ms)
+✔ sentadilla: límites heredados incluidos y feedback de poca profundidad (0.1851ms)
+✔ press: ciclo normal conserva conteo al regresar abajo (1.6474ms)
+✔ press: subida transitoria no se clasifica hasta el retorno; intento incompleto visible (1.0932ms)
+✔ press: ruido pequeño, espera y reposo no crean registros (1.4537ms)
+✔ press: asimetría no se diluye con el reposo entre repeticiones (7.0605ms)
+✔ press: extensión configurable independiente del umbral histórico de conteo (0.3682ms)
+✔ press: pérdida de un brazo requiere volver abajo y no mezcla simetrías (0.2614ms)
+✔ press: apertura experimental normalizada, bilateral, con referencia y persistencia (1.866ms)
+✔ press: apertura sin calibrar se declara no evaluada (0.2748ms)
+✔ press: un frame de apertura no activa error (0.3162ms)
+✔ calidad: rechaza NaN, infinito, puntos fuera de imagen y baja visibilidad (0.341ms)
+✔ UI: la tarjeta diferencia intento no contado y cobertura parcial (8.6159ms)
+✔ los picos de un frame no generan intentos incompletos (0.1532ms)
+✔ press: apertura solo se activa con petición explícita de depuración (0.2305ms)
+✔ sentadilla: feedback del fallo permanece legible hasta el siguiente intento (0.096ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 137.0964

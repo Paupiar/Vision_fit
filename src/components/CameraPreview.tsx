@@ -1,3 +1,7 @@
+import DetalleIntento from './DetalleIntento';
+import { interrumpirCurl } from '../ejercicios/curl';
+import { interrumpirSentadilla } from '../ejercicios/sentadilla';
+import { interrumpirPress } from '../ejercicios/pressHombro';
 // Importamos los hooks necesarios de React.
 import {
   useCallback,
@@ -626,6 +630,13 @@ function CurlCameraPreview(
           video,
           timestamp
         );
+      const seguimiento = resultado.landmarks[0];
+      if (estadoSesionRef.current === "analizando" && (!seguimiento || ![landmarksCurl.hombro, landmarksCurl.codo, landmarksCurl.muneca].every(indice => seguimiento[indice] && esLandmarkValido(seguimiento[indice])))) {
+        interrumpirCurl(estadoCurlRef.current);
+        setFeedback('Seguimiento perdido. Extiende el brazo para reanudar.');
+        setFaseActual('abajo');
+      }
+
 
 
       if (
@@ -1271,7 +1282,10 @@ function CurlCameraPreview(
               {
                 etiqueta: "Balanceo tronco",
                 valor: resumenSesion.erroresTronco
-              }
+              },
+              { etiqueta: "Rango incompleto", valor: resumenSesion.erroresRango },
+              { etiqueta: "Recorridos completos", valor: resumenSesion.completas },
+              { etiqueta: "Evaluación parcial", valor: resumenSesion.noEvaluadas }
             ]}
             errorPrincipal={
               resumenSesion.total === 0
@@ -1294,13 +1308,14 @@ function CurlCameraPreview(
                   >
 
                     <span className="analysis-history-number">
-                      Rep {repeticion.numero}
+                      Intento {repeticion.numero}
                     </span>
 
 
                     <strong>
                       {repeticion.resultado}
                     </strong>
+                      <DetalleIntento registro={repeticion} />
 
                   </div>
                 );
@@ -1409,6 +1424,12 @@ function SentadillaCameraPreview(
       null
     );
 
+
+  // Medida del pie para comprobar su detección en cámara.
+  const [anguloPie, setAnguloPie] = useState<number | null>(null);
+  const [mensajePie, setMensajePie] = useState<string>(
+    "Pulsa Empezar análisis para medir el pie"
+  );
 
   const [
     fase,
@@ -1538,6 +1559,9 @@ function SentadillaCameraPreview(
             setInclinacionTronco(
               null
             );
+
+            setAnguloPie(null);
+            setMensajePie("Pulsa Empezar análisis para medir el pie");
 
 
             setFase(
@@ -1761,6 +1785,13 @@ function SentadillaCameraPreview(
           video,
           timestamp
         );
+      const seguimiento = resultado.landmarks[0];
+      if (estadoSesionRef.current === "analizando" && (!seguimiento || ![landmarksSentadilla.cadera, landmarksSentadilla.rodilla, landmarksSentadilla.tobillo].every(indice => seguimiento[indice] && esLandmarkValido(seguimiento[indice])))) {
+        interrumpirSentadilla(estadoSentadillaRef.current);
+        setFeedback('Seguimiento perdido. Ponte de pie para reanudar.');
+        setFase('arriba');
+      }
+
 
 
       if (
@@ -2001,17 +2032,73 @@ function SentadillaCameraPreview(
             );
           }
 
+          // Mostramos el pie también durante la preparación.
+          // La medida del panel solo se actualiza con el análisis activo.
+          const puntoTalon = landmarks[landmarksSentadilla.talon];
+          const puntoPuntaPie = landmarks[landmarksSentadilla.puntaPie];
+
+          if (
+            puntoTalon &&
+            puntoPuntaPie &&
+            esLandmarkValido(puntoTalon) &&
+            esLandmarkValido(puntoPuntaPie)
+          ) {
+            const talonParaDibujo = convertirAPixeles(puntoTalon, canvas);
+            const puntaParaDibujo = convertirAPixeles(puntoPuntaPie, canvas);
+
+            const diferenciaX = Math.abs(puntaParaDibujo.x - talonParaDibujo.x);
+            const diferenciaY = puntaParaDibujo.y - talonParaDibujo.y;
+            const medidaValida =
+              Number.isFinite(diferenciaX) &&
+              Number.isFinite(diferenciaY) &&
+              Math.hypot(diferenciaX, diferenciaY) > 0;
+
+            if (estadoSesionRef.current === "analizando") {
+              const anguloPieActual = Math.atan2(diferenciaY, diferenciaX) * (180 / Math.PI);
+              setAnguloPie(medidaValida ? Math.round(anguloPieActual) : null);
+              setMensajePie(
+                medidaValida
+                  ? "Medida respecto a la horizontal de la imagen"
+                  : "No se puede medir el pie: los puntos no son válidos"
+              );
+            }
+
+            const verdePie =
+              estadoSesionRef.current === "analizando" &&
+              timestamp < verdeHastaRef.current;
+
+            // Conectamos tobillo-talón y talón-punta del pie.
+            dibujarConexion(contexto, tobillo, talonParaDibujo, verdePie);
+            dibujarConexion(contexto, talonParaDibujo, puntaParaDibujo, verdePie);
+            dibujarLandmark(contexto, talonParaDibujo, verdePie);
+            dibujarLandmark(contexto, puntaParaDibujo, verdePie);
+          } else if (estadoSesionRef.current === "analizando") {
+            setAnguloPie(null);
+            setMensajePie(
+              "Pie no disponible: muestra el talón y la punta del lado seleccionado"
+            );
+          }
+
         } else if (
           estadoSesionRef.current ===
           "analizando"
         ) {
+          setAnguloPie(null);
+          setMensajePie("Muestra la pierna y el pie completos");
           setMensaje(
             "Asegúrate de que se vea la pierna completa"
           );
         }
+      } else if (estadoSesionRef.current === "analizando") {
+        setAnguloPie(null);
+        setMensajePie("No se detecta el cuerpo");
       }
 
     } catch (error) {
+      if (estadoSesionRef.current === "analizando") {
+        setAnguloPie(null);
+        setMensajePie("No se pudo medir el pie en este frame");
+      }
       console.error(
         "Error analizando sentadilla:",
         error
@@ -2085,6 +2172,9 @@ function SentadillaCameraPreview(
 
         verdeHastaRef.current =
           0;
+
+        setAnguloPie(null);
+        setMensajePie("Esperando detección del pie");
       }
     );
   }
@@ -2190,7 +2280,7 @@ function SentadillaCameraPreview(
           introduccion="Colócate correctamente antes de iniciar el análisis de la sentadilla."
           instrucciones={[
             "Colócate de lado a la cámara.",
-            `Mantén visibles hombro, cadera, rodilla y tobillo del lado ${props.lado}.`,
+            `Mantén visibles hombro, cadera, rodilla, tobillo y el pie completo del lado ${props.lado}.`,
             "Deja suficiente espacio para que la cámara vea el movimiento completo.",
             "Empieza de pie, con la pierna extendida."
           ]}
@@ -2287,6 +2377,16 @@ function SentadillaCameraPreview(
                   : "--"}
               </strong>
 
+            </div>
+
+            <div className="analysis-metric">
+              <span>Ángulo del pie (medición exploratoria)</span>
+              <strong>
+                {anguloPie !== null ? anguloPie + "°" : "--"}
+              </strong>
+              <p className="analysis-empty-message">
+                {mensajePie}
+              </p>
             </div>
 
           </div>
@@ -2414,7 +2514,8 @@ function SentadillaCameraPreview(
               {
                 etiqueta: "Exceso de inclinación",
                 valor: resumen.excesoInclinacionTronco
-              }
+              },
+              { etiqueta: "Evaluación parcial", valor: resumen.noEvaluadas }
             ]}
             errorPrincipal={
               resumen.total === 0
@@ -2446,7 +2547,7 @@ function SentadillaCameraPreview(
                   >
 
                     <span className="analysis-history-number">
-                      Rep {repeticion.numero}
+                      Intento {repeticion.numero}
                     </span>
 
 
@@ -2455,6 +2556,7 @@ function SentadillaCameraPreview(
                       <strong>
                         {repeticion.resultado}
                       </strong>
+                      <DetalleIntento registro={repeticion} />
 
 
                       <p>
@@ -2908,6 +3010,13 @@ function PressHombroCameraPreview(
           video,
           timestamp
         );
+      const seguimiento = resultado.landmarks[0];
+      if (estadoSesionRef.current === "analizando" && (!seguimiento || ![11, 13, 15, 12, 14, 16].every(indice => seguimiento[indice] && esLandmarkValido(seguimiento[indice])))) {
+        interrumpirPress(estadoPressRef.current);
+        setFeedbackMovimiento('Seguimiento perdido. Muestra ambos brazos y vuelve abajo.');
+        setFase('esperando');
+      }
+
 
 
       if (
@@ -3112,7 +3221,7 @@ function PressHombroCameraPreview(
 
 
               setFeedbackSimetria(
-                analisis.feedbackSimetria
+                [analisis.feedbackSimetria, analisis.feedbackExtension, analisis.feedbackApertura].join(' · ')
               );
 
 
@@ -3122,7 +3231,7 @@ function PressHombroCameraPreview(
 
 
               if (
-                analisis.repeticionSumada
+                analisis.intentoFinalizado
               ) {
                 setRepeticiones(
                   analisis.repeticiones
@@ -3363,7 +3472,7 @@ function PressHombroCameraPreview(
           instrucciones={[
             "Colócate de frente a la cámara.",
             "Mantén completamente visibles los dos hombros, codos y muñecas.",
-            "Deja espacio por encima de la cabeza para poder extender ambos brazos.",
+            "Encuadra desde el pecho hacia arriba, sentado o de pie, dejando espacio para las muñecas por encima de la cabeza.",
             "Empieza con ambos brazos en la posición baja del press."
           ]}
           etiquetaDetalle="Análisis"
@@ -3565,15 +3674,14 @@ function PressHombroCameraPreview(
               {
                 etiqueta: "Descompensadas",
                 valor: resumen.descompensadas
-              }
+              },
+              { etiqueta: "Extensión incompleta", valor: resumen.extensionIncompleta },
+              { etiqueta: "Apertura (experimental)", valor: resumen.aperturaExcesiva },
+              { etiqueta: "Recorridos completos", valor: resumen.completas },
+              { etiqueta: "Intentos incompletos", valor: resumen.incompletas },
+              { etiqueta: "Evaluación parcial", valor: resumen.noEvaluadas }
             ]}
-            errorPrincipal={
-              resumen.total === 0
-                ? "Sin datos"
-                : resumen.descompensadas > 0
-                  ? "Descompensación entre brazos"
-                  : "Ninguno destacado"
-            }
+            errorPrincipal={resumen.total === 0 ? "Sin datos" : resumen.errorMasFrecuente}
             hayHistorial={
               historial.length > 0
             }
@@ -3590,7 +3698,7 @@ function PressHombroCameraPreview(
                   >
 
                     <span className="analysis-history-number">
-                      Rep {repeticion.numero}
+                      Intento {repeticion.numero}
                     </span>
 
 
@@ -3599,6 +3707,7 @@ function PressHombroCameraPreview(
                       <strong>
                         {repeticion.resultado}
                       </strong>
+                      <DetalleIntento registro={repeticion} />
 
 
                       <p>

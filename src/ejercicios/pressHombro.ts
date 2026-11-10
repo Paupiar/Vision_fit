@@ -1,864 +1,167 @@
-// --------------------------------------------------
-// PRESS DE HOMBRO
-// --------------------------------------------------
-//
-// El press de hombro se analiza
-// con la cámara situada DE FRENTE.
-//
-// Analizamos simultáneamente:
-//
-// IZQUIERDO
-// 11 -> hombro
-// 13 -> codo
-// 15 -> muñeca
-//
-// DERECHO
-// 12 -> hombro
-// 14 -> codo
-// 16 -> muñeca
-//
-// Actualmente analizamos:
-//
-// - ángulo de ambos codos;
-// - posición baja;
-// - posición alta;
-// - conteo bilateral;
-// - diferencia angular;
-// - simetría durante toda la repetición;
-// - historial;
-// - resumen de sesión.
-// --------------------------------------------------
-
-
-// --------------------------------------------------
-// UMBRALES DE MOVIMIENTO
-// --------------------------------------------------
-
-// Posición baja observada
-// durante las pruebas:
-// aproximadamente 50°.
-//
-// Dejamos margen hasta 60°.
-export const ANGULO_PRESS_ABAJO =
-  60;
-
-
-// Posición alta observada:
-// aproximadamente 150°.
-//
-// Dejamos margen desde 140°.
-export const ANGULO_PRESS_ARRIBA =
-  140;
-
-
-// --------------------------------------------------
-// UMBRALES DE SIMETRÍA
-// --------------------------------------------------
-
-// Durante las repeticiones correctas
-// observamos diferencias inferiores a 10°.
-//
-// Dejamos un margen hasta 15°.
-export const DIFERENCIA_MAXIMA_BRAZOS =
-  15;
-
-
-// No queremos considerar incorrecta
-// una repetición por un único frame.
-//
-// La diferencia superior a 15°
-// tendrá que aparecer al menos
-// durante el 20 % de la repetición.
-export const PORCENTAJE_MAXIMO_DESCOMPENSADO =
-  20;
-
-
-// --------------------------------------------------
-// PUNTO
-// --------------------------------------------------
-
-export interface PuntoPressHombro {
-  x: number;
-
-  y: number;
-
-  visibility?: number;
+import { PARAMETROS_PRESS as P } from './parametros';
+import { angulo, depurarIntento, errorPrincipal, puntoValido } from './registro';
+import type { PuntoAnalisis, RegistroIntento } from './registro';
+export const ANGULO_PRESS_ABAJO = P.abajo;
+export const ANGULO_PRESS_ARRIBA = P.arriba;
+export const DIFERENCIA_MAXIMA_BRAZOS = P.diferenciaMaxima;
+export const PORCENTAJE_MAXIMO_DESCOMPENSADO = P.porcentajeDescompensado;
+export type PuntoPressHombro = PuntoAnalisis;
+export type FasePressHombro = 'esperando' | 'abajo' | 'arriba';
+export type ConfiguracionPress = typeof P;
+export interface ResultadoRepeticionPress extends RegistroIntento {
+  numero: number; diferenciaMedia: number; diferenciaMaxima: number; porcentajeDescompensado: number;
+  errorSimetria: boolean; errorExtension: boolean; errorApertura: boolean; resultado: string;
 }
-
-
-// --------------------------------------------------
-// FASE
-// --------------------------------------------------
-
-export type FasePressHombro =
-  "esperando" |
-  "abajo" |
-  "arriba";
-
-
-// --------------------------------------------------
-// RESULTADO DE UNA REPETICIÓN
-// --------------------------------------------------
-
-export interface ResultadoRepeticionPress {
-  // Número de repetición.
-  numero: number;
-
-  // Diferencia angular media
-  // durante toda la repetición.
-  diferenciaMedia: number;
-
-  // Mayor diferencia detectada.
-  diferenciaMaxima: number;
-
-  // Porcentaje de frames
-  // donde se superaron los 15°.
-  porcentajeDescompensado: number;
-
-  // Indica si consideramos
-  // que existe una descompensación real.
-  errorSimetria: boolean;
-
-  // Clasificación final.
-  resultado:
-    "Correcta" |
-    "Descompensación entre brazos";
-}
-
-
-// --------------------------------------------------
-// ESTADO INTERNO
-// --------------------------------------------------
-
 export interface EstadoPressHombro {
-  fase: FasePressHombro;
-
-  repeticiones: number;
-
-
-  // ----------------------------------------------
-  // DATOS DE LA REPETICIÓN ACTUAL
-  // ----------------------------------------------
-
-  // Número de frames analizados.
-  framesAnalizados: number;
-
-  // Número de frames donde
-  // la diferencia superó 15°.
-  framesDescompensados: number;
-
-  // Suma de las diferencias.
-  //
-  // Nos permitirá calcular
-  // la diferencia media.
-  sumaDiferencias: number;
-
-  // Mayor diferencia observada.
-  diferenciaMaxima: number;
-
-
-  // ----------------------------------------------
-  // HISTORIAL
-  // ----------------------------------------------
-
-  historial:
-    ResultadoRepeticionPress[];
+  fase: FasePressHombro; repeticiones: number; framesAnalizados: number; framesDescompensados: number;
+  sumaDiferencias: number; diferenciaMaxima: number; historial: ResultadoRepeticionPress[];
+  activo: boolean; maxIzquierdo: number; maxDerecho: number; excursion: number;
+  framesApertura: number; errorApertura: boolean; maxApertura: number;
+  referenciaApertura: [number, number] | null; muestrasReferencia: [number, number][];
+  aperturaNoEvaluada: boolean; ultimoMensaje: string;
 }
-
-
-// --------------------------------------------------
-// RESULTADO DE UN FRAME
-// --------------------------------------------------
-
 export interface ResultadoPressHombro {
-  anguloCodoIzquierdo: number;
-
-  anguloCodoDerecho: number;
-
-  diferenciaAngular: number;
-
-  fase: FasePressHombro;
-
-  repeticiones: number;
-
-  cambioFase: boolean;
-
-  posicionBajaAlcanzada: boolean;
-
-  posicionAltaAlcanzada: boolean;
-
-  repeticionSumada: boolean;
-
-  feedbackMovimiento: string;
-
-  feedbackSimetria: string;
-
-  historial:
-    ResultadoRepeticionPress[];
+  anguloCodoIzquierdo: number; anguloCodoDerecho: number; diferenciaAngular: number;
+  fase: FasePressHombro; repeticiones: number; cambioFase: boolean;
+  posicionBajaAlcanzada: boolean; posicionAltaAlcanzada: boolean; repeticionSumada: boolean;
+  intentoFinalizado: boolean; feedbackMovimiento: string; feedbackSimetria: string;
+  feedbackExtension: string; feedbackApertura: string; historial: ResultadoRepeticionPress[];
 }
-
-
-// --------------------------------------------------
-// RESUMEN DE SESIÓN
-// --------------------------------------------------
-
 export interface ResumenSesionPress {
-  total: number;
-
-  correctas: number;
-
-  descompensadas: number;
-
-  porcentajeCorrectas: number;
+  total: number; correctas: number; descompensadas: number; porcentajeCorrectas: number;
+  extensionIncompleta: number; aperturaExcesiva: number; completas: number;
+  incompletas: number; noEvaluadas: number; errorMasFrecuente: string;
 }
-
-
-// --------------------------------------------------
-// CREAR ESTADO
-// --------------------------------------------------
-
-export function crearEstadoPressHombro():
-  EstadoPressHombro {
-  return {
-    fase:
-      "esperando",
-
-    repeticiones:
-      0,
-
-    framesAnalizados:
-      0,
-
-    framesDescompensados:
-      0,
-
-    sumaDiferencias:
-      0,
-
-    diferenciaMaxima:
-      0,
-
-    historial:
-      []
-  };
+export function crearEstadoPressHombro(): EstadoPressHombro {
+  return { fase: 'esperando', repeticiones: 0, framesAnalizados: 0, framesDescompensados: 0,
+    sumaDiferencias: 0, diferenciaMaxima: 0, historial: [], activo: false, maxIzquierdo: 0,
+    maxDerecho: 0, excursion: 0, framesApertura: 0, errorApertura: false, maxApertura: 0,
+    referenciaApertura: null, muestrasReferencia: [], aperturaNoEvaluada: false, ultimoMensaje: '' };
 }
-
-
-// --------------------------------------------------
-// REINICIAR DATOS DE UNA REPETICIÓN
-// --------------------------------------------------
-
-export function reiniciarDatosRepeticion(
-  estado: EstadoPressHombro
-) {
-  estado.framesAnalizados =
-    0;
-
-
-  estado.framesDescompensados =
-    0;
-
-
-  estado.sumaDiferencias =
-    0;
-
-
-  estado.diferenciaMaxima =
-    0;
+export function reiniciarDatosRepeticion(e: EstadoPressHombro) {
+  e.framesAnalizados = 0; e.framesDescompensados = 0; e.sumaDiferencias = 0;
+  e.diferenciaMaxima = 0; e.activo = false; e.maxIzquierdo = 0; e.maxDerecho = 0;
+  e.excursion = 0; e.framesApertura = 0; e.errorApertura = false; e.maxApertura = 0; e.aperturaNoEvaluada = false;
 }
-
-
-// --------------------------------------------------
-// CALCULAR ÁNGULO
-// --------------------------------------------------
-
-export function calcularAnguloCodoPress(
-  hombro: PuntoPressHombro,
-  codo: PuntoPressHombro,
-  muneca: PuntoPressHombro
-): number {
-  const angulo1 =
-    Math.atan2(
-      hombro.y - codo.y,
-      hombro.x - codo.x
-    );
-
-
-  const angulo2 =
-    Math.atan2(
-      muneca.y - codo.y,
-      muneca.x - codo.x
-    );
-
-
-  let angulo =
-    Math.abs(
-      angulo2 -
-      angulo1
-    );
-
-
-  angulo =
-    angulo *
-    (180 / Math.PI);
-
-
-  if (
-    angulo >
-    180
-  ) {
-    angulo =
-      360 -
-      angulo;
-  }
-
-
-  return angulo;
+export function interrumpirPress(e: EstadoPressHombro) {
+  reiniciarDatosRepeticion(e); e.fase = 'esperando'; e.referenciaApertura = null;
+  e.muestrasReferencia = []; e.ultimoMensaje = '';
 }
-
-
-// --------------------------------------------------
-// REGISTRAR SIMETRÍA DEL FRAME
-// --------------------------------------------------
-
-function registrarSimetriaFrame(
-  estado: EstadoPressHombro,
-  diferenciaAngular: number
-) {
-  // Añadimos un frame
-  // a la repetición actual.
-  estado.framesAnalizados =
-    estado.framesAnalizados +
-    1;
-
-
-  // Sumamos la diferencia
-  // para calcular después
-  // la media.
-  estado.sumaDiferencias =
-    estado.sumaDiferencias +
-    diferenciaAngular;
-
-
-  // Comprobamos si este frame
-  // supera los 15°.
-  if (
-    diferenciaAngular >
-    DIFERENCIA_MAXIMA_BRAZOS
-  ) {
-    estado.framesDescompensados =
-      estado.framesDescompensados +
-      1;
-  }
-
-
-  // Guardamos también
-  // la diferencia máxima.
-  if (
-    diferenciaAngular >
-    estado.diferenciaMaxima
-  ) {
-    estado.diferenciaMaxima =
-      diferenciaAngular;
-  }
+export const calcularAnguloCodoPress = angulo;
+export function obtenerFeedbackSimetria(d: number): string {
+  return d <= P.diferenciaMaxima ? 'Movimiento simétrico' : 'Intenta mover ambos brazos al mismo nivel';
 }
-
-
-// --------------------------------------------------
-// FEEDBACK INSTANTÁNEO DE SIMETRÍA
-// --------------------------------------------------
-
-// Este mensaje sí utiliza
-// el frame actual.
-//
-// Sirve para dar feedback inmediato,
-// pero NO clasifica por sí solo
-// la repetición final.
-export function obtenerFeedbackSimetria(
-  diferenciaAngular: number
-): string {
-  if (
-    diferenciaAngular <=
-    DIFERENCIA_MAXIMA_BRAZOS
-  ) {
-    return (
-      "Movimiento simétrico"
-    );
-  }
-
-
-  return (
-    "Intenta mover ambos brazos al mismo nivel"
-  );
+export function obtenerFeedbackMovimientoPress(fase: FasePressHombro, baja: boolean, alta: boolean, sumada: boolean): string {
+  if (sumada) return 'Repetición completa';
+  if (alta) return 'Posición alta alcanzada';
+  if (baja) return 'Posición inicial preparada';
+  return fase === 'esperando' ? 'Coloca ambos brazos en posición baja' : fase === 'abajo' ? 'Sube ambos brazos' : 'Baja ambos brazos';
 }
-
-
-// --------------------------------------------------
-// FEEDBACK DE MOVIMIENTO
-// --------------------------------------------------
-
-export function obtenerFeedbackMovimientoPress(
-  fase: FasePressHombro,
-  posicionBajaAlcanzada: boolean,
-  posicionAltaAlcanzada: boolean,
-  repeticionSumada: boolean
-): string {
-  if (
-    repeticionSumada
-  ) {
-    return (
-      "Repetición completa"
-    );
-  }
-
-
-  if (
-    posicionAltaAlcanzada
-  ) {
-    return (
-      "Posición alta alcanzada"
-    );
-  }
-
-
-  if (
-    posicionBajaAlcanzada
-  ) {
-    return (
-      "Posición inicial preparada"
-    );
-  }
-
-
-  if (
-    fase ===
-    "esperando"
-  ) {
-    return (
-      "Coloca ambos brazos en posición baja"
-    );
-  }
-
-
-  if (
-    fase ===
-    "abajo"
-  ) {
-    return (
-      "Sube ambos brazos"
-    );
-  }
-
-
-  return (
-    "Baja ambos brazos"
-  );
+// Indicador de proyección frontal, NO medida de rotación del hombro ni diagnóstico técnico.
+export function medirAperturaFrontal(hi: PuntoPressHombro, ci: PuntoPressHombro, hd: PuntoPressHombro, cd: PuntoPressHombro): [number, number] | null {
+  if (![hi, ci, hd, cd].every(puntoValido)) return null;
+  const anchura = Math.abs(hi.x - hd.x);
+  if (anchura <= 1e-6) return null;
+  return [Math.abs(ci.x - hi.x) / anchura, Math.abs(cd.x - hd.x) / anchura];
 }
-
-
-// --------------------------------------------------
-// ANALIZAR PRESS
-// --------------------------------------------------
-
-export function analizarPressHombro(
-  estado: EstadoPressHombro,
-
-  hombroIzquierdo: PuntoPressHombro,
-  codoIzquierdo: PuntoPressHombro,
-  munecaIzquierda: PuntoPressHombro,
-
-  hombroDerecho: PuntoPressHombro,
-  codoDerecho: PuntoPressHombro,
-  munecaDerecha: PuntoPressHombro
-): ResultadoPressHombro {
-  // ------------------------------------------------
-  // ÁNGULO IZQUIERDO
-  // ------------------------------------------------
-
-  const anguloCodoIzquierdo =
-    calcularAnguloCodoPress(
-      hombroIzquierdo,
-      codoIzquierdo,
-      munecaIzquierda
-    );
-
-
-  // ------------------------------------------------
-  // ÁNGULO DERECHO
-  // ------------------------------------------------
-
-  const anguloCodoDerecho =
-    calcularAnguloCodoPress(
-      hombroDerecho,
-      codoDerecho,
-      munecaDerecha
-    );
-
-
-  // ------------------------------------------------
-  // DIFERENCIA
-  // ------------------------------------------------
-
-  const diferenciaAngular =
-    Math.abs(
-      anguloCodoIzquierdo -
-      anguloCodoDerecho
-    );
-
-
-  // ------------------------------------------------
-  // POSICIONES
-  // ------------------------------------------------
-
-  const ambosAbajo =
-    anguloCodoIzquierdo <=
-      ANGULO_PRESS_ABAJO &&
-    anguloCodoDerecho <=
-      ANGULO_PRESS_ABAJO;
-
-
-  const ambosArriba =
-    anguloCodoIzquierdo >=
-      ANGULO_PRESS_ARRIBA &&
-    anguloCodoDerecho >=
-      ANGULO_PRESS_ARRIBA;
-
-
-  // ------------------------------------------------
-  // EVENTOS
-  // ------------------------------------------------
-
-  let cambioFase =
-    false;
-
-
-  let posicionBajaAlcanzada =
-    false;
-
-
-  let posicionAltaAlcanzada =
-    false;
-
-
-  let repeticionSumada =
-    false;
-
-
-  // ------------------------------------------------
-  // POSICIÓN INICIAL
-  // ------------------------------------------------
-
-  if (
-    estado.fase ===
-      "esperando" &&
-    ambosAbajo
-  ) {
-    estado.fase =
-      "abajo";
-
-
-    // Empezamos una repetición
-    // completamente limpia.
-    reiniciarDatosRepeticion(
-      estado
-    );
-
-
-    cambioFase =
-      true;
-
-
-    posicionBajaAlcanzada =
-      true;
+function finalizarIntento(e: EstadoPressHombro, c: ConfiguracionPress): ResultadoRepeticionPress {
+  const recorridoCompleto = e.fase === 'arriba';
+  if (recorridoCompleto) e.repeticiones++;
+  const diferenciaMedia = e.framesAnalizados ? e.sumaDiferencias / e.framesAnalizados : 0;
+  const porcentajeDescompensado = e.framesAnalizados ? e.framesDescompensados / e.framesAnalizados * 100 : 0;
+  const errorSimetria = porcentajeDescompensado >= c.porcentajeDescompensado;
+  const errorExtension = !recorridoCompleto || Math.min(e.maxIzquierdo, e.maxDerecho) < c.extensionMinima;
+  const errores = [errorSimetria ? 'Descompensación entre brazos' : '', errorExtension ? 'Extensión incompleta de los codos' : '',
+    e.errorApertura ? 'Apertura de codos fuera de referencia (experimental)' : ''].filter(Boolean);
+  const noEvaluados = c.apertura.habilitada && (!e.referenciaApertura || e.aperturaNoEvaluada) ? ['Apertura sin referencia o seguimiento suficiente'] : [];
+  const r: ResultadoRepeticionPress = { ejercicio: 'press-hombro', numero: e.historial.length + 1,
+    intento: e.historial.length + 1, numeroRepeticion: recorridoCompleto ? e.repeticiones : null,
+    recorridoCompleto, evaluacionCompleta: noEvaluados.length === 0, noEvaluados,
+    diferenciaMedia, diferenciaMaxima: e.diferenciaMaxima, porcentajeDescompensado,
+    errorSimetria, errorExtension, errorApertura: e.errorApertura,
+    condiciones: { extensionMaximaIzquierda: e.maxIzquierdo, extensionMaximaDerecha: e.maxDerecho,
+      extensionMinima: c.extensionMinima, altoConteo: c.arriba, bajoConteo: c.abajo,
+      diferenciaMaxima: e.diferenciaMaxima, porcentajeDescompensado, limiteSimetria: c.diferenciaMaxima,
+      limitePorcentaje: c.porcentajeDescompensado, aperturaExperimental: c.apertura.habilitada,
+      incrementoAperturaMaximo: e.maxApertura, referenciaIzquierda: e.referenciaApertura?.[0] ?? null,
+      referenciaDerecha: e.referenciaApertura?.[1] ?? null, limiteApertura: c.apertura.incrementoSobreReferencia },
+    resultado: errores.join(' + ') || (noEvaluados.length ? 'Sin errores observados; apertura no evaluada' : 'Correcta') };
+  e.historial.push(r); e.ultimoMensaje = r.resultado; depurarIntento(r);
+  return r;
+}
+// Activación explícita de laboratorio, sin cambiar la experiencia habitual.
+export function obtenerConfiguracionPress(): ConfiguracionPress {
+  const experimental = typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('debugVisionFit') === '1' &&
+    new URLSearchParams(window.location.search).get('aperturaExperimental') === '1';
+  return experimental ? { ...P, apertura: { ...P.apertura, habilitada: true } } : P;
+}
+export function analizarPressHombro(e: EstadoPressHombro, hi: PuntoPressHombro, ci: PuntoPressHombro, mi: PuntoPressHombro,
+  hd: PuntoPressHombro, cd: PuntoPressHombro, md: PuntoPressHombro, c: ConfiguracionPress = obtenerConfiguracionPress()): ResultadoPressHombro {
+  const ai = angulo(hi, ci, mi), ad = angulo(hd, cd, md), d = Math.abs(ai - ad);
+  if (!Number.isFinite(ai) || !Number.isFinite(ad)) {
+    interrumpirPress(e);
+    return { anguloCodoIzquierdo: ai, anguloCodoDerecho: ad, diferenciaAngular: d, fase: e.fase,
+      repeticiones: e.repeticiones, cambioFase: false, posicionBajaAlcanzada: false, posicionAltaAlcanzada: false,
+      repeticionSumada: false, intentoFinalizado: false, feedbackMovimiento: 'Recupera ambos brazos y vuelve a la posición baja',
+      feedbackSimetria: 'No evaluable', feedbackExtension: 'No evaluable', feedbackApertura: 'No evaluable', historial: e.historial };
   }
-
-
-  // ------------------------------------------------
-  // ANALIZAR SIMETRÍA
-  // ------------------------------------------------
-
-  // Cuando ya hemos confirmado
-  // la posición inicial,
-  // guardamos datos de simetría
-  // durante toda la repetición.
-  else if (
-    estado.fase !==
-    "esperando"
-  ) {
-    registrarSimetriaFrame(
-      estado,
-      diferenciaAngular
-    );
-
-
-    // ----------------------------------------------
-    // LLEGAR ARRIBA
-    // ----------------------------------------------
-
-    if (
-      estado.fase ===
-        "abajo" &&
-      ambosArriba
-    ) {
-      estado.fase =
-        "arriba";
-
-
-      cambioFase =
-        true;
-
-
-      posicionAltaAlcanzada =
-        true;
-    }
-
-
-    // ----------------------------------------------
-    // VOLVER ABAJO
-    // ----------------------------------------------
-
-    else if (
-      estado.fase ===
-        "arriba" &&
-      ambosAbajo
-    ) {
-      // ============================================
-      // REPETICIÓN COMPLETA
-      // ============================================
-
-      estado.repeticiones =
-        estado.repeticiones +
-        1;
-
-
-      // --------------------------------------------
-      // DIFERENCIA MEDIA
-      // --------------------------------------------
-
-      const diferenciaMedia =
-        estado.framesAnalizados ===
-        0
-          ? 0
-          : estado.sumaDiferencias /
-            estado.framesAnalizados;
-
-
-      // --------------------------------------------
-      // PORCENTAJE DESCOMPENSADO
-      // --------------------------------------------
-
-      const porcentajeDescompensado =
-        estado.framesAnalizados ===
-        0
-          ? 0
-          : (
-              estado.framesDescompensados /
-              estado.framesAnalizados
-            ) *
-            100;
-
-
-      // --------------------------------------------
-      // CLASIFICACIÓN
-      // --------------------------------------------
-
-      // Solo consideramos error técnico
-      // si la diferencia superior a 15°
-      // se ha mantenido durante
-      // al menos el 20 % de la repetición.
-      const errorSimetria =
-        porcentajeDescompensado >=
-        PORCENTAJE_MAXIMO_DESCOMPENSADO;
-
-
-      const resultado:
-        ResultadoRepeticionPress["resultado"] =
-        errorSimetria
-          ? "Descompensación entre brazos"
-          : "Correcta";
-
-
-      // --------------------------------------------
-      // GUARDAR REPETICIÓN
-      // --------------------------------------------
-
-      const nuevaRepeticion:
-        ResultadoRepeticionPress = {
-        numero:
-          estado.repeticiones,
-
-        diferenciaMedia:
-          diferenciaMedia,
-
-        diferenciaMaxima:
-          estado.diferenciaMaxima,
-
-        porcentajeDescompensado:
-          porcentajeDescompensado,
-
-        errorSimetria:
-          errorSimetria,
-
-        resultado:
-          resultado
-      };
-
-
-      estado.historial.push(
-        nuevaRepeticion
-      );
-
-
-      // --------------------------------------------
-      // PREPARAR SIGUIENTE REPETICIÓN
-      // --------------------------------------------
-
-      // Nos encontramos de nuevo
-      // abajo, por tanto ya estamos
-      // preparados para la siguiente.
-      estado.fase =
-        "abajo";
-
-
-      // Reiniciamos únicamente
-      // los datos técnicos
-      // de la siguiente repetición.
-      reiniciarDatosRepeticion(
-        estado
-      );
-
-
-      cambioFase =
-        true;
-
-
-      posicionBajaAlcanzada =
-        true;
-
-
-      repeticionSumada =
-        true;
+  const faseAntes = e.fase;
+  const bajos = ai <= c.abajo && ad <= c.abajo;
+  const altos = ai >= c.arriba && ad >= c.arriba;
+  let baja = false, alta = false, sumada = false, finalizado = false;
+  const apertura = medirAperturaFrontal(hi, ci, hd, cd);
+  if (bajos && !e.activo && c.apertura.habilitada && apertura && !e.referenciaApertura) {
+    e.muestrasReferencia.push(apertura);
+    if (e.muestrasReferencia.length >= c.apertura.framesReferencia) {
+      e.referenciaApertura = [0, 1].map(i => e.muestrasReferencia.reduce((s, m) => s + m[i], 0) / e.muestrasReferencia.length) as [number, number];
     }
   }
-
-
-  // ------------------------------------------------
-  // FEEDBACK
-  // ------------------------------------------------
-
-  const feedbackMovimiento =
-    obtenerFeedbackMovimientoPress(
-      estado.fase,
-      posicionBajaAlcanzada,
-      posicionAltaAlcanzada,
-      repeticionSumada
-    );
-
-
-  const feedbackSimetria =
-    obtenerFeedbackSimetria(
-      diferenciaAngular
-    );
-
-
-  // ------------------------------------------------
-  // RESULTADO
-  // ------------------------------------------------
-
-  return {
-    anguloCodoIzquierdo:
-      anguloCodoIzquierdo,
-
-    anguloCodoDerecho:
-      anguloCodoDerecho,
-
-    diferenciaAngular:
-      diferenciaAngular,
-
-    fase:
-      estado.fase,
-
-    repeticiones:
-      estado.repeticiones,
-
-    cambioFase:
-      cambioFase,
-
-    posicionBajaAlcanzada:
-      posicionBajaAlcanzada,
-
-    posicionAltaAlcanzada:
-      posicionAltaAlcanzada,
-
-    repeticionSumada:
-      repeticionSumada,
-
-    feedbackMovimiento:
-      feedbackMovimiento,
-
-    feedbackSimetria:
-      feedbackSimetria,
-
-    historial:
-      estado.historial
-  };
+  if (e.fase === 'esperando' && bajos) { e.fase = 'abajo'; baja = true; }
+  else if (e.fase !== 'esperando') {
+    // Excluye el reposo en posición baja de la estadística de simetría.
+    if (!bajos && !e.activo) { reiniciarDatosRepeticion(e); e.activo = true; e.ultimoMensaje = ''; }
+    if (e.activo) {
+      e.maxIzquierdo = Math.max(e.maxIzquierdo, ai); e.maxDerecho = Math.max(e.maxDerecho, ad);
+      e.excursion = Math.max(e.excursion, Math.max(ai, ad) - c.abajo);
+      e.framesAnalizados++; e.sumaDiferencias += d; e.diferenciaMaxima = Math.max(e.diferenciaMaxima, d);
+      if (d > c.diferenciaMaxima) e.framesDescompensados++;
+      if (c.apertura.habilitada && ai <= c.apertura.anguloMaximoEvaluable && ad <= c.apertura.anguloMaximoEvaluable) {
+        e.aperturaNoEvaluada ||= !apertura || !e.referenciaApertura;
+        if (apertura && e.referenciaApertura) {
+          // Exigir aumento bilateral evita atribuir un desfase unilateral a apertura.
+          const incremento = Math.min(apertura[0] - e.referenciaApertura[0], apertura[1] - e.referenciaApertura[1]);
+          e.maxApertura = Math.max(e.maxApertura, incremento);
+          e.framesApertura = incremento > c.apertura.incrementoSobreReferencia ? e.framesApertura + 1 : 0;
+          e.errorApertura ||= e.framesApertura >= c.apertura.framesConsecutivos;
+        }
+      } else e.framesApertura = 0;
+      if (e.fase === 'abajo' && altos) { e.fase = 'arriba'; alta = true; }
+      if (bajos) {
+        if (e.fase === 'arriba' || (e.excursion >= c.excursionMinima && e.framesAnalizados >= c.framesMovimientoMinimos)) {
+          const r = finalizarIntento(e, c); sumada = r.recorridoCompleto; finalizado = true;
+        }
+        reiniciarDatosRepeticion(e); e.fase = 'abajo'; baja = true;
+      }
+    }
+  }
+  return { anguloCodoIzquierdo: ai, anguloCodoDerecho: ad, diferenciaAngular: d, fase: e.fase,
+    repeticiones: e.repeticiones, cambioFase: faseAntes !== e.fase, posicionBajaAlcanzada: baja,
+    posicionAltaAlcanzada: alta, repeticionSumada: sumada, intentoFinalizado: finalizado,
+    feedbackMovimiento: e.ultimoMensaje || obtenerFeedbackMovimientoPress(e.fase, baja, alta, sumada),
+    feedbackSimetria: d <= c.diferenciaMaxima ? 'Movimiento simétrico' : 'Intenta mover ambos brazos al mismo nivel',
+    feedbackExtension: finalizado && e.historial.at(-1)?.errorExtension ? 'Extensión incompleta de los codos' : 'La extensión se evalúa al volver abajo',
+    feedbackApertura: !c.apertura.habilitada ? 'Experimental desactivado' : !e.referenciaApertura ? 'Mantén la posición baja para calibrar (experimental)' : (e.errorApertura || (finalizado && e.historial.at(-1)?.errorApertura)) ? 'Apertura fuera de referencia (experimental)' : 'Comparación experimental con la posición inicial',
+    historial: e.historial };
 }
-
-
-// --------------------------------------------------
-// RESUMEN DE SESIÓN
-// --------------------------------------------------
-
-export function calcularResumenSesionPress(
-  historial:
-    ResultadoRepeticionPress[]
-): ResumenSesionPress {
-  const total =
-    historial.length;
-
-
-  const correctas =
-    historial.filter(
-      function (repeticion) {
-        return (
-          !repeticion.errorSimetria
-        );
-      }
-    ).length;
-
-
-  const descompensadas =
-    historial.filter(
-      function (repeticion) {
-        return (
-          repeticion.errorSimetria
-        );
-      }
-    ).length;
-
-
-  const porcentajeCorrectas =
-    total ===
-    0
-      ? 0
-      : (
-          correctas /
-          total
-        ) *
-        100;
-
-
-  return {
-    total:
-      total,
-
-    correctas:
-      correctas,
-
-    descompensadas:
-      descompensadas,
-
-    porcentajeCorrectas:
-      porcentajeCorrectas
-  };
+export function calcularResumenSesionPress(historial: ResultadoRepeticionPress[]): ResumenSesionPress {
+  const total = historial.length;
+  const correctas = historial.filter(r => r.recorridoCompleto && r.evaluacionCompleta && !r.errorSimetria && !r.errorExtension && !r.errorApertura).length;
+  const descompensadas = historial.filter(r => r.errorSimetria).length;
+  const extensionIncompleta = historial.filter(r => r.errorExtension).length;
+  const aperturaExcesiva = historial.filter(r => r.errorApertura).length;
+  return { total, correctas, descompensadas, extensionIncompleta, aperturaExcesiva,
+    completas: historial.filter(r => r.recorridoCompleto).length, incompletas: historial.filter(r => !r.recorridoCompleto).length,
+    noEvaluadas: historial.filter(r => !r.evaluacionCompleta).length, porcentajeCorrectas: total ? correctas / total * 100 : 0,
+    errorMasFrecuente: errorPrincipal([['Descompensación entre brazos', descompensadas], ['Extensión incompleta de los codos', extensionIncompleta], ['Apertura fuera de referencia (experimental)', aperturaExcesiva]]) };
 }

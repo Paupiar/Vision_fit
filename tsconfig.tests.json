@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "CommonJS", "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0", "outDir": ".test-build", "rootDir": "src",
+    "strict": true, "skipLibCheck": true, "jsx": "react-jsx"
+  },
+  "include": ["src/ejercicios/**/*.ts", "src/mediapipe/dibujo.ts", "src/components/DetalleIntento.tsx"]
+}

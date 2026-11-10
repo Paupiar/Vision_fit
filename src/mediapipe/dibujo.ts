@@ -1,3 +1,4 @@
+import { CALIDAD } from '../ejercicios/parametros';
 // --------------------------------------------------
 // CONFIGURACIÓN DE DIBUJO
 // --------------------------------------------------
@@ -14,8 +15,7 @@
 // con un tamaño visual parecido.
 // --------------------------------------------------
 
-export const VISIBILIDAD_MINIMA =
-  0.7;
+export const VISIBILIDAD_MINIMA = CALIDAD.visibilidadMinima;
 
 
 // Radio visual aproximado
@@ -58,6 +58,8 @@ export function esLandmarkValido(
   //
   // En ese caso consideramos
   // que el punto es válido.
+  if (!Number.isFinite(punto.x) || !Number.isFinite(punto.y) ||
+      punto.x < 0 || punto.x > 1 || punto.y < 0 || punto.y > 1) return false;
   if (
     punto.visibility ===
     undefined

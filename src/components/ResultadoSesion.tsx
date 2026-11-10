@@ -89,10 +89,10 @@ function obtenerConsejoSesion(
     return "Completa varias repeticiones para poder obtener una valoración técnica de la sesión.";
   }
 
-  if (
-    porcentajeCorrectas >= 90 ||
-    errorPrincipal === "Ninguno destacado"
-  ) {
+  if (errorPrincipal === "Ninguno destacado" && porcentajeCorrectas < 90) {
+    return "Completa el encuadre para evaluar todas las partes del movimiento antes de valorar la técnica.";
+  }
+  if (porcentajeCorrectas >= 90) {
     return "Mantén una ejecución controlada e intenta repetir este nivel de técnica en la próxima sesión.";
   }
 
@@ -287,7 +287,7 @@ function ResultadoSesion(
 
         {!props.hayHistorial ? (
           <p className="analysis-empty-message">
-            Completa una repetición para empezar a generar el historial.
+            Completa un ciclo de movimiento para empezar a generar el historial.
           </p>
         ) : (
           <div className="analysis-history">
